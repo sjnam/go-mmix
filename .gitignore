@@ -1,0 +1,21 @@
+# weave/조판 생성물
+*.tex
+*.idx
+*.scn
+*.toc
+*.log
+*.dvi
+*.pdf
+
+# go build로 만든 실행 파일. 디렉터리 이름과 같으므로 경로를 고정한다.
+/mmixal/mmixal
+/mmixsim/mmixsim
+/mmotype/mmotype
+/mmmix/mmmix
+/abstime/abstime
+/bin/
+
+# examples/에서 예제를 돌리면 생기는 파일
+/examples/*.mmo
+/examples/*.lst
+/examples/*.mmb
