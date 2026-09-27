@@ -47,7 +47,8 @@ test:
 # luatex은 nonstopmode라야 오류가 나도 멈추지 않고 .log에 다 남긴다.
 # 조판 경고(Overfull, Underfull, Error, Missing, Undefined)는 0이어야 한다.
 doc:
-	@! grep -nP '\\[A-Za-z]+\\\p{Hangul}' */*.w || \
+	@perl -CSD -ne 'if (/\\[A-Za-z]+\\\p{Hangul}/) { print "$$ARGV:$$.: $$_"; $$bad=1 } \
+	  close ARGV if eof; END { exit $$bad }' */*.w || \
 	  (echo '위 줄: \\MMIX\\의 꼴은 \\의가 제어 순서가 된다. \\MMIX의로 쓸 것'; false)
 	@for d in $(DOCS); do \
 	  p=$${d%/*}; w=$${d#*/}; \
