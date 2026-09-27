@@ -6,6 +6,10 @@ were found while translating MMIXware into a Korean literate program in Go
 running the same inputs and comparing the outputs byte for byte. That
 comparison exposed several odd behaviors on the C side.
 
+I should acknowledge that a substantial part of the work of translating
+MMIXware into Korean GWEB was done with the help of Claude Code. This includes
+the in-depth, detailed testing.
+
 Each entry below gives the location, the symptom, a minimal way to reproduce
 it, and a proposed patch in the change-file format. All patches were applied
 to a copy of the sources and checked:
