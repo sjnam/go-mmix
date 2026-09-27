@@ -14,7 +14,7 @@
 \input kotexgweb
 \def\title{MMIXAL}
 
-@* \MMIXAL의 정의. 이 프로그램은 \MMIX의 어셈블리 언어인 \MMIXAL로 쓴 입력을
+@* MMIXAL의 정의. 이 프로그램은 \MMIX의 어셈블리 언어인 \MMIXAL로 쓴 입력을
 받아서, \MMIX\ 시뮬레이터에 적재해 실행할 수 있는 이진 파일로 번역한다.
 @^assembly language@>
 \MMIXAL은 컴퓨터 제조사들이 흔히 내놓는 ``산업용'' 어셈블리 언어보다 훨씬

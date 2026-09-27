@@ -47,9 +47,9 @@ import (
 @<표@>
 @<함수들@>
 
-@ 원본은 옛 \CEE/와 맞추려고 |ARGS| 매크로와 |FILENAME_MAX|, |SEEK_SET|, |SEEK_END|의
+@ 원본은 옛 \CEE/와 맞추려고 \.{ARGS} 매크로와 \.{FILENAME\_MAX}, \.{SEEK\_SET}, \.{SEEK\_END}의
 대용 정의를 두었다. \GO/에서는 필요 없다. 다만 파일 이름의 최대 길이는 \.{mmixal}에서처럼
-원본과 비교 시험을 한 macOS의 |FILENAME_MAX| 값 1024를 쓴다.
+원본과 비교 시험을 한 macOS의 \.{FILENAME\_MAX} 값 1024를 쓴다.
 
 부호 없는 32비트 타입 \&{tetra}는 시뮬레이터의 정의와 맞아야 했다. 여기서는 \.{mmixarith}의
 정의를 그대로 쓴다.
