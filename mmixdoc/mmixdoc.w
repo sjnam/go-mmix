@@ -6,6 +6,8 @@
 \input luamplib.sty
 \def\title{MMIX}
 
+\font\logo=logo10
+
 \def\NNIX{\hbox{\mc NNIX}}
 \def\beginword{\vcenter\bgroup\let\\=\wordrule\halign\bgroup&\hfil##\hfil\cr}
 \def\endword{\noalign{\vskip\baselineskip}\egroup\egroup
@@ -58,7 +60,7 @@
 
 보충: 이 문서는 크누스의 \.{mmix-doc.w}를 옮긴 것이다. 원본처럼 코드는 없고 \MMIX\ 기계의
 정의만 담았다. 원본은 그림 하나를 따로 그린 \.{mmix.1} 파일로 넣었는데, 여기서는 그 그림을
-조판하는 동안 MetaPost로 바로 그린다. 이 문서의 절 번호는 원본의 절 번호와 같다. 다른 모듈의
+조판하는 동안 {\logo METAPOST}로 바로 그린다. 이 문서의 절 번호는 원본의 절 번호와 같다. 다른 모듈의
 문서가 ``\.{mmix-doc}의 몇 절''이라고 가리키면 이 문서의 같은 절을 보면 된다.
 
 @ 원래의 \.{MIX} 컴퓨터는 운영체제 없이 돌릴 수 있었다. 천공 카드나 종이 테이프로 부트스트랩해서
