@@ -16,6 +16,7 @@
 @s mmixarith.Round int
 @s mmixio.Simulator int
 @s testing.T int
+@s FILE int
 
 \input kotexgweb
 \def\title{MMIXSIM}
@@ -3547,7 +3548,11 @@ case '!':
 type fmtStyle int
 @#
 const (
-	decimal fmtStyle = iota; hex; zhex; floating; handle
+	decimal  fmtStyle = 0
+        hex      fmtStyle = 1
+        zhex     fmtStyle = 2
+        floating fmtStyle = 3
+        handle   fmtStyle = 4
 )
 
 @ @<서식 문자의 경우들@>=
