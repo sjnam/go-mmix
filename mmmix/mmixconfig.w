@@ -312,7 +312,7 @@ func (cf *configReader) configPanic(format string, a ...any) {
 
 보충: 설정 파일을 읽는 동안에만 쓰는 원본의 전역 변수들은 구조체 |configReader|의 필드다.
 원본의 |get_token|에 있던 정적 변수 |buffer|와 |buf_pointer|도 호출 사이에 값을 지켜야 하므로
-필드다. 설정 파일은 \.{mmmix.w}에서 정의하는 타입 \&{cfile}로 읽는데, \CEE/의 |fgets|를 흉내 낸다.
+필드다. 설정 파일은 \.{mmmix.w}에서 정의하는 타입 \KW{cfile}로 읽는데, \CEE/의 |fgets|를 흉내 낸다.
 
 @<상수@>=
 const configBufSize = 100 // 긴 줄은 필요 없다
@@ -481,7 +481,7 @@ pv := []pvSpec{
 	{"memchunksmax", &mx.memChunksMax, 1000, 1, intMax, false},
 	{"hashprime", &mx.hashPrime, 2003, 2, intMax, false}}
 
-@ 원본의 |INT_MAX|는 32비트 |int|의 가장 큰 값이다.
+@ 원본의 \.{INT\_MAX}는 32비트 |int|의 가장 큰 값이다.
 
 @<상수@>=
 const intMax = 1<<31 - 1
@@ -510,7 +510,7 @@ var opTable = []opSpec{
 	{"fint", fint, 4}, {"fix", fix, 2}, {"flot", flot, 2},
 	{"feps", feps, 4}}
 
-@ 루틴 |newCache|는 기본값을 가진 \&{cache} 구조체를 만든다. (이 기본값들은 \CPV\ 표에서 읽지
+@ 루틴 |newCache|는 기본값을 가진 \KW{cache} 구조체를 만든다. (이 기본값들은 \CPV\ 표에서 읽지
 않고 프로그램에 ``박혀'' 있다.)
 
 보충: 원본은 메모리를 할당할 수 없으면 공황 메시지를 냈다. \GO/에서는 할당이 실패하지 않으므로
@@ -578,7 +578,7 @@ mx.funit[mx.funitCount].ops[7] = 0x1        // \.{TRIP}
 
 덧붙여, 명세를 뜻 있는 방식으로 줄마다 나눌 필요는 없다. 그냥 토큰 하나씩 읽는다.
 
-보충: 원본의 |rewind|는 파일의 처음으로 돌아가고 파일 끝 표시를 지운다. 여기서는 \&{cfile}의
+보충: 원본의 |rewind|는 파일의 처음으로 돌아가고 파일 끝 표시를 지운다. 여기서는 \KW{cfile}의
 필드를 직접 되돌린다. 루틴 |getToken|의 버퍼는 그대로 남는다.
 
 @<모든 명세를 기록한다@>=

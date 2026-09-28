@@ -575,14 +575,14 @@ ReadErr  GETA t,1F              readerr: fputs("Trouble r...!",stderr)\cr
 
 @ 이 64비트 \MMIX\ 아키텍처용 프로그램은 32비트 정수 산술에 바탕을 두고 있다. 1999년에 이
 글을 쓸 무렵 크누스가 쓸 수 있던 컴퓨터가 거의 다 그런 제약을 받았기 때문이다. 이
-프로그램은 {\mc MMIX-ARITH} 모듈의 서브루틴을 쓰는데, 타입 \&{tetra}가 부호 없는 32비트
-정수를 나타낸다는 것만 가정한다. 여기서 준 \&{tetra}의 정의는, 필요하다면 그 모듈의
+프로그램은 {\mc MMIX-ARITH} 모듈의 서브루틴을 쓰는데, 타입 \KW{tetra}가 부호 없는 32비트
+정수를 나타낸다는 것만 가정한다. 여기서 준 \KW{tetra}의 정의는, 필요하다면 그 모듈의
 정의와 맞도록 고쳐야 한다.
 @^system dependencies@>
 
 보충: 옮긴이는 \.{mmixarith}에서처럼 옥타바이트를 두 테트라의 구조체가 아니라 64비트
 부호 없는 정수로 나타냈다. 정의는 \.{mmixarith}의 것을 그대로 쓴다. 원본은 서브루틴을 새
-컴파일러에서도 옛 컴파일러에서도 선언하려고 |ARGS| 매크로를 두었는데, \GO/에서는 필요
+컴파일러에서도 옛 컴파일러에서도 선언하려고 \.{ARGS} 매크로를 두었는데, \GO/에서는 필요
 없다.
 
 @<타입 정의@>=
@@ -637,7 +637,7 @@ const (
 	negOne  = mmixarith.NegOne  // $-1$
 )
 
-@ 원본은 여기서 산술이 제대로 되는지 빨리 검사해 보았다. 타입 \&{tetra}를 잘못
+@ 원본은 여기서 산술이 제대로 되는지 빨리 검사해 보았다. 타입 \KW{tetra}를 잘못
 정의했다면 |shift_left(neg_one,1)|의 윗 테트라가 \Hex{ffffffff}가 아닐 것이다. \GO/에서는
 타입이 크기를 보장하므로 이 검사를 뺐다. 그러나 그 검사가 쓰던 |panic| 매크로는 다른
 곳에서도 쓰므로 메서드로 남긴다.
@@ -1134,7 +1134,7 @@ m.g[255] = 0x6000000000000000 + Octa(4*k) + 12*8 // 여기서부터 \.{UNSAVE}�
 참조가 들어 있다. 그래서 명령마다 그 문맥을 알 수 있다. 이 프로그램의 다음 절들은 그런
 정보를 원할 때 쓸 수 있게 해 준다.
 
-원시 파일의 데이터는 \&{fileNode} 구조체에 둔다.
+원시 파일의 데이터는 \KW{fileNode} 구조체에 둔다.
 
 @<타입 정의@>=
 type fileNode struct {
@@ -1144,7 +1144,7 @@ type fileNode struct {
 }
 
 @ 원시 파일이 유니코드로 된 날을 조금이나마 대비해서, 원시 파일의 문자를 나타내는 타입
-\&{Char}를 정의한다.
+\KW{Char}를 정의한다.
 
 @<타입 정의@>=
 type Char = byte // 언젠가 와이드가 될 바이트들
@@ -1221,7 +1221,7 @@ if st, err := os.Stat(string(m.fileInfo[m.curFile].name)); err == nil {
 
 보충: 원본의 \.{"line \%.6s \%s"}는 \.{"\%d:\ \ \ \ "}로 만든 문자열의 처음 여섯 문자를
 찍는다. 줄 번호가 다섯 자리를 넘지 않으므로 뒤의 빈칸만 잘린다. 원본은 |fseek|에
-|SEEK_SET|을 썼고, 옛 라이브러리를 위해 그 값을 대신 정의해 두었다.
+\.{SEEK\_SET}을 썼고, 옛 라이브러리를 위해 그 값을 대신 정의해 두었다.
 
 @<함수들@>=
 func (m *simulator) printLine(k int) {
@@ -1298,8 +1298,8 @@ profileShowingSource bool   // 마지막 빈도수를 찍을 때의 |showingSour
 @ @<시뮬레이터의 초깃값@>=
 shownFile: -1,
 
-@ 보충: 원본은 처음에는 |fopen|으로 열고, 그 뒤로는 |freopen|으로 같은 |FILE|을 다시 열었다.
-그런데 |freopen|의 결과를 버렸으므로, 다시 열기에 실패하면 |src_file|은 닫힌 |FILE|을
+@ 보충: 원본은 처음에는 |fopen|으로 열고, 그 뒤로는 |freopen|으로 같은 \KW{FILE}을 다시 열었다.
+그런데 |freopen|의 결과를 버렸으므로, 다시 열기에 실패하면 |src_file|은 닫힌 \KW{FILE}을
 가리킨 채 남는다. 그러면 파일 이름만 찍히고, 그 뒤의 읽기는 모두 실패해서 줄이 하나도
 보이지 않는다. 여기서도 다시 열기에 실패하면 닫힌 파일을 그대로 두어 이것을 흉내 낸다. 원시
 줄 지도를 만드는 일은 한 곳에서만 하므로 원본의 |make_map|을 절로 두었다.
@@ -1586,7 +1586,7 @@ if ll[0].bkpt&execBit != 0 {
 m.tracing = m.breakpoint || ll[0].bkpt&traceBit != 0 || ll[0].freq <= m.traceThreshold
 m.instPtr += 4
 
-@ 시뮬레이션의 많은 부분은 표로 움직인다. 연산 코드마다 \&{opInfo}라는 정적 데이터
+@ 시뮬레이션의 많은 부분은 표로 움직인다. 연산 코드마다 \KW{opInfo}라는 정적 데이터
 구조가 있다.
 
 @<타입 정의@>=
@@ -2724,8 +2724,8 @@ for j = int(z); j < G; j++ {
 }
 G = int(z)
 
-@ 원본은 여기서 반올림 방식의 번호 |ROUND_OFF|~(1), |ROUND_UP|~(2), |ROUND_DOWN|~(3),
-|ROUND_NEAR|~(4)를 정의했다. 옮긴 \.{mmixarith}에는 |RoundOff|부터 |RoundNear|까지가 같은
+@ 원본은 여기서 반올림 방식의 번호 \.{ROUND\_OFF}~(1), \.{ROUND\_UP}~(2), \.{ROUND\_DOWN}~(3),
+\.{ROUND\_NEAR}~(4)를 정의했다. 옮긴 \.{mmixarith}에는 |RoundOff|부터 |RoundNear|까지가 같은
 값으로 정의되어 있다.
 
 @<rA를 고칠 준비를 한다@>=
@@ -3256,7 +3256,7 @@ stdinBufStart int       // 그 버퍼에서의 현재 위치
 stdinBufEnd   int       // 그 버퍼의 현재 끝
 
 @ 명령을 하나 실행할 때마다 바로 뒤에 다음 일을 한다. 정확하고 허용되지 않은 아래넘침은
-무시한다. (이것은 |RESUME_SET|이 일으킨 아래넘침에도 적용된다.)
+무시한다. (이것은 \.{RESUME\_SET}이 일으킨 아래넘침에도 적용된다.)
 
 보충: 레지스터 rA의 아래 여덟 비트가 사건 비트이고, 그다음 여덟 비트가 허용 비트다. 변수 |exc|의 비트들은
 허용 비트와 같은 자리에 있다. 그래서 |exc|의 비트 가운데 rA의 허용 비트나 |hBit|와 겹치는 것이 허용된
@@ -3314,8 +3314,8 @@ case RESUME:
 @ 여기서는 ropcode의 제약이 지켜지는지 확인한다. 지켜진다면 ropcode는 다음 가져오기
 단계에서 실제로 수행된다.
 
-보충: 원본에서는 |RESUME_CONT|가 |RESUME_SET|으로, |RESUME_SET|이 |RESUME_AGAIN|으로
-흘러내렸다. \GO/의 |fallthrough|가 같은 일을 한다. ropcode |RESUME_CONT|에서 금지되는 것은 rX에
+보충: 원본에서는 \.{RESUME\_CONT}가 \.{RESUME\_SET}으로, \.{RESUME\_SET}이 \.{RESUME\_AGAIN}으로
+흘러내렸다. \GO/의 |fallthrough|가 같은 일을 한다. ropcode \.{RESUME\_CONT}에서 금지되는 것은 rX에
 든 명령의 연산 코드의 윗 네 비트가 4, 5, 8, 9, 10, 11, 15인 경우, 곧 분기, 적재와 저장,
 그리고 \.{JMP}부터 \.{TRIP}까지다.
 

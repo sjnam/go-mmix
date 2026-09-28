@@ -1,4 +1,4 @@
-//line mmotype.w:32
+//line mmotype.w:34
 package main
 
 import (
@@ -10,10 +10,10 @@ import (
 	"time"
 )
 
-//line mmotype.w:86
+//line mmotype.w:88
 type typer struct {
 
-//line mmotype.w:124
+//line mmotype.w:126
 	listing bool           // 모든 것을 나열하는가?
 	verbose bool           // 입력의 테트라들도 읽는 대로 보여 주는가?
 	mmoFile *bufio.Reader  // 입력 파일
@@ -21,14 +21,14 @@ type typer struct {
 	stderr  io.Writer      // 표준 오류
 	loc     *time.Location // 파일을 만든 시각을 찍을 시간대
 
-//line mmotype.w:202
+//line mmotype.w:204
 	count     int     // 지금까지 읽은 테트라바이트의 수
 	byteCount int     // 다음에 읽을 바이트의 색인
 	buf       [4]byte // 가장 최근에 읽은 바이트들
 	yz        int     // 가장 낮은 두 바이트
 	tet       Tetra   // |buf|의 바이트들을 큰 끝 방식으로 묶은 것
 
-//line mmotype.w:292
+//line mmotype.w:294
 	curLoc     Octa        // 현재 위치
 	listedFile int         // 가장 최근에 나열한 파일 번호
 	curFile    int         // 가장 최근에 고른 파일 번호
@@ -37,22 +37,22 @@ type typer struct {
 	fileNamed  [256]bool   // 그 번호의 파일 이름을 보았는가?
 	tmp        Octa        // 잠깐 관심 있는 옥타바이트
 
-//line mmotype.w:682
+//line mmotype.w:684
 	stabStart int    // 기호표가 시작한 곳
 	symBuf    []byte // 현재 마디로 오는 가운데 가지들의 문자들
 
-//line mmotype.w:88
+//line mmotype.w:90
 }
 
 type exitSignal int // 이 종료 코드로 프로그램을 끝내라는 신호
 
-//line mmotype.w:160
+//line mmotype.w:162
 type (
 	Tetra = uint32 // 테트라바이트
 	Octa  = uint64 // 옥타바이트
 )
 
-//line mmotype.w:135
+//line mmotype.w:137
 const (
 	mm       = 0x98 // \.{mmo} 형식의 탈출 코드
 	lopQuote = 0x0  // 인용 lopcode
@@ -70,10 +70,10 @@ const (
 	lopEnd   = 0xc  // 모든 것을 끝내는 lopcode
 )
 
-//line mmotype.w:679
+//line mmotype.w:681
 const symLengthMax = 1000
 
-//line mmotype.w:175
+//line mmotype.w:177
 func (t *typer) readTet() {
 	if _, err := io.ReadFull(t.mmoFile, t.buf[:]); err != nil {
 		fmt.Fprintf(t.stderr, "Unexpected end of file after %d tetras!\n", t.count)
@@ -88,7 +88,7 @@ func (t *typer) readTet() {
 	t.count++
 }
 
-//line mmotype.w:192
+//line mmotype.w:194
 func (t *typer) readByte() byte {
 	if t.byteCount == 0 {
 		t.readTet()
@@ -98,17 +98,17 @@ func (t *typer) readByte() byte {
 	return b
 }
 
-//line mmotype.w:247
+//line mmotype.w:249
 func (t *typer) err(m string) {
 	fmt.Fprintf(t.stderr, "Error in tetra %d: %s!\n", t.count, m)
 
 }
 
-//line mmotype.w:309
+//line mmotype.w:311
 func (t *typer) y() int { return int(t.buf[2]) } // 둘째로 낮은 바이트
 func (t *typer) z() int { return int(t.buf[3]) } // 가장 낮은 바이트
 
-//line mmotype.w:593
+//line mmotype.w:595
 func (t *typer) printStab() {
 	m := int(t.readByte()) // 주 조절 바이트
 	if m&0x40 != 0 {
@@ -116,7 +116,7 @@ func (t *typer) printStab() {
 	}
 	if m&0x2f != 0 {
 
-//line mmotype.w:626
+//line mmotype.w:628
 		var hi byte
 		if m&0x80 != 0 {
 			hi = t.readByte() // 16비트 문자
@@ -126,7 +126,7 @@ func (t *typer) printStab() {
 			c = '?' // 아이고, |(hi<<8)+c|는 지금으로서는 쉽게 찍을 수 없다
 		}
 
-//line mmotype.w:600
+//line mmotype.w:602
 		t.symBuf = append(t.symBuf, c)
 		if len(t.symBuf) == symLengthMax {
 			fmt.Fprintf(t.stderr, "Oops, the symbol is too long!\n")
@@ -135,7 +135,7 @@ func (t *typer) printStab() {
 		}
 		if m&0xf != 0 {
 
-//line mmotype.w:647
+//line mmotype.w:649
 			var equiv string
 			j := m & 0xf
 			switch {
@@ -167,7 +167,7 @@ func (t *typer) printStab() {
 			}
 			fmt.Fprintf(t.out, "    %s = %s (%d)\n", sym, equiv, serial-128) // 일련번호는 $|serial|-128$
 
-//line mmotype.w:608
+//line mmotype.w:610
 		}
 		if m&0x20 != 0 {
 			t.printStab() // 가운데 부분 트라이를 순회한다
@@ -179,14 +179,14 @@ func (t *typer) printStab() {
 	}
 }
 
-//line mmotype.w:47
+//line mmotype.w:49
 func mmotype(args []string, stdout, stderr io.Writer, loc *time.Location) (code int) {
 	var j, delta int
 	postamble := false
 	t := &typer{out: bufio.NewWriter(stdout), stderr: stderr, loc: loc}
 	defer func() {
 
-//line mmotype.w:73
+//line mmotype.w:75
 		t.out.Flush()
 		if r := recover(); r != nil {
 			e, ok := r.(exitSignal)
@@ -196,10 +196,10 @@ func mmotype(args []string, stdout, stderr io.Writer, loc *time.Location) (code 
 			code = int(e)
 		}
 
-//line mmotype.w:53
+//line mmotype.w:55
 	}()
 
-//line mmotype.w:95
+//line mmotype.w:97
 	t.listing, t.verbose = true, false
 options:
 	for j = 1; j < len(args)-1 && len(args[j]) == 2 && args[j][0] == '-'; j++ {
@@ -218,9 +218,9 @@ options:
 		return -1
 	}
 
-//line mmotype.w:55
+//line mmotype.w:57
 
-//line mmotype.w:114
+//line mmotype.w:116
 	f, err := os.Open(args[len(args)-1])
 	if err != nil {
 		fmt.Fprintf(stderr, "Can't open file %s!\n", args[len(args)-1])
@@ -230,12 +230,12 @@ options:
 	defer f.Close()
 	t.mmoFile = bufio.NewReader(f)
 
-//line mmotype.w:301
+//line mmotype.w:303
 	t.listedFile, t.curFile = -1, -1
 
-//line mmotype.w:56
+//line mmotype.w:58
 
-//line mmotype.w:521
+//line mmotype.w:523
 	t.readTet() // 입력의 첫 테트라바이트를 읽는다
 	if t.buf[0] != mm || t.buf[1] != lopPre {
 		fmt.Fprintf(stderr, "Input is not an MMO file (first two bytes are wrong)!\n")
@@ -261,11 +261,11 @@ options:
 		}
 	}
 
-//line mmotype.w:57
+//line mmotype.w:59
 items:
 	for !postamble {
 
-//line mmotype.w:217
+//line mmotype.w:219
 		t.readTet()
 	loop:
 		for {
@@ -279,7 +279,7 @@ items:
 					}
 					t.readTet()
 
-//line mmotype.w:317
+//line mmotype.w:319
 				case lopLoc:
 					if t.z() == 2 {
 						j = t.y()
@@ -299,7 +299,7 @@ items:
 					t.curLoc += Octa(t.yz)
 					continue items
 
-//line mmotype.w:345
+//line mmotype.w:347
 				case lopFixo:
 					if t.z() == 2 {
 						j = t.y()
@@ -321,7 +321,7 @@ items:
 				case lopFixr:
 					delta = t.yz
 
-//line mmotype.w:390
+//line mmotype.w:392
 					if delta >= 0x1000000 {
 						t.tmp = t.curLoc + Octa(int64(-((delta&0xffffff)-(1<<j))<<2))
 					} else {
@@ -331,10 +331,10 @@ items:
 						fmt.Fprintf(t.out, "%016x: %08x\n", t.tmp, Tetra(delta))
 					}
 
-//line mmotype.w:366
+//line mmotype.w:368
 					continue items
 
-//line mmotype.w:369
+//line mmotype.w:371
 				case lopFixrx:
 					j = t.yz
 					if j != 16 && j != 24 {
@@ -350,7 +350,7 @@ items:
 						continue items
 					}
 
-//line mmotype.w:390
+//line mmotype.w:392
 					if delta >= 0x1000000 {
 						t.tmp = t.curLoc + Octa(int64(-((delta&0xffffff)-(1<<j))<<2))
 					} else {
@@ -360,10 +360,10 @@ items:
 						fmt.Fprintf(t.out, "%016x: %08x\n", t.tmp, Tetra(delta))
 					}
 
-//line mmotype.w:384
+//line mmotype.w:386
 					continue items
 
-//line mmotype.w:409
+//line mmotype.w:411
 				case lopFile:
 					if t.fileNamed[t.y()] {
 						for j = t.z(); j > 0; j-- {
@@ -382,7 +382,7 @@ items:
 							continue items
 						}
 
-//line mmotype.w:444
+//line mmotype.w:446
 						y := t.y()
 						t.curFile = y
 						var name []byte
@@ -398,7 +398,7 @@ items:
 						}
 						t.fileName[y], t.fileNamed[y] = string(name), true
 
-//line mmotype.w:427
+//line mmotype.w:429
 					}
 					t.curLine = 0
 					continue items
@@ -411,7 +411,7 @@ items:
 					t.curLine = t.yz
 					continue items
 
-//line mmotype.w:464
+//line mmotype.w:466
 				case lopSpec:
 					if t.listing {
 						fmt.Fprintf(t.out, "Special data %d at loc %016x", t.yz, t.curLoc)
@@ -419,7 +419,7 @@ items:
 							fmt.Fprintf(t.out, "\n")
 						} else {
 
-//line mmotype.w:277
+//line mmotype.w:279
 							if t.curFile == t.listedFile {
 								fmt.Fprintf(t.out, " (line %d)\n", t.curLine)
 							} else {
@@ -431,7 +431,7 @@ items:
 								t.listedFile = t.curFile
 							}
 
-//line mmotype.w:471
+//line mmotype.w:473
 						}
 					}
 					for {
@@ -447,7 +447,7 @@ items:
 						}
 					}
 
-//line mmotype.w:490
+//line mmotype.w:492
 				case lopPre:
 					t.err("Can't have another preamble")
 
@@ -472,7 +472,7 @@ items:
 					t.err("Symbol table can't end before it begins")
 					continue items
 
-//line mmotype.w:230
+//line mmotype.w:232
 				default:
 					t.err("Unknown lopcode")
 
@@ -483,7 +483,7 @@ items:
 		}
 		if t.listing {
 
-//line mmotype.w:257
+//line mmotype.w:259
 			fmt.Fprintf(t.out, "%016x: %08x", t.curLoc, t.tet)
 			if t.curLine == 0 {
 				fmt.Fprintf(t.out, "\n")
@@ -492,7 +492,7 @@ items:
 					fmt.Fprintf(t.out, "\n")
 				} else {
 
-//line mmotype.w:277
+//line mmotype.w:279
 					if t.curFile == t.listedFile {
 						fmt.Fprintf(t.out, " (line %d)\n", t.curLine)
 					} else {
@@ -504,19 +504,19 @@ items:
 						t.listedFile = t.curFile
 					}
 
-//line mmotype.w:265
+//line mmotype.w:267
 				}
 				t.curLine++
 			}
 			t.curLoc = (t.curLoc + 4) &^ 3
 
-//line mmotype.w:240
+//line mmotype.w:242
 		}
 
-//line mmotype.w:60
+//line mmotype.w:62
 	}
 
-//line mmotype.w:550
+//line mmotype.w:552
 	for j = t.z(); j < 256; j++ {
 		t.readTet()
 		t.tmp = Octa(t.tet) << 32
@@ -530,9 +530,9 @@ items:
 		}
 	}
 
-//line mmotype.w:62
+//line mmotype.w:64
 
-//line mmotype.w:567
+//line mmotype.w:569
 	t.readTet()
 	if t.buf[0] != mm || t.buf[1] != lopStab {
 		fmt.Fprintf(stderr, "Symbol table does not follow the postamble!\n")
@@ -548,7 +548,7 @@ items:
 	t.symBuf = t.symBuf[:0]
 	t.printStab()
 
-//line mmotype.w:694
+//line mmotype.w:696
 	for t.byteCount != 0 {
 		if t.readByte() != 0 {
 			fmt.Fprintf(stderr, "Nonzero byte follows the symbol table!\n")
@@ -573,7 +573,7 @@ items:
 		}
 	}
 
-//line mmotype.w:63
+//line mmotype.w:65
 	return 0
 }
 

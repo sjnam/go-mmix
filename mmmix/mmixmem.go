@@ -1,10 +1,9 @@
 //line mmixmem.w:29
 package main
 
-//line mmixmem.w:35
 var kind = [4]string{"byte", "wyde", "tetra", "octa"}
 
-//line mmixmem.w:44
+//line mmixmem.w:41
 func (mx *machine) specRead(addr Octa, size int) Octa {
 	var val Octa
 	size &= 0x3
@@ -25,7 +24,7 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 	if mx.verbose&showSpecBit != 0 {
 		mx.printf("   (spec_read ")
 
-//line mmixmem.w:70
+//line mmixmem.w:67
 		switch size {
 		case 0:
 			mx.printf("%02x", Tetra(val))
@@ -37,13 +36,13 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 			mx.printf("%016x", val)
 		}
 
-//line mmixmem.w:64
+//line mmixmem.w:61
 		mx.printf(" from %016x at time %d)\n", addr, int32(Tetra(mx.ticks)))
 	}
 	return val << ((8 - (1 << size) - int(addr&7)) << 3)
 }
 
-//line mmixmem.w:84
+//line mmixmem.w:81
 func (mx *machine) specWrite(addr, val Octa, size int) {
 	if mx.verbose&showSpecBit != 0 {
 		size &= 0x3
@@ -51,7 +50,7 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 		val >>= (8 - (1 << size) - int(addr&7)) << 3
 		mx.printf("   (spec_write ")
 
-//line mmixmem.w:70
+//line mmixmem.w:67
 		switch size {
 		case 0:
 			mx.printf("%02x", Tetra(val))
@@ -63,7 +62,7 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 			mx.printf("%016x", val)
 		}
 
-//line mmixmem.w:91
+//line mmixmem.w:88
 		mx.printf(" to %016x at time %d)\n", addr, int32(Tetra(mx.ticks)))
 	}
 }

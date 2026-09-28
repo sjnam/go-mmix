@@ -8,6 +8,8 @@
 @s bytes.Buffer int
 @s time.Location int
 @s testing.T int
+@s do int
+@s while int
 
 \input kotexgweb
 \def\title{MMOTYPE}
@@ -154,7 +156,7 @@ const (
 
 보충: 이 프로그램은 원본에서도 {\mc MMIX-ARITH}를 쓰지 않는 독립된 프로그램이었다. 그래서
 여기서도 \.{mmixarith} 꾸러미를 가져오지 않고 타입 이름만 같게 정의한다. \GO/의 |byte|는
-원본의 \&{byte}와 같은 부호 없는 한 바이트이므로 따로 정의할 필요가 없다.
+원본의 \KW{byte}와 같은 부호 없는 한 바이트이므로 따로 정의할 필요가 없다.
 
 @<타입 정의@>=
 type (

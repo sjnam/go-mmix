@@ -41,7 +41,7 @@ type specnode struct {
 	known    bool
 	addr     Octa
 	up, down *specnode
-	ctl      *control // 이 \&{specnode}를 담은 제어 블록
+	ctl      *control // 이 \KW{specnode}를 담은 제어 블록
 }
 
 //line mmixpipe.w:610
@@ -101,10 +101,10 @@ type label int
 type replacePolicy int
 
 const (
-	random replacePolicy = iota
-	serial
-	pseudoLRU
-	lru
+	random    replacePolicy = 0
+	serial    replacePolicy = 1
+	pseudoLRU replacePolicy = 2
+	lru       replacePolicy = 3
 
 //line mmixpipe.w:3436
 )
@@ -208,7 +208,7 @@ type machine struct {
 	oldTail            *fetch  // 현재 사이클에 볼 수 있는 가져오기 버퍼의 뒤
 
 //line mmixpipe.w:1386
-	unknownSpec specnode // 원본의 |UNKNOWN_SPEC|이 가리키는 곳
+	unknownSpec specnode // 원본의 \.{UNKNOWN\_SPEC}이 가리키는 곳
 
 //line mmixpipe.w:1529
 	funit      []funcUnit // 기능 장치들의 배열
@@ -316,7 +316,7 @@ type machine struct {
 	writeCtl control   // 그 제어 블록
 
 //line mmixpipe.w:5039
-	dunno Octa // 원본의 |DUNNO|가 가리키는 곳
+	dunno Octa // 원본의 \.{DUNNO}가 가리키는 곳
 
 //line mmixpipe.w:6075
 	instPtr spec   // 명령 포인터(프로그램 계수기라고도 한다)

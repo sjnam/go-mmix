@@ -28,11 +28,8 @@
 @c
 package main
 
-@<표@>
-@<함수들@>
-
-@ @<표@>=
 var kind = [4]string{"byte", "wyde", "tetra", "octa"}
+@<함수들@>
 
 @ 진단 제어 |verbose|의 |interactiveReadBit|가 켜져 있으면 사용자가 값을 그때그때 공급해야 한다.
 그렇지 않으면 0을 읽는다.
