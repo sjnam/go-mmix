@@ -3429,10 +3429,10 @@ $r_{10}\gets0$, $r_{101}\gets1$이 된다. 여기서 $r_{101}$은 $r_5$와 같�
 type replacePolicy int
 @#
 const (
-	random    replacePolicy = 0
-	serial    replacePolicy = 1
-	pseudoLRU replacePolicy = 2
-	lru       replacePolicy = 3
+	random    replacePolicy = iota
+	serial
+	pseudoLRU
+	lru
 )
 
 @ 캐시에는 ``희생자'' 영역이 있을 수도 있다. 여기에는 주 캐시 영역에서 빼낸 마지막 $2^v$개의

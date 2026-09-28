@@ -432,7 +432,7 @@ func (s *stream) fprintf(format string, a ...any) {
 	if s.bad && s.unbuffered {
 		return
 	}
-	s.write([]byte(fmt.Sprintf(format, a...)))
+	s.write(fmt.Appendf(nil, format, a...))
 }
 
 //line mmixio.w:571

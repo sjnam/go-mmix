@@ -101,10 +101,10 @@ type label int
 type replacePolicy int
 
 const (
-	random    replacePolicy = 0
-	serial    replacePolicy = 1
-	pseudoLRU replacePolicy = 2
-	lru       replacePolicy = 3
+	random replacePolicy = iota
+	serial
+	pseudoLRU
+	lru
 
 //line mmixpipe.w:3436
 )

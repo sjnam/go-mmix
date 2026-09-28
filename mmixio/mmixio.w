@@ -156,7 +156,7 @@ func (x *IO) abort(handle byte) Octa {
 두었다. \GO/에서는 그에 해당하는 |os.OpenFile|의 플래그를 표로 둔다. \.{"w"}와 \.{"w+b"}는
 파일을 만들거나 길이를 0으로 줄인다. {\mc POSIX} 시스템에서는 텍스트 방식과 이진 방식이
 다르지 않다.
-
+@d os.O_RDONLY os.O_WRONLY os.O_CREATE os.O_TRUNC os.O_RDWR
 @<표@>=
 var modeFlags = [5]int{
 	os.O_RDONLY,                        // \.{"r"}
@@ -559,7 +559,7 @@ func (s *stream) fprintf(format string, a ...any) {
 	if s.bad && s.unbuffered {
 		return
 	}
-	s.write([]byte(fmt.Sprintf(format, a...)))
+	s.write(fmt.Appendf(nil, format, a...))
 }
 
 @ 보충: 시뮬레이터 자신도 경고와 오류 알림을 |stderr|에 |fprintf|로 찍는다. 원본에서는 그것이

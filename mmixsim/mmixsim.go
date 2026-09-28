@@ -155,11 +155,11 @@ type opInfo struct {
 type fmtStyle int
 
 const (
-	decimal  fmtStyle = 0
-	hex      fmtStyle = 1
-	zhex     fmtStyle = 2
-	floating fmtStyle = 3
-	handle   fmtStyle = 4
+	decimal fmtStyle = iota
+	hex
+	zhex
+	floating
+	handle
 
 //line mmixsim.w:3556
 )
