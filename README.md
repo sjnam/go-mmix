@@ -1,5 +1,3 @@
-# MMIXware 한글 GWEB(Go) 판
-
 <p align="center"><img src="mmix-logo.svg" alt="MMIX" width="500"></p><!-- markdownlint-disable-line MD033 -->
 
 도널드 크누스(Donald E. Knuth)의 **MMIXware**를 한글 문학적 프로그램(GWEB)과 Go로 옮긴 저장소다.
