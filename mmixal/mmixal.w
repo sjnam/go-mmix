@@ -283,7 +283,7 @@ $$\vbox{\halign{$#$\hfil\cr
 }}$$
 
 연산 코드 필드에는 (\.{ADD} 같은) 기호로 된 \MMIX\ 연산 이름, 또는 {\it 별칭 연산\/}
-(alias operation), 또는 {\it 유사 연산\/}(pseudo-operation)이 들어 있다. 별칭 연산은
+({\it alias operation\/}), 또는 {\it 유사 연산\/}({\it pseudo-operation\/})이 들어 있다. 별칭 연산은
 표준 이름이 어떤 맥락에서 어울리지 않는 \MMIX\ 연산들의 다른 이름이다. 유사 연산은
 \MMIX\ 명령에 곧바로 대응하지는 않지만, 어셈블 과정을 중요한 방식으로 이끈다.
 
@@ -728,7 +728,7 @@ $\delta$를 {\it 음수\/} $(\delta\land\Hex{ffffff})-2^{\rm Z}$로 취급해야
 파일을 만든 시각을 그리니치 평균시 1970년 1월 1일 00:00:00부터 잰 초로 기록한다.
 
 \bull |lopPost|: $\rm X=\Hex{0a}$, $\rm Y=0$, $\rm Z=G$(32 이상이어야 한다). 이 명령은
-적재할 모든 명령과 데이터 뒤에 오는 {\it 후기\/}(postamble)를 시작한다. 적재된 프로그램은
+적재할 모든 명령과 데이터 뒤에 오는 {\it 후기\/}({\it postamble\/})를 시작한다. 적재된 프로그램은
 rG가 이 G 값인 채로 시작하며, \$G, $\rm G+1$, \dots,~\$255는 다음 $\rm(256-G)*2$개의
 테트라바이트 값으로 처음에 정해진다. 이 테트라바이트들은 $\rm 256-G$개의 옥타바이트를
 큰 끝 방식(높은 절반이 먼저)으로 나타낸다.
@@ -1350,8 +1350,8 @@ if (a.curLoc^a.mmoCurLoc)&^3 != 0 {
 	a.mmoLoc()
 }
 
-@* 기호표. 기호는 Bentley와 Sedgewick의 발상을 따르는 {\it 삼진 탐색 트라이\/}(ternary
-search trie)로 저장하고 꺼낸다. ({\sl ACM--SIAM Symp.\ on Discrete Algorithms\/ \bf8}
+@* 기호표. 기호는 Bentley와 Sedgewick의 발상을 따르는 {\it 삼진 탐색 트라이\/}({\it ternary
+search trie\/})로 저장하고 꺼낸다. ({\sl ACM--SIAM Symp.\ on Discrete Algorithms\/ \bf8}
 (1997), 360--369; R.~Sedgewick, {\sl Algorithms in C\/} (Reading, Mass.:\
 Addison--Wesley, 1998), \S15.4를 보라.) 트라이의 마디마다 문자 하나가 저장되고, 주어진
 @^Bentley, Jon Louis@>
