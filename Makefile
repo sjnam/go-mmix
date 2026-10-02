@@ -3,6 +3,7 @@
 #   make            # tangle + go vet + go test
 #   make tangle     # 각 .w -> .go (+ _test.go)
 #   make doc        # 각 .w의 .pdf 조판 (한글이라 luatex)
+#   make intro      # 어셈블러와 시뮬레이터의 앞머리 안내서 (*-intro.pdf)
 #   make test       # go vet + go test
 #   make clean      # 조판 생성물 삭제 (.w 원본은 남김)
 #
@@ -10,6 +11,7 @@
 
 GTANGLE ?= gtangle
 GWEAVE  ?= gweave
+MUTOOL  ?= mutool
 
 # 옮기기가 진행되면서 여기에 디렉터리가 하나씩 늘어난다(라이브러리와 명령 모두).
 PKGS := mmixarith abstime mmixal mmotype mmixio mmixsim mmmix
@@ -21,7 +23,7 @@ webs = $(or $(WEBS_$(1)),$(1))
 DOCONLY := mmixdoc
 DOCS := $(foreach p,$(PKGS) $(DOCONLY),$(foreach w,$(call webs,$(p)),$(p)/$(w)))
 
-.PHONY: all tangle doc test clean $(PKGS) mmixsim-abstime mmmix-abstime
+.PHONY: all tangle doc intro test clean $(PKGS) mmixsim-abstime mmmix-abstime
 .DEFAULT_GOAL := all
 
 all: tangle test
@@ -56,6 +58,24 @@ doc:
 	   luatex --interaction=nonstopmode $$w.tex >/dev/null; \
 	   printf '%s: 조판 경고 %s개\n' $$d \
 	     $$(grep -ac 'Overfull\|Underfull\|Error\|Missing\|Undefined' $$w.log)); \
+	done
+
+# 크누스의 Makefile은 dvips -pp로 mmixal.dvi의 0--13쪽과 mmix-sim.dvi의 0--8쪽을 떼어
+# 사용자 안내서로 삼았다. 번역하면서 쪽이 달라졌으므로 쪽 번호 대신 안내가 끝난 뒤
+# 처음 오는 별표 절의 번호를 적고, 그 절이 시작하는 쪽을 .toc에서 읽어 그 앞쪽까지
+# 뗀다(별표 절은 늘 새 쪽에서 시작한다). 목차 쪽(N, 마지막 쪽)도 원본처럼 붙인다.
+INTRO := mmixal/mmixal:27 mmixsim/mmixsim:8
+intro:
+	@for e in $(INTRO); do \
+	  d=$${e%:*}; s=$${e#*:}; p=$${d%/*}; w=$${d#*/}; \
+	  (cd $$p && \
+	   { [ $$w.pdf -nt $$w.w ] && [ $$w.toc -nt $$w.w ] || \
+	     { $(GWEAVE) $$w.w >/dev/null && \
+	       luatex --interaction=nonstopmode $$w.tex >/dev/null; }; } && \
+	   n=$$(sed -n "s/^\\\\Tline{0}{$$s}{.*}{\([0-9]*\)}$$/\1/p" $$w.toc) && \
+	   [ -n "$$n" ] && \
+	   $(MUTOOL) merge -o $$w-intro.pdf $$w.pdf 1-$$((n-1)),N && \
+	   echo "$$p/$$w-intro.pdf: 1--$$((n-1))쪽과 목차") || exit 1; \
 	done
 
 clean:

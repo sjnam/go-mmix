@@ -61,6 +61,7 @@ make          # 모든 .w를 tangle한 뒤 go vet, go test
 make tangle   # .w → .go (+ _test.go)
 make test     # go vet + go test
 make doc      # 각 .w를 조판해 .pdf를 만들고 조판 경고 수를 보여 준다
+make intro    # mmixal과 mmixsim의 앞머리 안내서(*-intro.pdf)를 뗀다
 make clean    # 조판 생성물 삭제
 ```
 
