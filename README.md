@@ -41,7 +41,7 @@ Go 프로그램은 크누스의 C 프로그램과 같은 입력에 대해 바이
 - `boilerplate.w`: 모든 `.w`가 첫머리에서 `@i`로 읽어 들이는 공통 머리말이다.
   저작권 안내와 매크로가 들어 있다.
 - `Makefile`: tangle, 테스트, 조판을 한꺼번에 돌린다.
-- `go.mod`: 모듈 `github.com/sjnam/mmix`를 정의한다.
+- `go.mod`: 모듈 `github.com/sjnam/go-mmix`를 정의한다.
 - `BUGS.md`: 옮기면서 찾은 원본의 버그와 문서 오타(영문). 재현 방법과 패치를 담았다.
 
 각 디렉터리의 일차 산출물은 `.w`다. Go 원시 파일 `.go`는 `gtangle`이 `.w`에서

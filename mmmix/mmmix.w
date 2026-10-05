@@ -39,7 +39,7 @@ import (
 	"os"
 	"strconv"
 	@#
-	"github.com/sjnam/mmix/mmixio"
+	"github.com/sjnam/go-mmix/mmixio"
 )
 
 @<타입 정의@>

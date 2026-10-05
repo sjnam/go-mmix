@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/sjnam/mmix/mmixarith"
+	"github.com/sjnam/go-mmix/mmixarith"
 )
 
 //line mmixal.w:794

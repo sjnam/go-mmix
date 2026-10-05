@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/sjnam/mmix/mmixarith"
+	"github.com/sjnam/go-mmix/mmixarith"
 )
 
 //line mmixio.w:58

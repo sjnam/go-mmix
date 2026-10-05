@@ -88,8 +88,8 @@ import (
 	"strconv"
 	"sync/atomic"
 	@#
-	"github.com/sjnam/mmix/mmixarith"
-	"github.com/sjnam/mmix/mmixio"
+	"github.com/sjnam/go-mmix/mmixarith"
+	"github.com/sjnam/go-mmix/mmixio"
 )
 
 @<타입 정의@>

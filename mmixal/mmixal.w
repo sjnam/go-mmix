@@ -53,7 +53,7 @@ import (
 	"os"
 	"time"
 	@#
-	"github.com/sjnam/mmix/mmixarith"
+	"github.com/sjnam/go-mmix/mmixarith"
 )
 
 @<타입 정의@>
