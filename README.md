@@ -1,5 +1,10 @@
 <p align="center"><img src="mmix-logo.svg" alt="MMIX" width="500"></p><!-- markdownlint-disable-line MD033 -->
 
+This repository translates Donald E. Knuth's **MMIXware** into Korean literate programs (GWEB) and Go.
+MMIX is a 64-bit RISC computer that Knuth designed for the examples in *The Art of Computer Programming* (TAOCP).
+MMIXware is the package, written entirely in CWEB, that contains the machine's specification,
+an assembler, a simulator, and a pipelined meta-simulator.
+
 도널드 크누스(Donald E. Knuth)의 **MMIXware**를 한글 문학적 프로그램(GWEB)과 Go로 옮긴 저장소다.
 MMIX는 크누스가 『The Art of Computer Programming』(TAOCP)의 예제를 위해 설계한 64비트 RISC 컴퓨터다.
 MMIXware는 그 기계의 명세, 어셈블러, 시뮬레이터, 그리고 파이프라인 메타 시뮬레이터를 모두 CWEB로 쓴 꾸러미다.
