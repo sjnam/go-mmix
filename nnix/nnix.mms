@@ -19,6 +19,8 @@
 % 5단계: Exec과 Wait. Exec(TRAP 0,12,0)은 디스크의 목적 파일을 지금 프로세스의 새
 %   주소 공간에 싣고 MMIX-SIM과 같은 실행 환경을 차려 실행한다. Wait(TRAP 0,13,0)은
 %   끝난 자식을 거둔다. 이 둘과 Fork로 셸(nnix/sh.mms)이 디스크의 프로그램을 돌린다.
+% 8단계: PTP. 세그먼트마다 테이블 페이지를 셋 두고 중간 테이블은 필요할 때 만든다.
+%   세그먼트마다 8MB이던 한계가 8TB가 된다.
 % 6단계: 프레임 회수와 쓸 때 복사. 프레임마다 참조 계수를 두고, 끝난 프로세스와 Exec이
 %   버린 주소 공간의 프레임을 빈 목록으로 돌려받는다. Fork는 스택 세그먼트 말고는 페이지를
 %   복사하지 않고 함께 쓰며, 쓰기 허가를 끄고 PTE의 x 필드에 COW 표시를 해 둔다. 누가
@@ -42,14 +44,19 @@
 %                 #5800에 Exec의 인자 버퍼, #8000에 핸들 표(256개 x 64바이트),
 %                 #c000에 Exec의 커널 핸들, #10000에 늘 0인 페이지, #18000에 프레임 관리
 %                 (다음 새 프레임, 빈 목록의 머리), #20000부터 프레임마다의 참조 계수
-%   7<<32         프로세스 p의 페이지 테이블이 7<<32+p<<15에. 세그먼트마다 한 페이지
+%   7<<32         프로세스 p의 페이지 테이블이 7<<32+p<<17에. 세그먼트마다 세 페이지
+%                 (수준 0, 1, 2). PTP가 가리키는 중간 테이블은 프레임 풀에서 꺼낸다
 %   8<<32 ..      프레임 풀. 빈 목록에서 먼저 꺼내고, 없으면 앞에서부터 새로 꺼낸다.
 %   2^48+d<<16    장치 d. d=0은 HIO, d=1은 블록 장치다.
 %
-% 프로세스 p의 rV는 #12340D0700000000+p<<15+(p+1)<<3이다. b1..b4=1,2,3,4, 페이지
-% 크기 2^13, 테이블 뿌리 r=7<<32+p<<15, 주소 공간 번호 n=p+1, 하드웨어 변환(f=0)이다.
-% 주소 공간 번호가 프로세스마다 다르므로 프로세스를 바꿀 때 변환 캐시를 비우지 않는다.
-% 세그먼트마다 테이블이 한 페이지뿐이라 세그먼트마다 처음 1024페이지(8MB)만 쓸 수 있다.
+% 프로세스 p의 rV는 #369C0D0700000000+p<<17+(p+1)<<3이다. b1..b4=3,6,9,12(mmmix가
+% 미리 짜 두는 환경과 같다), 페이지 크기 2^13, 테이블 뿌리 r=7<<32+p<<17, 주소 공간
+% 번호 n=p+1, 하드웨어 변환(f=0)이다. 주소 공간 번호가 프로세스마다 다르므로 프로세스를
+% 바꿀 때 변환 캐시를 비우지 않는다. 세그먼트 i의 테이블은 뿌리에서 3i, 3i+1, 3i+2번째
+% 페이지다. 페이지 번호를 1024진 자릿수 a2 a1 a0로 쓰면, 1024보다 작은 페이지의 PTE는
+% 첫 테이블에, 그다음 백만 페이지는 둘째 테이블의 PTP를 거쳐, 그다음 십억 페이지는 셋째
+% 테이블의 PTP 둘을 거쳐 찾는다(mmixdoc.w 45절). 그래서 세그먼트마다 2^30페이지(8TB)를
+% 쓸 수 있다. 7단계까지는 b1..b4=1,2,3,4로 세그먼트마다 테이블이 한 페이지(8MB)뿐이었다.
 %
 % 커널은 인터럽트를 끈 채로 돈다. 그래서 커널이 하드웨어 변환으로 비어 있는
 % 사용자 페이지를 읽으면 폴트가 나지 않고 조용히 0이 읽힌다. 그러므로 커널은
@@ -420,7 +427,8 @@ Kill    GETA  res+1,:KillMsg
 
 % PageIn(va): 지금 프로세스에서 va가 든 페이지를 들인다. 빈 프레임을 하나 꺼내,
 % 프로그램 이미지의 같은 페이지(세그먼트 i의 페이지 p라면 물리 주소 i<<32+p<<13)를
-% 복사하고(Exec한 프로세스라면 0으로 채우고), PTE를 쓴다. 테이블과 주소 공간 번호는 rV에서 얻는다. 텍스트 세그먼트는
+% 복사하고(Exec한 프로세스이거나 이미지 너머의 페이지라면 0으로 채우고), PTE를 쓴다.
+% PTE의 자리는 PteSlot이 찾고, 모자라는 중간 테이블은 그때 만든다. 텍스트 세그먼트는
 % rwx, 나머지는 rw-다(뼈대 페이지 테이블과 같다).
 % 돌려주는 값: 0이면 들였고, 1이면 이미 있었고, -1이면 범위 밖이다.
         PREFIX PageIn:
@@ -432,23 +440,20 @@ rv      IS    $5
 rj      IS    $6
 frame   IS    $7
 res     IS    $8
-:PageIn BN    $0,9F             사용자의 주소는 음이 아니어야 한다
+:PageIn GET   rj,:rJ
+        BN    $0,9F             사용자의 주소는 음이 아니어야 한다
+        GET   rv,:rV
+        SET   res+1,rv
+        SET   res+2,$0
+        SETL  res+3,1
+        PUSHJ res,:PteSlot
+        BZ    res,9F            세그먼트마다 2^30페이지까지다
+        SET   pte,res
+        LDO   t,pte,0
+        BNZ   t,8F
         SRU   seg,$0,61
         ANDNH $0,#e000
         SRU   pg,$0,:PageS
-        SRU   t,pg,10
-        BNZ   t,9F              세그먼트마다 처음 1024페이지뿐이다
-        GET   rv,:rV
-        SLU   pte,rv,24
-        SRU   pte,pte,37
-        SLU   pte,pte,13
-        ORH   pte,#8000         테이블 뿌리의 커널 주소
-        SLU   t,seg,:PageS
-        ADDU  pte,pte,t
-        8ADDU pte,pg,pte        pte=PTE의 주소
-        LDO   t,pte,0
-        BNZ   t,8F
-        GET   rj,:rJ
         PUSHJ res,:AllocFrame
         SET   frame,res
         GETA  t,:Cur
@@ -459,17 +464,18 @@ res     IS    $8
         LDO   t,t,:BACK
         SETH  res+1,#8000
         BZ    t,1F
+        SRU   t,pg,19
+        BNZ   t,1F              이미지는 세그먼트마다 2^32바이트까지다
         SLU   t,seg,32
         OR    res+1,res+1,t
         SLU   t,pg,:PageS
         OR    res+1,res+1,t     이미지 안의 같은 페이지
         JMP   3F
 1H      ORMH  res+1,#0006
-        ORML  res+1,#0001       늘 0인 페이지(Exec한 프로세스)
+        ORML  res+1,#0001       늘 0인 페이지
 3H      SET   res+2,frame
         ZSZ   res+3,seg,1       텍스트 세그먼트인가
         PUSHJ res,:CopyPage
-        PUT   :rJ,rj
         ANDNH frame,#8000       물리 주소
         SETL  t,#1ff8
         AND   t,rv,t
@@ -479,13 +485,292 @@ res     IS    $8
         SET   t,7               rwx
 2H      OR    frame,frame,t
         STO   frame,pte,0
+        PUT   :rJ,rj
         SET   $0,0
         POP   1,0
-8H      SET   $0,1
+8H      PUT   :rJ,rj
+        SET   $0,1
         POP   1,0
-9H      NEG   $0,0,1
+9H      PUT   :rJ,rj
+        NEG   $0,0,1
         POP   1,0
         PREFIX :
+
+% PteSlot(rv,va,alloc): rV가 rv인 주소 공간에서 가상 주소 va의 PTE 자리(커널 주소).
+% 세그먼트 i의 수준 d 테이블은 뿌리에서 3i+d번째 페이지다. 페이지 번호가 1024 이상이면
+% 수준 1이나 2의 테이블에서 PTP를 따라 내려간다. 중간 테이블이 없으면 alloc이 0이
+% 아닐 때만 만들고, 아니면 0이다. 페이지 번호가 2^30 이상이어도 0이다. 만들 때는 수준 1
+% 테이블의 항목 0에 표시를 한다. 페이지 번호 0..1023은 수준 0에 있으므로 이 칸은 하드웨어도
+% Translate도 장치도 읽지 않는다. Walk는 표시가 없는 세그먼트의 수준 1과 2를 건너뛴다.
+        PREFIX Slot:
+rv      IS    $0
+va      IS    $1
+alloc   IS    $2
+seg     IS    $3
+pg      IS    $4
+base    IS    $5
+t       IS    $6
+n3      IS    $7
+d       IS    $8
+rj      IS    $9
+res     IS    $10
+:PteSlot BN   va,Zero
+        SRU   seg,va,61
+        ANDNH va,#e000
+        SRU   pg,va,:PageS
+        SLU   base,rv,24
+        SRU   base,base,37
+        SLU   base,base,13
+        ORH   base,#8000        뿌리
+        SLU   t,seg,1
+        ADD   t,t,seg
+        SLU   t,t,:PageS
+        ADDU  base,base,t       세그먼트의 수준 0 테이블
+        SETL  t,#1ff8
+        AND   n3,rv,t           주소 공간 번호(n<<3)
+        SRU   d,pg,10
+        BNZ   d,1F
+        8ADDU $0,pg,base        수준 0
+        POP   1,0
+1H      GET   rj,:rJ
+        BZ    alloc,4F
+        SETL  t,#2000
+        ADDU  t,base,t
+        STCO  1,t,0             이 세그먼트가 PTP를 쓴다는 표시(수준 1 테이블의 항목 0)
+4H      SRU   t,pg,20
+        BNZ   t,2F
+        SETL  t,#2000
+        ADDU  base,base,t       수준 1 테이블
+        SRU   t,pg,10           a1
+        8ADDU res+1,t,base
+        SET   res+2,alloc
+        SET   res+3,n3
+        PUSHJ res,:Follow
+        JMP   3F
+2H      SRU   t,pg,30
+        BNZ   t,Fail
+        SETL  t,#4000
+        ADDU  base,base,t       수준 2 테이블
+        SRU   t,pg,20           a2
+        8ADDU res+1,t,base
+        SET   res+2,alloc
+        SET   res+3,n3
+        PUSHJ res,:Follow
+        BZ    res,Fail
+        SRU   t,pg,10
+        SETL  d,#3ff
+        AND   t,t,d             a1
+        8ADDU res+1,t,res
+        SET   res+2,alloc
+        SET   res+3,n3
+        PUSHJ res,:Follow
+3H      BZ    res,Fail
+        SETL  d,#3ff
+        AND   t,pg,d            a0
+        8ADDU $0,t,res
+        PUT   :rJ,rj
+        POP   1,0
+Fail    PUT   :rJ,rj
+Zero    SET   $0,0
+        POP   1,0
+        PREFIX :
+
+% Follow(pslot,alloc,n3): PTP 자리 pslot이 가리키는 다음 테이블의 커널 주소. PTP가
+% 없으면 alloc이 0이 아닐 때만 0으로 채운 프레임을 꺼내 테이블로 삼고 PTP를 쓴다.
+% PTP는 부호 비트, 테이블의 물리 주소, 주소 공간 번호로 이루어진다. 프레임의 커널 주소가
+% 이미 부호 비트를 가지므로 거기에 n<<3만 더하면 된다.
+Follow  LDO   $3,$0,0
+        BZ    $3,1F
+        SETL  $4,#1fff
+        ANDN  $0,$3,$4
+        POP   1,0
+1H      BZ    $1,9F
+        GET   $5,rJ
+        PUSHJ $6,AllocFrame
+        PUT   rJ,$5
+        SET   $7,0
+        SETL  $8,#2000
+2H      STCO  0,$6,$7
+        ADDU  $7,$7,8
+        CMP   $9,$7,$8
+        BN    $9,2B
+        OR    $3,$6,$2
+        STO   $3,$0,0
+        SET   $0,$6
+        POP   1,0
+9H      SET   $0,0
+        POP   1,0
+
+% Walk(rv,cb,arg,nseg,free): rV가 rv인 주소 공간의 세그먼트 0..nseg-1에 든 PTE마다
+% cb(자리,가상 주소,arg)를 PUSHGO로 부른다. free가 0이 아니면 PTP가 가리키던 중간
+% 테이블의 프레임도 다 훑은 뒤에 돌려주고 그 PTP를 지운다. 수준 1과 2의 테이블에서
+% 항목 0은 쓰지 않는다(페이지 번호 0..1023은 수준 0에 있다).
+        PREFIX Walk:
+rv      IS    $0
+cb      IS    $1
+arg     IS    $2
+nseg    IS    $3
+free    IS    $4
+seg     IS    $5
+base    IS    $6
+i       IS    $7
+j       IS    $8
+k       IS    $9
+e       IS    $10               윗 테이블의 PTP 자리
+ps      IS    $11               가운데 테이블의 PTP 자리
+c       IS    $12               PTE 테이블
+c2      IS    $13               가운데 테이블
+vb      IS    $14               세그먼트의 가상 주소
+t       IS    $15
+sl      IS    $16               PTE 자리
+rj      IS    $17
+res     IS    $18
+:Walk   GET   rj,:rJ
+        SET   seg,0
+Seg     CMP   t,seg,nseg
+        BNN   t,Done
+        SLU   vb,seg,61
+        SLU   base,rv,24
+        SRU   base,base,37
+        SLU   base,base,13
+        ORH   base,#8000        뿌리
+        SLU   t,seg,1
+        ADD   t,t,seg
+        SLU   t,t,:PageS
+        ADDU  base,base,t       이 세그먼트의 수준 0 테이블(뿌리에서 3i번째 페이지)
+% 수준 0
+        SET   i,0
+L0      8ADDU sl,i,base
+        LDO   t,sl,0
+        BZ    t,L0n
+        SET   res+1,sl
+        SLU   res+2,i,:PageS
+        OR    res+2,res+2,vb
+        SET   res+3,arg
+        PUSHGO res,cb,0
+L0n     ADD   i,i,1
+        SETL  t,1024
+        CMP   t,i,t
+        BN    t,L0
+        SETL  t,#2000
+        ADDU  t,base,t
+        LDO   t,t,0
+        BZ    t,NextS           이 세그먼트는 PTP를 쓰지 않는다
+% 수준 1: 페이지 번호 a1 a0
+        SET   i,1
+L1      SETL  t,#2000
+        ADDU  e,base,t
+        8ADDU e,i,e
+        LDO   c,e,0
+        BZ    c,L1n
+        SETL  t,#1fff
+        ANDN  c,c,t
+        SET   j,0
+L1a     8ADDU sl,j,c
+        LDO   t,sl,0
+        BZ    t,L1b
+        SET   res+1,sl
+        SLU   res+2,i,10
+        OR    res+2,res+2,j
+        SLU   res+2,res+2,:PageS
+        OR    res+2,res+2,vb
+        SET   res+3,arg
+        PUSHGO res,cb,0
+L1b     ADD   j,j,1
+        SETL  t,1024
+        CMP   t,j,t
+        BN    t,L1a
+        BZ    free,L1n
+        SET   res+1,c
+        PUSHJ res,:DecRef
+        STCO  0,e,0
+L1n     ADD   i,i,1
+        SETL  t,1024
+        CMP   t,i,t
+        BN    t,L1
+% 수준 2: 페이지 번호 a2 a1 a0
+        SET   i,1
+L2      SETL  t,#4000
+        ADDU  e,base,t
+        8ADDU e,i,e
+        LDO   c2,e,0
+        BZ    c2,L2n
+        SETL  t,#1fff
+        ANDN  c2,c2,t
+        SET   j,0
+L2a     8ADDU ps,j,c2
+        LDO   c,ps,0
+        BZ    c,L2d
+        SETL  t,#1fff
+        ANDN  c,c,t
+        SET   k,0
+L2b     8ADDU sl,k,c
+        LDO   t,sl,0
+        BZ    t,L2c
+        SET   res+1,sl
+        SLU   res+2,i,10
+        OR    res+2,res+2,j
+        SLU   res+2,res+2,10
+        OR    res+2,res+2,k
+        SLU   res+2,res+2,:PageS
+        OR    res+2,res+2,vb
+        SET   res+3,arg
+        PUSHGO res,cb,0
+L2c     ADD   k,k,1
+        SETL  t,1024
+        CMP   t,k,t
+        BN    t,L2b
+        BZ    free,L2d
+        SET   res+1,c
+        PUSHJ res,:DecRef
+        STCO  0,ps,0
+L2d     ADD   j,j,1
+        SETL  t,1024
+        CMP   t,j,t
+        BN    t,L2a
+        BZ    free,L2n
+        SET   res+1,c2
+        PUSHJ res,:DecRef
+        STCO  0,e,0
+L2n     ADD   i,i,1
+        SETL  t,1024
+        CMP   t,i,t
+        BN    t,L2
+        BZ    free,NextS
+        SETL  t,#2000
+        ADDU  t,base,t
+        STCO  0,t,0             표시를 지운다
+NextS   ADD   seg,seg,1
+        JMP   Seg
+Done    PUT   :rJ,rj
+        POP   0,0
+        PREFIX :
+
+% Walk의 콜백들. 모두 (자리,가상 주소,arg)를 받는다.
+% FreeCb: PTE를 지우고 그 프레임의 참조를 놓는다.
+FreeCb  LDO   $3,$0,0
+        STCO  0,$0,0
+        SETL  $4,#1fff
+        ANDN  $6,$3,$4
+        ANDNH $6,#ffff
+        ORH   $6,#8000
+        GET   $4,rJ
+        PUSHJ $5,DecRef
+        PUT   rJ,$4
+        POP   0,0
+% SyncCb: 그 프레임을 SYNCD로 메모리에 내려보낸다(CopyPage를 보라).
+SyncCb  LDO   $3,$0,0
+        SETL  $4,#1fff
+        ANDN  $3,$3,$4
+        ANDNH $3,#ffff
+        ORH   $3,#8000
+        SET   $4,0
+        SETL  $5,#2000
+1H      SYNCD #ff,$3,$4
+        INCL  $4,#100
+        CMP   $6,$4,$5
+        BN    $6,1B
+        POP   0,0
 
 % 프레임 관리. 커널 메모리 #8000000600018000에 다음 새 프레임(FMTop)과 빈 목록의
 % 머리(FMFree)를 두고, #8000000600020000부터 프레임마다 참조 계수 바이트를 둔다.
@@ -550,29 +835,17 @@ DecRef  GET   $1,rJ
         STO   $0,$4,8           빈 목록의 머리가 된다
 9H      POP   0,0
 
-% FreeSpace(): 지금 프로세스의 페이지 테이블을 비우고 프레임들의 참조를 놓는다. 그다음
-% 옛 변환을 변환 캐시에서 지운다.
-FreeSpace GET $4,rJ
-        GET   $0,rV
-        SLU   $0,$0,24
-        SRU   $0,$0,37
-        SLU   $0,$0,13
-        ORH   $0,#8000          테이블 네 장
-        SET   $1,0
-1H      LDO   $2,$0,$1
-        BZ    $2,2F
-        STCO  0,$0,$1
-        SETL  $3,#1fff
-        ANDN  $6,$2,$3
-        ANDNH $6,#ffff
-        ORH   $6,#8000
-        PUSHJ $5,DecRef
-2H      ADDU  $1,$1,8
-        SETL  $3,#8000
-        CMP   $3,$1,$3
-        BN    $3,1B
+% FreeSpace(): 지금 프로세스의 페이지 테이블을 비우고 프레임들과 중간 테이블들의 참조를
+% 놓는다. 그다음 옛 변환을 변환 캐시에서 지운다.
+FreeSpace GET $0,rJ
+        GET   $2,rV
+        GETA  $3,FreeCb
+        SET   $4,0
+        SETL  $5,4
+        SETL  $6,1
+        PUSHJ $1,Walk
         SYNC  6
-        PUT   rJ,$4
+        PUT   rJ,$0
         POP   0,0
 
 % CowBreak(va): 지금 프로세스에서 va가 든 쓸 때 복사 페이지를 쓸 수 있게 한다. 그 프레임을
@@ -589,25 +862,18 @@ e       IS    $6
 rj      IS    $7
 nf      IS    $8
 res     IS    $9
-:CowBreak BN  va,9F
+:CowBreak GET  rj,:rJ
         SRU   seg,va,61
-        ANDNH va,#e000
-        SRU   pg,va,:PageS
-        SRU   t,pg,10
-        BNZ   t,9F
-        GET   t,:rV
-        SLU   pte,t,24
-        SRU   pte,pte,37
-        SLU   pte,pte,13
-        ORH   pte,#8000
-        SLU   t,seg,:PageS
-        ADDU  pte,pte,t
-        8ADDU pte,pg,pte        pte=PTE의 주소
+        GET   res+1,:rV
+        SET   res+2,va
+        SET   res+3,0
+        PUSHJ res,:PteSlot
+        BZ    res,9F
+        SET   pte,res           pte=PTE의 주소
         LDO   e,pte,0
         SRU   t,e,48
         AND   t,t,1
         BZ    t,9F              쓸 때 복사하는 페이지가 아니다
-        GET   rj,:rJ
         SETL  t,#1fff
         ANDN  old,e,t
         ANDNH old,#ffff
@@ -636,7 +902,8 @@ res     IS    $9
         PUT   :rJ,rj
         SET   $0,0
         POP   1,0
-9H      NEG   $0,0,1
+9H      PUT   :rJ,rj
+        NEG   $0,0,1
         POP   1,0
         PREFIX :
 
@@ -816,9 +1083,9 @@ res     IS    $5
         BNZ   t,1B
         SETL  t,1
         STO   t,c,:ST
-        SETH  t,#1234
+        SETH  t,#369C
         ORMH  t,#0D07
-        SLU   u,cp,15
+        SLU   u,cp,17
         ADDU  t,t,u
         ADD   u,cp,1
         SLU   u,u,3
@@ -1088,45 +1355,49 @@ Next    GETA  $1,Cur
 9H      POP   1,0
 
 % CopySpace(prv,crv): rV가 prv인 주소 공간에 들어 있는 페이지를 rV가 crv인 주소 공간의
-% 테이블의 같은 자리에 넣는다. 스택 세그먼트의 페이지는 새 프레임에 복사한다. 커널이
-% 인터럽트를 끈 채 SAVE로 거기에 쓰므로 쓰기 허가를 끌 수 없기 때문이다. 나머지는 프레임을
-% 함께 쓰고, 쓸 수 있던 페이지는 부모와 자식 모두에서 쓰기 허가를 끄고 COW 표시를 한다. 자식의 테이블은 앞서 같은 pid를 쓴 프로세스의 것일 수 있으므로
-% 부모에게 없는 페이지의 칸도 모두 지운다.
+% 같은 자리에 넣는다. Walk가 부모의 PTE마다 CopyCb를 부른다. 자식의 PTE 자리는 PteSlot이
+% 찾고, 모자라는 중간 테이블은 그때 만든다. 스택 세그먼트의 페이지는 새 프레임에 복사한다.
+% 커널이 인터럽트를 끈 채 SAVE로 거기에 쓰므로 쓰기 허가를 끌 수 없기 때문이다. 나머지는 프레임을
+% 함께 쓰고, 쓸 수 있던 페이지는 부모와 자식 모두에서 쓰기 허가를 끄고 COW 표시를 한다.
+% 자식의 테이블은 비어 있다(앞서 같은 pid를 쓴 프로세스는 Exit에서 테이블을 비웠다).
+CopySpace GET $2,rJ
+        SET   $4,$0
+        GETA  $5,CopyCb
+        SET   $6,$1
+        SETL  $7,4
+        SET   $8,0
+        PUSHJ $3,Walk
+        PUT   rJ,$2
+        POP   0,0
+
         PREFIX Copy:
-pb      IS    $0
-cb      IS    $1
-cn      IS    $2
-i       IS    $3
+sl      IS    $0                부모의 PTE 자리
+va      IS    $1
+crv     IS    $2
+cs      IS    $3                자식의 PTE 자리
 pte     IS    $4
 t       IS    $5
-lim     IS    $6
-rj      IS    $7
-fr      IS    $8
+cn      IS    $6
+fr      IS    $7
+rj      IS    $8
 res     IS    $9
-:CopySpace GET   rj,:rJ
+:CopyCb GET   rj,:rJ
+        SET   res+1,crv
+        SET   res+2,va
+        SETL  res+3,1
+        PUSHJ res,:PteSlot
+        SET   cs,res
         SETL  t,#1ff8
-        AND   cn,cb,t           자식의 주소 공간 번호(n<<3)
-        SLU   pb,pb,24
-        SRU   pb,pb,37
-        SLU   pb,pb,13
-        ORH   pb,#8000          부모의 테이블
-        SLU   cb,cb,24
-        SRU   cb,cb,37
-        SLU   cb,cb,13
-        ORH   cb,#8000          자식의 테이블
-        SET   i,0
-        SETL  lim,#8000         테이블 네 장
-1H      LDO   pte,pb,i
-        STCO  0,cb,i            앞서 이 자리를 쓴 프로세스의 PTE를 지운다
-        BZ    pte,2F
-        SETL  t,#6000
-        CMP   t,i,t
-        BNN   t,Copy            스택 세그먼트는 바로 복사한다
+        AND   cn,crv,t          자식의 주소 공간 번호(n<<3)
+        LDO   pte,sl,0
+        SRU   t,va,61
+        CMP   t,t,3
+        BZ    t,Copy            스택 세그먼트는 바로 복사한다
         AND   t,pte,2
         BZ    t,Share
         ANDN  pte,pte,2         쓰기 허가를 끄고
         ORH   pte,:COW          쓸 때 복사한다고 적는다
-        STO   pte,pb,i          부모도 그렇다
+        STO   pte,sl,0          부모도 그렇다
 Share   SETL  t,#1fff
         ANDN  res+1,pte,t
         ANDNH res+1,#ffff
@@ -1135,8 +1406,9 @@ Share   SETL  t,#1fff
         SETL  t,#1ff8
         ANDN  fr,pte,t
         OR    fr,fr,cn          주소 공간 번호만 자식의 것으로
-        STO   fr,cb,i
-        JMP   2F
+        STO   fr,cs,0
+        PUT   :rJ,rj
+        POP   0,0
 Copy    PUSHJ res,:AllocFrame
         SET   fr,res
         SETL  t,#1fff
@@ -1144,18 +1416,13 @@ Copy    PUSHJ res,:AllocFrame
         ANDNH res+1,#ffff
         ORH   res+1,#8000       부모의 프레임
         SET   res+2,fr
-        SETL  t,#2000
-        CMP   t,i,t
-        ZSN   res+3,t,1         텍스트 세그먼트인가
+        SET   res+3,0
         PUSHJ res,:CopyPage
         ANDNH fr,#8000
         OR    fr,fr,cn
         AND   t,pte,7
         OR    fr,fr,t
-        STO   fr,cb,i
-2H      ADDU  i,i,8
-        CMP   t,i,lim
-        BN    t,1B
+        STO   fr,cs,0
         PUT   :rJ,rj
         POP   0,0
         PREFIX :
@@ -2629,28 +2896,14 @@ PutO    GET   $2,rJ
 
 % FlushText(): 텍스트 세그먼트의 들어 있는 프레임을 모두 SYNCD로 메모리에 내려보낸다.
 % 커널이 STTU로 실은 명령은 아직 D-캐시에만 있을 수 있기 때문이다(CopyPage를 보라).
-FlushText GET $0,rV
-        SLU   $0,$0,24
-        SRU   $0,$0,37
-        SLU   $0,$0,13
-        ORH   $0,#8000          세그먼트 0의 테이블
-        SET   $1,0
-1H      LDO   $2,$0,$1
-        BZ    $2,3F
-        SETL  $3,#1fff
-        ANDN  $2,$2,$3
-        ANDNH $2,#ffff
-        ORH   $2,#8000          프레임의 커널 주소
-        SET   $3,0
-2H      SYNCD #ff,$2,$3
-        INCL  $3,#100
-        SETL  $4,#2000
-        CMP   $4,$3,$4
-        BN    $4,2B
-3H      ADDU  $1,$1,8
-        SETL  $4,#2000
-        CMP   $4,$1,$4
-        BN    $4,1B
+FlushText GET $0,rJ
+        GET   $2,rV
+        GETA  $3,SyncCb
+        SET   $4,0
+        SETL  $5,1
+        SET   $6,0
+        PUSHJ $1,Walk
+        PUT   rJ,$0
         POP   0,0
 
 % ---- 잠들기와 깨우기 ----
@@ -2888,7 +3141,7 @@ ExitNext OCTA  0                Exit이 다음에 돌릴 pid
 FsOwner OCTA  -1                파일 시스템 자물쇠를 쥔 pid(없으면 -1)
 Cur     OCTA  0                 지금 도는 프로세스의 pid
 NReady  OCTA  1                 돌 수 있는 프로세스의 수
-Procs   OCTA  1,#12340D0700000008,0,0,0,0,0,0,-1,1 프로세스 0: 돌 수 있고, 테이블은 7<<32, n=1, 부모 없음, 이미지
+Procs   OCTA  1,#369C0D0700000008,0,0,0,0,0,0,-1,1 프로세스 0: 돌 수 있고, 테이블은 7<<32, n=1, 부모 없음, 이미지
         LOC   Procs+NProc*128
 KillMsg BYTE  "NNIX: page fault I can't serve",#a,0
         LOC   (@+3)&-4
