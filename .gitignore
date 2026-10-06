@@ -13,6 +13,7 @@
 /mmotype/mmotype
 /mmmix/mmmix
 /abstime/abstime
+/nnixfs/nnixfs
 /bin/
 
 # make nnix로 만드는 커널 목적 파일

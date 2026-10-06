@@ -15,7 +15,7 @@ GWEAVE  ?= gweave
 MUTOOL  ?= mutool
 
 # 옮기기가 진행되면서 여기에 디렉터리가 하나씩 늘어난다(라이브러리와 명령 모두).
-PKGS := mmixarith abstime mmixal mmotype mmixio mmixsim mmmix
+PKGS := mmixarith abstime mmixal mmotype mmixio mmixsim mmmix nnixfs
 
 # 디렉터리마다 든 .w 파일들. 따로 적지 않으면 디렉터리 이름과 같은 .w 하나다.
 WEBS_mmmix := mmixpipe mmixconfig mmixmem mmmix

@@ -12,6 +12,10 @@
 % 3단계: 프로세스 여럿. 새 시스템 호출 Fork(TRAP 0,11,0)가 주소 공간을 복사해
 %   자식을 만들고, 구간 계수기 rI의 타이머 인터럽트가 SAVE와 UNSAVE로 프로세스를
 %   번갈아 돌린다. Halt는 그 프로세스만 끝내고, 마지막 프로세스가 끝나면 멈춘다.
+% 4단계: 파일 시스템. mmmix -d로 붙인 블록 장치의 디스크(NNIXFS, 호스트 도구
+%   nnixfs로 만든다)를 부팅할 때 마운트하고, 파일 연산을 커널이 직접 한다.
+%   표준 입출력(핸들 0, 1, 2)은 그대로 HIO로 보낸다. 디스크가 없으면 3단계처럼
+%   모든 입출력을 HIO로 보낸다.
 %
 %   mmixal -b 250 -o nnix.mmo nnix.mms
 %   mmmix -knnix.mmo plain.mmconfig hello.mmb
@@ -24,9 +28,11 @@
 %   0 .. 4<<32    mmmix가 실은 프로그램 이미지(세그먼트 i가 i<<32에)
 %   4<<32         mmmix의 뼈대 페이지 테이블(부팅 뒤로는 쓰지 않는다)
 %   5<<32         이 커널의 코드와 데이터
+%   6<<32         파일 시스템의 커널 메모리: FAT 16KB, 디렉터리 4KB, 블록 캐시 1KB,
+%                 줄 버퍼 1KB, 그리고 #8000부터 핸들 표(256개 x 64바이트)
 %   7<<32         프로세스 p의 페이지 테이블이 7<<32+p<<15에. 세그먼트마다 한 페이지
 %   8<<32 ..      빈 프레임 풀. 앞에서부터 하나씩 꺼낸다.
-%   2^48+d<<16    장치 d. 지금은 d=0인 HIO 하나뿐이다.
+%   2^48+d<<16    장치 d. d=0은 HIO, d=1은 블록 장치다.
 %
 % 프로세스 p의 rV는 #12340D0700000000+p<<15+(p+1)<<3이다. b1..b4=1,2,3,4, 페이지
 % 크기 2^13, 테이블 뿌리 r=7<<32+p<<15, 주소 공간 번호 n=p+1, 하드웨어 변환(f=0)이다.
@@ -76,6 +82,29 @@ XXO     IS    40                rXX
 YYO     IS    48                rYY
 ZZO     IS    56                rZZ
 Quantum IS    10000             타이머의 한 조각(사이클)
+
+% 블록 장치(장치 1)의 레지스터. ID, CMD, RESULT, DONE의 오프셋은 HIO와 같다.
+BLK     IS    #8001             장치 1의 기준 주소는 SETH BLK와 ORML BLKLO로 만든다
+BLKLO   IS    #0001
+BBLOCK  IS    #08               쓰기: 블록 번호
+BADDR   IS    #10               쓰기: 메모리 쪽 버퍼의 주소
+BSize   IS    1024              블록의 바이트 수
+
+% 파일 시스템(nnixfs/nnixfs.w의 형식과 같다)과 그 커널 메모리(6<<32부터)
+NDirBlk IS    4                 디렉터리의 블록 수
+NEnt    IS    64                디렉터리 항목의 수
+NameMax IS    47                이름의 최대 길이
+MaxFatBlk IS  16                커널이 올릴 수 있는 FAT의 블록 수
+DirOff  IS    #4000             디렉터리의 오프셋(FAT는 0에)
+BufOff  IS    #5000             블록 캐시의 오프셋
+LineOff IS    #5400             줄 버퍼의 오프셋
+HOff    IS    #8000             핸들 표의 오프셋
+HKIND   IS    0                 핸들 항목: 0이면 닫힘, 1이면 콘솔, 2면 파일
+HMODE   IS    8                 mmixio의 방식 코드
+HENT    IS    16                디렉터리 항목의 번호
+HPOS    IS    24                위치
+HCBLK   IS    32                위치가 든 디스크 블록(0이면 모른다)
+HCIDX   IS    40                그 블록의 파일 안 번호
 
 PageS   IS    13                페이지 크기는 2^13바이트
 StackPages IS    4              부팅할 때 들여놓는 스택 세그먼트의 페이지 수
@@ -160,6 +189,7 @@ res     IS    $3
         ADD   k,k,1
         CMP   t,k,:StackPages
         BN    t,1B
+        PUSHJ res,:Mount        디스크가 있으면 마운트한다
         PUT   :rJ,rj
         POP   0,0
         PREFIX :
@@ -174,7 +204,8 @@ a0      IS    $3                장치의 첫째 인자
 a1      IS    $4                장치의 둘째 인자
 kind    IS    $5                인자를 가져오는 방식
 rj      IS    $6                안에서 PUSHJ를 하므로 rJ를 여기 둔다
-res     IS    $7                부르는 서브루틴의 결과 자리
+x       IS    $7                핸들 표의 항목
+res     IS    $8                부르는 서브루틴의 결과 자리
 :Syscall GET   rj,:rJ
         GET   t,:rXX
         SLU   t,t,32
@@ -198,7 +229,7 @@ res     IS    $7                부르는 서브루틴의 결과 자리
         LDBU  kind,t,op
         SET   a0,0
         SET   a1,0
-        BZ    kind,Call
+        BZ    kind,1F
         GET   a0,:rBB
         CMP   t,kind,4
         BNN   t,1F
@@ -215,7 +246,29 @@ res     IS    $7                부르는 서브루틴의 결과 자리
         BN    res,Bad
         ORH   res,#8000
         LDO   a0,res,0          a0=M[rBB]
-1H      CMP   t,kind,6
+% 디스크가 있으면 핸들 표를 본다. Fopen과 파일은 FsOp가, 콘솔은 HIO가 맡는다.
+1H      GETA  t,:Mounted
+        LDO   t,t,0
+        BZ    t,Con
+        SETH  x,#8000
+        ORMH  x,#0006
+        SETL  t,:HOff
+        ADDU  x,x,t
+        SLU   t,h,6
+        ADDU  x,x,t             x=핸들 h의 항목
+        CMP   t,op,:Fopen
+        BZ    t,Fs
+        LDO   t,x,:HKIND
+        CMP   t,t,1
+        BZ    t,Con
+Fs      SET   res+1,x
+        SET   res+2,op
+        SET   res+3,a0
+        SET   res+4,a1
+        PUSHJ res,:FsOp
+        JMP   Ret
+Con     BZ    kind,Call
+        CMP   t,kind,6
         BZ    t,Call
         SET   res+1,a0
         CMP   t,kind,2
@@ -241,7 +294,7 @@ Call    SET   res+1,a0
         SLU   t,op,8
         OR    res+3,t,h
         PUSHJ res,:Device
-        PUT   :rBB,res          RESUME 1이 이것을 사용자의 $255에 넣는다
+Ret     PUT   :rBB,res          RESUME 1이 이것을 사용자의 $255에 넣는다
 Done    PUT   :rJ,rj
         POP   0,0
 Bad     NEG   t,0,1
@@ -266,7 +319,8 @@ Stop    BNZ   h,Warn
         PUSHJ res,:Next
         SET   t,res
         JMP   :Resume           이 레지스터 스택은 버린다
-Last    GET   $255,:rBB         종료 코드는 Halt할 때의 사용자 $255다(mmmix -s)
+Last    PUSHJ res,:SyncFS       디스크를 맞춘다(디스크가 없으면 할 일이 없다)
+        GET   $255,:rBB         종료 코드는 Halt할 때의 사용자 $255다(mmmix -s)
 :Halt5  SYNC  5                 쓰기 버퍼를 비운다
 1H      SYNC  4
         JMP   1B
@@ -695,6 +749,971 @@ res     IS    $9
         POP   0,0
         PREFIX :
 
+% ---- 파일 시스템 ----
+% 디스크가 붙어 있으면(Mounted) 커널은 파일을 직접 다룬다. 핸들 표의 항목마다
+% 종류(0: 닫힘, 1: 콘솔, 2: 파일), mmixio와 같은 방식 코드(1: 읽기, 2: 쓰기,
+% 4: 찾기, 8: 읽고 쓰기), 디렉터리 항목 번호, 위치, 그리고 위치가 든 블록과
+% 그 블록의 파일 안 번호를 둔다. 콘솔 핸들은 HIO로 보내고, 파일은 FsOp가 다룬다.
+% 반환값과 오류는 mmixio(mmixio.w)와 똑같이 맞춘다.
+%
+% FsOp(H,op,a0,a1): 핸들 항목 H에 연산 op를 한다. 인자는 Syscall이 가져온 그대로다.
+        PREFIX Fs:
+H       IS    $0
+op      IS    $1
+a0      IS    $2
+a1      IS    $3
+rj      IS    $4
+mode    IS    $5
+n       IS    $6
+k       IS    $7
+c       IS    $8
+t       IS    $9
+o       IS    $10
+s       IS    $11
+eof     IS    $12
+ln      IS    $13               줄 버퍼의 커널 주소
+res     IS    $14
+:FsOp   GET   rj,:rJ
+        NEG   t,0,1
+        GETA  res,:URTag        사용자 페이지의 캐시를 비운다
+        STO   t,res,0
+        GETA  res,:UWTag
+        STO   t,res,0
+        SETH  ln,#8000
+        ORMH  ln,#0006
+        SETL  t,:LineOff
+        ADDU  ln,ln,t
+        LDO   mode,H,:HMODE
+        CMP   t,op,:Fopen
+        BZ    t,Open
+        CMP   t,op,:Fclose
+        BZ    t,Close
+        CMP   t,op,:Fread
+        BZ    t,Read
+        CMP   t,op,:Fgets
+        BZ    t,Gets
+        CMP   t,op,:Fgetws
+        BZ    t,Getws
+        CMP   t,op,:Fwrite
+        BZ    t,Write
+        CMP   t,op,:Fputs
+        BZ    t,Puts
+        CMP   t,op,:Fputws
+        BZ    t,Putws
+        CMP   t,op,:Fseek
+        BZ    t,Seek
+        JMP   Tell
+Neg1    NEG   o,0,1
+Ret     SET   $0,o
+        PUT   :rJ,rj
+        POP   1,0
+
+% Fopen(name=a0, mode=a1). 이름을 줄 버퍼로 가져와 디렉터리에서 찾는다. 읽기
+% 방식(0, 2)이면 있어야 하고, 쓰기 방식이면 있으면 비우고 없으면 만든다.
+% 실패하면 mmixio처럼 핸들을 닫는다.
+Open    CMPU  t,a1,4
+        BP    t,Abort
+        SET   k,0
+1H      ADDU  res+1,a0,k
+        PUSHJ res,:UGet
+        BN    res,Abort
+        STB   res,ln,k
+        BZ    res,2F
+        ADD   k,k,1
+        SETL  t,1024
+        CMP   t,k,t
+        BN    t,1B
+        JMP   Abort             이름이 1024바이트 안에서 끝나지 않는다
+2H      BZ    k,Abort
+        CMP   t,k,:NameMax
+        BP    t,Abort
+        SETH  s,#8000
+        ORMH  s,#0006
+        SETL  t,:DirOff
+        ADDU  s,s,t             s=디렉터리
+        SET   n,0
+3H      SLU   t,n,6
+        ADDU  c,s,t             c=항목 n
+        LDBU  t,c,0
+        BZ    t,5F
+        SET   o,0
+4H      LDBU  t,c,o
+        LDBU  eof,ln,o
+        CMP   t,t,eof
+        BNZ   t,5F
+        ADD   o,o,1
+        CMP   t,o,k
+        BNP   t,4B
+        JMP   Found
+5H      ADD   n,n,1
+        CMP   t,n,:NEnt
+        BN    t,3B
+        CMP   t,a1,0            없다
+        BZ    t,Abort
+        CMP   t,a1,2
+        BZ    t,Abort
+        SET   n,0
+6H      SLU   t,n,6
+        ADDU  c,s,t
+        LDBU  t,c,0
+        BZ    t,7F
+        ADD   n,n,1
+        CMP   t,n,:NEnt
+        BN    t,6B
+        JMP   Abort             디렉터리가 가득 찼다
+7H      SET   o,0
+8H      LDBU  t,ln,o
+        STB   t,c,o
+        ADD   o,o,1
+        CMP   t,o,k
+        BNP   t,8B
+        STCO  0,c,48
+        STCO  0,c,56
+        JMP   Mark
+Found   CMP   t,a1,0
+        BZ    t,Set
+        CMP   t,a1,2
+        BZ    t,Set
+        LDTU  res+1,c,48        쓰기 방식이면 비운다
+        PUSHJ res,:FreeChain
+        STCO  0,c,48
+        STCO  0,c,56
+Mark    GETA  t,:MetaDirty
+        SETL  res,1
+        STO   res,t,0
+Set     SETL  t,2
+        STO   t,H,:HKIND
+        GETA  t,:ModeCode
+        LDBU  t,t,a1
+        STO   t,H,:HMODE
+        STO   n,H,:HENT
+        STCO  0,H,:HPOS
+        STCO  0,H,:HCBLK
+        STCO  0,H,:HCIDX
+        SET   o,0
+        JMP   Ret
+Abort   STCO  0,H,:HKIND
+        STCO  0,H,:HMODE
+        JMP   Neg1
+
+% Fclose. 파일이면 디스크를 맞춘다.
+Close   BZ    mode,Neg1
+        LDO   t,H,:HKIND
+        CMP   t,t,2
+        BNZ   t,1F
+        PUSHJ res,:SyncFS
+1H      STCO  0,H,:HKIND
+        STCO  0,H,:HMODE
+        SET   o,0
+        JMP   Ret
+
+% Fread(buffer=a0, size=a1): 읽은 바이트 수에서 size를 뺀 값을 돌려준다.
+Read    AND   t,mode,1
+        BZ    t,8F
+        AND   t,mode,8
+        BZ    t,1F
+        ANDN  mode,mode,2
+        STO   mode,H,:HMODE
+1H      SRU   t,a1,32
+        BNZ   t,8F
+        SET   n,0
+2H      CMPU  t,n,a1
+        BNN   t,3F
+        SET   res+1,H
+        PUSHJ res,:Getc
+        BN    res,3F
+        SET   res+2,res
+        ADDU  res+1,a0,n
+        PUSHJ res,:UPut
+        BN    res,8F
+        ADD   n,n,1
+        JMP   2B
+3H      SUBU  o,n,a1
+        JMP   Ret
+8H      NEG   o,0,1
+        SUBU  o,o,a1            -1-size
+        JMP   Ret
+
+% Fgets(buffer=a0, size=a1). mmixio처럼 255바이트씩 줄 버퍼에 모아 옮긴다.
+% 한 덩이를 읽기 시작할 때 이미 파일 끝이면 -1이다.
+Gets    AND   t,mode,1
+        BZ    t,Neg1
+        BZ    a1,Neg1
+        AND   t,mode,8
+        BZ    t,1F
+        ANDN  mode,mode,2
+        STO   mode,H,:HMODE
+1H      SUB   a1,a1,1
+        SET   o,0
+2H      SETL  s,255
+        CMPU  t,a1,s
+        BNN   t,3F
+        SET   s,a1
+3H      BZ    s,4F
+        SET   res+1,H
+        PUSHJ res,:AtEnd
+        BNZ   res,Neg1
+4H      SET   n,0
+        SET   eof,0
+5H      CMP   t,n,s
+        BNN   t,7F
+        SET   res+1,H
+        PUSHJ res,:Getc
+        BN    res,6F
+        STB   res,ln,n
+        ADD   n,n,1
+        CMP   t,res,#a
+        BZ    t,7F
+        JMP   5B
+6H      SET   eof,1
+7H      SET   t,0
+        STB   t,ln,n
+        SET   k,0
+8H      LDBU  res+2,ln,k
+        ADDU  res+1,a0,k
+        PUSHJ res,:UPut
+        BN    res,Neg1
+        ADD   k,k,1
+        CMP   t,k,n
+        BNP   t,8B
+        ADDU  o,o,n
+        SUBU  a1,a1,n
+        BNZ   eof,Ret
+        BZ    a1,Ret
+        BZ    n,9F
+        SUB   t,n,1
+        LDBU  t,ln,t
+        CMP   t,t,#a
+        BZ    t,Ret
+9H      ADDU  a0,a0,n
+        JMP   2B
+
+% Fgetws(buffer=a0, size=a1). 와이드 문자 127개씩. 파일 끝에서는 0을 돌려준다.
+Getws   AND   t,mode,1
+        BZ    t,Neg1
+        BZ    a1,Neg1
+        AND   t,mode,8
+        BZ    t,1F
+        ANDN  mode,mode,2
+        STO   mode,H,:HMODE
+1H      ANDN  a0,a0,1
+        SUB   a1,a1,1
+        SET   o,0
+2H      SETL  s,127
+        CMPU  t,a1,s
+        BNN   t,3F
+        SET   s,a1
+3H      SET   n,0
+        SET   k,0
+        SET   eof,0
+4H      CMP   t,n,s
+        BNN   t,6F
+        SET   res+1,H
+        PUSHJ res,:Getc
+        BN    res,5F
+        SET   c,res
+        SET   res+1,H
+        PUSHJ res,:Getc
+        BN    res,5F
+        STB   c,ln,k
+        ADD   k,k,1
+        STB   res,ln,k
+        ADD   k,k,1
+        ADD   n,n,1
+        BNZ   c,4B
+        CMP   t,res,#a
+        BNZ   t,4B
+        JMP   6F
+5H      SET   eof,1
+6H      SET   t,0
+        STB   t,ln,k
+        ADD   c,k,1
+        STB   t,ln,c
+        SET   c,0
+7H      LDBU  res+2,ln,c
+        ADDU  res+1,a0,c
+        PUSHJ res,:UPut
+        BN    res,Neg1
+        ADD   c,c,1
+        ADD   t,k,1
+        CMP   t,c,t
+        BNP   t,7B
+        ADDU  o,o,n
+        SUBU  a1,a1,n
+        BNZ   eof,Ret
+        BZ    a1,Ret
+        BZ    n,8F
+        SUB   t,k,2
+        LDBU  t,ln,t
+        BNZ   t,8F
+        SUB   t,k,1
+        LDBU  t,ln,t
+        CMP   t,t,#a
+        BZ    t,Ret
+8H      ADDU  a0,a0,k
+        JMP   2B
+
+% Fwrite(buffer=a0, size=a1): 다 쓰면 0, 아니면 못 쓴 바이트 수의 음수.
+Write   AND   t,mode,2
+        BNZ   t,1F
+        NEG   o,0,a1
+        JMP   Ret
+1H      AND   t,mode,8
+        BZ    t,2F
+        ANDN  mode,mode,1
+        STO   mode,H,:HMODE
+2H      SET   n,0
+3H      CMPU  t,n,a1
+        BNN   t,4F
+        ADDU  res+1,a0,n
+        PUSHJ res,:UGet
+        BN    res,5F
+        SET   res+2,res
+        SET   res+1,H
+        PUSHJ res,:Putc
+        BN    res,5F
+        ADD   n,n,1
+        JMP   3B
+4H      SET   o,0
+        JMP   Ret
+5H      SUBU  o,n,a1
+        JMP   Ret
+
+% Fputs(string=a0): 쓴 바이트 수.
+Puts    AND   t,mode,2
+        BZ    t,Neg1
+        AND   t,mode,8
+        BZ    t,1F
+        ANDN  mode,mode,1
+        STO   mode,H,:HMODE
+1H      SET   o,0
+2H      ADDU  res+1,a0,o
+        PUSHJ res,:UGet
+        BN    res,Neg1
+        BZ    res,Ret
+        SET   res+2,res
+        SET   res+1,H
+        PUSHJ res,:Putc
+        BN    res,Neg1
+        ADD   o,o,1
+        JMP   2B
+
+% Fputws(string=a0): 쓴 와이드 문자의 수.
+Putws   AND   t,mode,2
+        BZ    t,Neg1
+        AND   t,mode,8
+        BZ    t,1F
+        ANDN  mode,mode,1
+        STO   mode,H,:HMODE
+1H      SET   n,0
+2H      ADDU  res+1,a0,n
+        PUSHJ res,:UGet
+        BN    res,Neg1
+        SET   c,res
+        ADDU  res+1,a0,n
+        ADD   res+1,res+1,1
+        PUSHJ res,:UGet
+        BN    res,Neg1
+        SET   k,res
+        OR    t,c,k
+        BZ    t,3F
+        SET   res+1,H
+        SET   res+2,c
+        PUSHJ res,:Putc
+        BN    res,Neg1
+        SET   res+1,H
+        SET   res+2,k
+        PUSHJ res,:Putc
+        BN    res,Neg1
+        ADD   n,n,2
+        JMP   2B
+3H      SRU   o,n,1
+        JMP   Ret
+
+% Fseek(offset=a0). 음수면 끝에서부터 센다(-1이 끝). 텍스트 방식이면 -1.
+Seek    AND   t,mode,4
+        BZ    t,Neg1
+        AND   t,mode,8
+        BZ    t,1F
+        SETL  mode,#f
+        STO   mode,H,:HMODE
+1H      SRU   t,a0,31
+        BN    a0,2F
+        BNZ   t,Neg1
+        SET   c,a0
+        JMP   3F
+2H      SETL  s,1
+        SLU   s,s,33
+        SUBU  s,s,1
+        CMPU  t,t,s
+        BNZ   t,Neg1
+        SET   res+1,H
+        PUSHJ res,:EntAddr
+        LDO   c,res,56
+        ADD   c,c,a0
+        ADD   c,c,1
+        BN    c,Neg1
+3H      STO   c,H,:HPOS
+        STCO  0,H,:HCBLK
+        SET   o,0
+        JMP   Ret
+
+% Ftell: 위치. 텍스트 방식이면 -1.
+Tell    AND   t,mode,4
+        BZ    t,Neg1
+        LDO   o,H,:HPOS
+        SLU   o,o,32
+        SRU   o,o,32
+        JMP   Ret
+        PREFIX :
+
+% EntAddr(H): 핸들 항목 H가 가리키는 디렉터리 항목의 커널 주소.
+EntAddr LDO   $1,$0,HENT
+        SLU   $1,$1,6
+        SETH  $0,#8000
+        ORMH  $0,#0006
+        SETL  $2,DirOff
+        ADDU  $0,$0,$2
+        ADDU  $0,$0,$1
+        POP   1,0
+
+% AtEnd(H): 위치가 파일 끝이거나 그 너머이면 1, 아니면 0.
+AtEnd   GET   $3,rJ
+        SET   $5,$0
+        PUSHJ $4,EntAddr
+        PUT   rJ,$3
+        LDO   $1,$4,56
+        LDO   $2,$0,HPOS
+        CMPU  $1,$2,$1
+        ZSNN  $0,$1,1
+        POP   1,0
+
+% Getc(H): 핸들 H의 위치에서 바이트 하나를 읽고 위치를 하나 늘린다. 파일 끝이면 -1.
+        PREFIX Getc:
+pos     IS    $1
+t       IS    $2
+rj      IS    $3
+res     IS    $4
+:Getc   GET   rj,:rJ
+        SET   res+1,$0
+        PUSHJ res,:AtEnd
+        BNZ   res,9F
+        SET   res+1,$0
+        SET   res+2,0
+        PUSHJ res,:BlockFor
+        BZ    res,9F
+        SET   res+1,res
+        PUSHJ res,:GetBlk
+        LDO   pos,$0,:HPOS
+        SETL  t,#3ff
+        AND   t,pos,t
+        SETH  res,#8000
+        ORMH  res,#0006
+        INCL  res,:BufOff
+        LDBU  t,res,t
+        ADD   pos,pos,1
+        STO   pos,$0,:HPOS
+        SET   $0,t
+        PUT   :rJ,rj
+        POP   1,0
+9H      NEG   $0,0,1
+        PUT   :rJ,rj
+        POP   1,0
+        PREFIX :
+
+% Putc(H,c): 핸들 H의 위치에 바이트 c를 쓰고 위치를 하나 늘린다. 블록이 모자라면
+% 할당한다. 파일이 길어지면 디렉터리 항목의 크기를 고친다. 디스크가 가득 차면 -1.
+        PREFIX Putc:
+pos     IS    $2
+t       IS    $3
+rj      IS    $4
+res     IS    $5
+:Putc   GET   rj,:rJ
+        SET   res+1,$0
+        SETL  res+2,1
+        PUSHJ res,:BlockFor
+        BZ    res,9F
+        SET   res+1,res
+        PUSHJ res,:GetBlk
+        LDO   pos,$0,:HPOS
+        SETL  t,#3ff
+        AND   t,pos,t
+        SETH  res,#8000
+        ORMH  res,#0006
+        INCL  res,:BufOff
+        STB   $1,res,t
+        GETA  t,:CacheDirty
+        SETL  res,1
+        STO   res,t,0
+        ADD   pos,pos,1
+        STO   pos,$0,:HPOS
+        SET   res+1,$0
+        PUSHJ res,:EntAddr
+        LDO   t,res,56
+        CMPU  t,pos,t
+        BNP   t,1F
+        STO   pos,res,56        파일이 길어졌다
+        GETA  t,:MetaDirty
+        SETL  res,1
+        STO   res,t,0
+1H      SET   $0,0
+        PUT   :rJ,rj
+        POP   1,0
+9H      NEG   $0,0,1
+        PUT   :rJ,rj
+        POP   1,0
+        PREFIX :
+
+% BlockFor(H,alloc): 핸들 H의 위치가 든 디스크 블록. 위치의 블록 번호가 항목에
+% 기억한 것과 같으면 그대로 쓰고, 바로 다음이면 FAT를 한 칸만 따라가고, 아니면
+% 첫 블록부터 걷는다. 사슬이 모자라면 alloc이 0이 아닐 때만 블록을 할당해 잇고,
+% 아니면 0이다.
+        PREFIX BlockFor:
+H       IS    $0
+alloc   IS    $1
+idx     IS    $2
+b       IS    $3
+t       IS    $4
+k       IS    $5
+rj      IS    $6
+res     IS    $7
+:BlockFor GET rj,:rJ
+        LDO   idx,H,:HPOS
+        SRU   idx,idx,10
+        LDO   b,H,:HCBLK
+        BZ    b,Walk
+        LDO   t,H,:HCIDX
+        CMP   k,t,idx
+        BZ    k,Done
+        ADD   t,t,1
+        CMP   k,t,idx
+        BNZ   k,Walk
+        SET   res+1,b
+        SET   res+2,alloc
+        PUSHJ res,:FatNext
+        BZ    res,Fail
+        SET   b,res
+        JMP   Done
+Walk    SET   res+1,H
+        PUSHJ res,:EntAddr
+        SET   k,res
+        LDTU  b,k,48
+        BNZ   b,1F
+        BZ    alloc,Fail
+        PUSHJ res,:AllocBlk
+        BZ    res,Fail
+        SET   b,res
+        STT   b,k,48            첫 블록
+        GETA  t,:MetaDirty
+        SETL  res,1
+        STO   res,t,0
+1H      SET   k,0
+2H      CMP   t,k,idx
+        BNN   t,Done
+        SET   res+1,b
+        SET   res+2,alloc
+        PUSHJ res,:FatNext
+        BZ    res,Fail
+        SET   b,res
+        ADD   k,k,1
+        JMP   2B
+Done    STO   b,H,:HCBLK
+        STO   idx,H,:HCIDX
+        SET   $0,b
+        PUT   :rJ,rj
+        POP   1,0
+Fail    SET   $0,0
+        PUT   :rJ,rj
+        POP   1,0
+        PREFIX :
+
+% FatNext(b,alloc): FAT에서 블록 b의 다음 블록. 사슬의 끝이면 alloc이 0이 아닐
+% 때만 새 블록을 할당해 잇고, 아니면 0이다. 사슬이 망가져 빈 블록을 가리켜도 0이다.
+        PREFIX FatNext:
+b       IS    $0
+alloc   IS    $1
+a       IS    $2
+nb      IS    $3
+t       IS    $4
+rj      IS    $5
+res     IS    $6
+:FatNext SETH a,#8000
+        ORMH  a,#0006
+        4ADDU a,b,a             a=FAT[b]의 주소
+        LDTU  nb,a,0
+        SETML t,#ffff
+        ORL   t,#ffff
+        CMP   t,nb,t
+        BZ    t,1F
+        SET   $0,nb             0이면 망가진 사슬이다
+        POP   1,0
+1H      SET   $0,0
+        BZ    alloc,9F
+        GET   rj,:rJ
+        PUSHJ res,:AllocBlk
+        PUT   :rJ,rj
+        BZ    res,9F
+        STT   res,a,0
+        GETA  t,:MetaDirty
+        SETL  nb,1
+        STO   nb,t,0
+        SET   $0,res
+9H      POP   1,0
+        PREFIX :
+
+% AllocBlk(): 데이터 영역의 앞에서부터 빈 블록을 찾아 사슬의 끝으로 표시하고, 0으로
+% 채운 채 블록 캐시에 올린다(나중에 디스크에 쓰인다). 가득 찼으면 0이다.
+        PREFIX AllocBlk:
+b       IS    $0
+n       IS    $1
+a       IS    $2
+t       IS    $3
+rj      IS    $4
+res     IS    $5
+:AllocBlk GETA t,:DataStart
+        LDO   b,t,0
+        GETA  t,:NBlocks
+        LDO   n,t,0
+1H      CMP   t,b,n
+        BNN   t,8F
+        SETH  a,#8000
+        ORMH  a,#0006
+        4ADDU a,b,a
+        LDTU  t,a,0
+        BZ    t,2F
+        ADD   b,b,1
+        JMP   1B
+2H      SETML t,#ffff
+        ORL   t,#ffff
+        STT   t,a,0
+        GETA  t,:MetaDirty
+        SETL  n,1
+        STO   n,t,0
+        GET   rj,:rJ
+        SET   res+1,b
+        PUSHJ res,:ZeroBlk
+        PUT   :rJ,rj
+        POP   1,0
+8H      SET   $0,0
+        POP   1,0
+        PREFIX :
+
+% FreeChain(b): 블록 b에서 시작하는 사슬을 FAT에서 풀어 준다. 풀린 블록이 캐시에
+% 남아 나중에 디스크에 쓰이지 않도록 캐시를 먼저 비우고 잊는다.
+        PREFIX FreeChain:
+b       IS    $0
+a       IS    $1
+nb      IS    $2
+end     IS    $3
+zero    IS    $4
+rj      IS    $5
+res     IS    $6
+:FreeChain GET rj,:rJ
+        PUSHJ res,:FlushBuf
+        PUT   :rJ,rj
+        NEG   end,0,1
+        GETA  a,:CacheBlk
+        STO   end,a,0
+        SETML end,#ffff
+        ORL   end,#ffff
+        SET   zero,0
+1H      BZ    b,9F
+        CMP   nb,b,end
+        BZ    nb,9F
+        SETH  a,#8000
+        ORMH  a,#0006
+        4ADDU a,b,a
+        LDTU  b,a,0
+        STTU  zero,a,0
+        JMP   1B
+9H      GETA  a,:MetaDirty
+        SETL  nb,1
+        STO   nb,a,0
+        POP   0,0
+        PREFIX :
+
+% 블록 캐시. 디스크 블록 하나(CacheBlk, 없으면 -1)를 커널 메모리 BufOff에 둔다.
+% CacheDirty가 0이 아니면 아직 디스크에 쓰지 않은 것이다.
+% GetBlk(b): 블록 b를 캐시에 올린다.
+GetBlk  GETA  $1,CacheBlk
+        LDO   $2,$1,0
+        CMP   $2,$2,$0
+        BZ    $2,9F
+        GET   $3,rJ
+        PUSHJ $4,FlushBuf
+        SET   $5,$0
+        SETH  $6,#8000
+        ORMH  $6,#0006
+        INCL  $6,BufOff
+        SETL  $7,1              읽기
+        PUSHJ $4,BlkIO
+        PUT   rJ,$3
+        GETA  $1,CacheBlk
+        STO   $0,$1,0
+        GETA  $1,CacheDirty
+        STCO  0,$1,0
+9H      POP   0,0
+
+% FlushBuf(): 캐시가 더러우면 디스크에 쓴다.
+FlushBuf GETA $0,CacheDirty
+        LDO   $1,$0,0
+        BZ    $1,9F
+        STCO  0,$0,0
+        GET   $2,rJ
+        GETA  $0,CacheBlk
+        LDO   $4,$0,0
+        SETH  $5,#8000
+        ORMH  $5,#0006
+        INCL  $5,BufOff
+        SETL  $6,2              쓰기
+        PUSHJ $3,BlkIO
+        PUT   rJ,$2
+9H      POP   0,0
+
+% ZeroBlk(b): 새로 할당한 블록 b를 0으로 채운 채 캐시에 올린다. 읽을 필요가 없다.
+ZeroBlk GET   $1,rJ
+        PUSHJ $2,FlushBuf
+        PUT   rJ,$1
+        SETH  $1,#8000
+        ORMH  $1,#0006
+        INCL  $1,BufOff
+        SET   $2,0
+        SETL  $3,BSize
+1H      STCO  0,$1,$2
+        ADDU  $2,$2,8
+        CMP   $4,$2,$3
+        BN    $4,1B
+        GETA  $1,CacheBlk
+        STO   $0,$1,0
+        GETA  $1,CacheDirty
+        SETL  $2,1
+        STO   $2,$1,0
+        POP   0,0
+
+% WriteBlocks(blk,addr,n): 커널 메모리 addr부터 n블록을 디스크의 블록 blk부터 쓴다.
+% ReadBlocks(blk,addr,n)는 거꾸로 읽는다. 둘 다 BlkIO의 명령 하나만 다르다.
+WriteBlocks SETL $3,2
+        JMP   1F
+ReadBlocks SETL $3,1
+1H      GET   $4,rJ
+2H      BZ    $2,9F
+        SET   $6,$0
+        SET   $7,$1
+        SET   $8,$3
+        PUSHJ $5,BlkIO
+        ADD   $0,$0,1
+        INCL  $1,BSize
+        SUB   $2,$2,1
+        JMP   2B
+9H      PUT   rJ,$4
+        POP   0,0
+
+% SyncFS(): 캐시와, 바뀌었으면 FAT와 디렉터리를 디스크에 쓴다. 파일을 닫을 때와
+% 기계를 멈추기 전에 부른다.
+        PREFIX Sync:
+t       IS    $0
+rj      IS    $1
+res     IS    $2
+:SyncFS GET   rj,:rJ
+        PUSHJ res,:FlushBuf
+        GETA  t,:MetaDirty
+        LDO   res,t,0
+        BZ    res,9F
+        STCO  0,t,0
+        GETA  t,:FatStart
+        LDO   res+1,t,0
+        SETH  res+2,#8000
+        ORMH  res+2,#0006       FAT
+        GETA  t,:FatBlocks
+        LDO   res+3,t,0
+        PUSHJ res,:WriteBlocks
+        GETA  t,:DirStart
+        LDO   res+1,t,0
+        SETH  res+2,#8000
+        ORMH  res+2,#0006
+        SETL  t,:DirOff
+        ADDU  res+2,res+2,t     디렉터리
+        SETL  res+3,:NDirBlk
+        PUSHJ res,:WriteBlocks
+9H      PUT   :rJ,rj
+        POP   0,0
+        PREFIX :
+
+% BlkIO(blk,addr,cmd): 블록 장치에 명령 하나(1: 읽기, 2: 쓰기)를 시키고 결과(0이나
+% -1)를 돌려준다. 규약은 Device와 같다. 장치는 음수 주소를 물리 주소로 본다.
+BlkIO   SETH  $3,BLK
+        ORML  $3,BLKLO
+        LDO   $4,$3,DONE
+        STO   $0,$3,BBLOCK
+        STO   $1,$3,BADDR
+        STO   $2,$3,CMD
+1H      LDO   $5,$3,DONE
+        CMPU  $5,$5,$4
+        BZ    $5,1B
+        SYNC  2
+        LDO   $0,$3,RESULT
+        POP   1,0
+
+% UGet(va): 사용자 주소 va의 바이트. UPut(va,c): 거기에 바이트 c를 쓴다. 실패하면
+% -1이다. 바이트마다 UserPA를 부르지 않도록 읽기와 쓰기에 페이지 하나씩을 기억한다.
+% FsOp가 시작할 때 이 기억을 지운다(페이지 테이블은 시스템 호출 사이에 바뀔 수 있다).
+        PREFIX UGet:
+va      IS    $0
+pg      IS    $1
+t       IS    $2
+m       IS    $3
+rj      IS    $4
+res     IS    $5
+:UGet   SETL  m,#1fff
+        ANDN  pg,va,m
+        GETA  t,:URTag
+        LDO   t,t,0
+        CMP   t,t,pg
+        BZ    t,1F
+        GET   rj,:rJ
+        SET   res+1,pg
+        SETL  res+2,4           p_r
+        PUSHJ res,:UserPA
+        PUT   :rJ,rj
+        BN    res,9F
+        ORH   res,#8000
+        GETA  t,:URPA
+        STO   res,t,0
+        GETA  t,:URTag
+        STO   pg,t,0
+1H      GETA  t,:URPA
+        LDO   t,t,0
+        AND   va,va,m
+        LDBU  $0,t,va
+        POP   1,0
+9H      NEG   $0,0,1
+        POP   1,0
+        PREFIX :
+
+        PREFIX UPut:
+va      IS    $0
+c       IS    $1
+pg      IS    $2
+t       IS    $3
+m       IS    $4
+rj      IS    $5
+res     IS    $6
+:UPut   SETL  m,#1fff
+        ANDN  pg,va,m
+        GETA  t,:UWTag
+        LDO   t,t,0
+        CMP   t,t,pg
+        BZ    t,1F
+        GET   rj,:rJ
+        SET   res+1,pg
+        SETL  res+2,2           p_w
+        PUSHJ res,:UserPA
+        PUT   :rJ,rj
+        BN    res,9F
+        ORH   res,#8000
+        GETA  t,:UWPA
+        STO   res,t,0
+        GETA  t,:UWTag
+        STO   pg,t,0
+1H      GETA  t,:UWPA
+        LDO   t,t,0
+        AND   va,va,m
+        STB   c,t,va
+        SET   $0,0
+        POP   1,0
+9H      NEG   $0,0,1
+        POP   1,0
+        PREFIX :
+
+% Mount(): 블록 장치가 있고 그 디스크가 NNIXFS이면 FAT와 디렉터리를 커널 메모리에
+% 올리고 Mounted를 1로 한다. 핸들 0, 1, 2는 콘솔로(방식은 mmixio와 같이 1, 2, 2) 둔다.
+        PREFIX Mount:
+t       IS    $0
+u       IS    $1
+d       IS    $2
+rj      IS    $3
+res     IS    $4
+:Mount  GET   rj,:rJ
+        SETH  d,:BLK
+        ORML  d,:BLKLO
+        LDO   t,d,:ID
+        SETH  u,#4e4e           "NNIX-BLK"
+        ORMH  u,#4958
+        ORML  u,#2d42
+        ORL   u,#4c4b
+        CMP   t,t,u
+        BNZ   t,9F              블록 장치가 없다
+        SET   res+1,0
+        SETH  res+2,#8000
+        ORMH  res+2,#0006
+        INCL  res+2,:BufOff
+        SET   res+3,1
+        PUSHJ res,:ReadBlocks   슈퍼블록
+        SETH  d,#8000
+        ORMH  d,#0006
+        INCL  d,:BufOff
+        LDO   t,d,0
+        SETH  u,#4e4e           "NNIXFS01"
+        ORMH  u,#4958
+        ORML  u,#4653
+        ORL   u,#3031
+        CMP   t,t,u
+        BNZ   t,9F
+        LDO   t,d,40
+        CMP   t,t,:NDirBlk
+        BNZ   t,9F              디렉터리는 네 블록이어야 한다
+        LDO   t,d,24
+        CMP   t,t,:MaxFatBlk
+        BP    t,9F              FAT는 16블록까지
+        LDO   t,d,8
+        GETA  u,:NBlocks
+        STO   t,u,0
+        LDO   t,d,16
+        GETA  u,:FatStart
+        STO   t,u,0
+        LDO   t,d,24
+        GETA  u,:FatBlocks
+        STO   t,u,0
+        LDO   t,d,32
+        GETA  u,:DirStart
+        STO   t,u,0
+        LDO   t,d,48
+        GETA  u,:DataStart
+        STO   t,u,0
+        GETA  t,:FatStart
+        LDO   res+1,t,0
+        SETH  res+2,#8000
+        ORMH  res+2,#0006
+        GETA  t,:FatBlocks
+        LDO   res+3,t,0
+        PUSHJ res,:ReadBlocks   FAT
+        GETA  t,:DirStart
+        LDO   res+1,t,0
+        SETH  res+2,#8000
+        ORMH  res+2,#0006
+        SETL  t,:DirOff
+        ADDU  res+2,res+2,t
+        SETL  res+3,:NDirBlk
+        PUSHJ res,:ReadBlocks   디렉터리
+        SETH  d,#8000
+        ORMH  d,#0006
+        SETL  t,:HOff
+        ADDU  d,d,t             핸들 표
+        SETL  t,1
+        STO   t,d,:HKIND
+        STO   t,d,:HMODE
+        STO   t,d,64+:HKIND
+        STO   t,d,128+:HKIND
+        SETL  t,2
+        STO   t,d,64+:HMODE
+        STO   t,d,128+:HMODE
+        GETA  t,:Mounted
+        SETL  u,1
+        STO   u,t,0
+9H      PUT   :rJ,rj
+        POP   0,0
+        PREFIX :
+
 % Device(a0,a1,cmd): HIO에 명령 하나를 시키고 그 결과를 돌려준다.
 % 앞 명령이 끝났으므로 쓰기 버퍼에 이 장치로 가는 저장은 남아 있지 않다.
 % DONE은 순수하게 읽히므로 투기적으로 읽혀도 상관없고, 값이 바뀔 때까지 돈다.
@@ -843,4 +1862,21 @@ NReady  OCTA  1                 돌 수 있는 프로세스의 수
 Procs   OCTA  1,#12340D0700000008 프로세스 0: 돌 수 있고, 테이블은 7<<32, n=1
         LOC   Procs+NProc*64
 KillMsg BYTE  "NNIX: page fault I can't serve",#a,0
+        LOC   (@+3)&-4          GETA로 가리키는 곳은 테트라 경계여야 한다
 ArgKind BYTE  0,1,0,2,2,2,3,4,5,6,0
+        LOC   (@+3)&-4
+ModeCode BYTE 1,2,5,6,#f        Fopen의 방식 0..4에 대한 mmixio의 방식 코드
+        LOC   (@+7)&-8
+Mounted OCTA  0                 디스크를 마운트했는가
+NBlocks OCTA  0                 디스크의 블록 수
+FatStart OCTA 0                 FAT가 시작하는 블록
+FatBlocks OCTA 0                FAT의 블록 수
+DirStart OCTA 0                 디렉터리가 시작하는 블록
+DataStart OCTA 0                데이터가 시작하는 블록
+CacheBlk OCTA -1                블록 캐시에 든 블록(없으면 -1)
+CacheDirty OCTA 0               캐시를 아직 디스크에 쓰지 않았는가
+MetaDirty OCTA 0                FAT나 디렉터리를 아직 디스크에 쓰지 않았는가
+URTag   OCTA  -1                UGet이 기억하는 사용자 페이지
+URPA    OCTA  0                 그 페이지의 커널 주소
+UWTag   OCTA  -1                UPut이 기억하는 사용자 페이지
+UWPA    OCTA  0                 그 페이지의 커널 주소

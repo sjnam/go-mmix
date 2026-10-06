@@ -11,6 +11,7 @@
 @s mmixio.Simulator int
 @s cfile int
 @s hio int
+@s blk int
 
 \input kotexgweb
 \def\title{MMIXPIPE}
@@ -8588,7 +8589,7 @@ stdinBufEnd   int       // 그 버퍼의 현재 끝
 절 ``기계의 상태''에 모였다. 그것들을 필드로 가진 구조체가 |machine|이다. 여기에 입출력을 위한
 필드를 더한다. 표준 출력은 버퍼를 거치고, 표준 오류는 바로 쓴다. 필드 |io|는 \.{mmixio}의 상태이고,
 |stdin|은 표준 입력을 \CEE/의 |fgets|처럼 읽는 파일이다. 타입 \KW{cfile}은 \.{mmmix.w}에서 정의한다.
-필드 |specBuf|는 \.{mmixmem.w}의 원본에서 정적 버퍼였다. 필드 |hio|는 \NNIX\ 커널을 위해
+필드 |specBuf|는 \.{mmixmem.w}의 원본에서 정적 버퍼였다. 필드 |hio|와 |blk|는 \NNIX\ 커널을 위해
 \.{mmixmem.w}에 덧붙인 장치다.
 
 @<타입 정의@>=
@@ -8600,6 +8601,7 @@ type machine struct {
 	stdin  *cfile        // 표준 입력
 	specBuf [20]byte     // \.{mmixmem.w}의 |specRead|가 쓰는 버퍼
 	hio     *hio         // \.{mmixmem.w}의 호스트 입출력 장치(\.{-k}를 주었을 때만)
+	blk     *blk         // \.{mmixmem.w}의 블록 장치(\.{-d}를 주었을 때만)
 }
 
 @ 원본의 |exit(n)|은 종료 코드를 담은 |exitSignal|을 던지는 공황이 된다. 주 프로그램이 그것을

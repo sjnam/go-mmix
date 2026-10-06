@@ -7,6 +7,8 @@
 @s machine int
 @s hio int
 @s mmixio.IO int
+@s blk int
+@s os.File int
 
 \input kotexgweb
 \def\title{MMIXMEM}
@@ -35,7 +37,11 @@
 @c
 package main
 
-import "github.com/sjnam/go-mmix/mmixio"
+import (
+	"os"
+	@#
+	"github.com/sjnam/go-mmix/mmixio"
+)
 
 var kind = [4]string{"byte", "wyde", "tetra", "octa"}
 @<상수@>
@@ -55,6 +61,8 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 	addr = addr&^0xffffffff | Octa(Tetra(addr)&-(Tetra(1)<<size))
 	if mx.hio != nil && addr-hioBase < hioSize {
 		@<장치 0의 레지스터를 읽어 |val|에 넣는다@>
+	} else if mx.blk != nil && addr-blkBase < hioSize {
+		@<장치 1의 레지스터를 읽어 |val|에 넣는다@>
 	} else if mx.verbose&interactiveReadBit != 0 {
 		mx.printf("** Read %s from loc %016x: ", kind[size], addr)
 		mx.stdin.fgets(mx.specBuf[:], 20)
@@ -106,6 +114,9 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 	}
 	if mx.hio != nil && addr-hioBase < hioSize && size == 3 && addr&7 == 0 {
 		@<장치 0의 레지스터에 |val|을 쓴다@>
+	}
+	if mx.blk != nil && addr-blkBase < hioSize && size == 3 && addr&7 == 0 {
+		@<장치 1의 레지스터에 |val|을 쓴다@>
 	}
 }
 
@@ -341,6 +352,105 @@ func (h *hio) MMPutChars(buf []byte, size int, addr Octa) {
 		h.mx.putChars(buf[k:], n, pa)
 		k += n
 	}
+}
+
+@* 블록 장치. 보충: 이 장도 옮긴이가 덧붙인 것이다. \NNIX\ 커널의 4단계는 파일 시스템을 갖는다.
+그 디스크가 장치~1이다. 명령줄에 \.{-d<image>}를 주면 호스트의 파일 하나가 1024바이트짜리 블록들의
+디스크가 된다. 디스크 이미지는 저장소의 도구 \.{nnixfs}로 만들고, 거기에 파일을 넣고 꺼낸다.
+장치는 블록 하나를 메모리와 디스크 사이에서 통째로 옮긴다(DMA). 레지스터는 모두 옥타바이트다.
+$$\vbox{\halign{\hfil\tt#\quad&\.{#}\hfil\quad&#\hfil\cr
+\#00&ID&읽기: 상수 \.{"NNIX-BLK"}\cr
+\#08&BLOCK&쓰기: 블록 번호\cr
+\#10&ADDR&쓰기: 메모리 쪽 버퍼의 주소(음수면 부호 비트를 지운 물리 주소)\cr
+\#18&CMD&쓰기: 1이면 블록을 메모리로 읽고, 2면 메모리를 블록에 쓴다. 닿는 순간 실행한다\cr
+\#20&RESULT&읽기: 마지막 명령의 결과. 0이면 성공, $-1$이면 실패\cr
+\#28&DONE&읽기: 지금까지 끝낸 명령의 수\cr
+\#30&NBLK&읽기: 디스크의 블록 수\cr}}$$
+규약은 장치~0과 같다. 커널은 \.{DONE}이 바뀔 때까지 기다린 뒤에 \.{RESULT}를 읽는다.
+
+@<상수@>=
+const (
+	blkBase   = hioBase + hioSize  // 장치 1의 물리 주소
+	blkSize   = 1024               // 블록의 바이트 수
+	blkBlock  = 0x08               // 레지스터 \.{BLOCK}의 오프셋
+	blkAddr   = 0x10               // 레지스터 \.{ADDR}의 오프셋
+	blkNblk   = 0x30               // 레지스터 \.{NBLK}의 오프셋
+	blkMagic  = 0x4e4e49582d424c4b // \.{"NNIX-BLK"}
+)
+
+@ @<타입 정의@>=
+type blk struct {
+	mx     *machine
+	f      *os.File // 디스크 이미지
+	nblk   Octa     // 레지스터 \.{NBLK}
+	block  Octa     // 레지스터 \.{BLOCK}
+	addr   Octa     // 레지스터 \.{ADDR}
+	result Octa     // 레지스터 \.{RESULT}
+	done   Octa     // 레지스터 \.{DONE}
+}
+
+@ 레지스터 \.{ID}, \.{RESULT}, \.{DONE}의 오프셋은 장치~0과 같다.
+
+@<장치 1의 레지스터를 읽어...@>=
+var reg Octa
+switch addr&^7 - blkBase {
+case hioID:
+	reg = blkMagic
+case hioResult:
+	reg = mx.blk.result
+case hioDone:
+	reg = mx.blk.done
+case blkNblk:
+	reg = mx.blk.nblk
+}
+val = reg >> ((8 - (1 << size) - int(addr&7)) << 3)
+
+@ 메모리는 |magicRead|와 |magicWrite|로 읽고 쓴다. 그러니 이 장치도 캐시 일관성을 지키는 DMA다.
+버퍼는 옥타바이트 경계에 있어야 하고 입출력 공간에 걸치면 안 된다. 호스트 파일의 읽기나 쓰기가
+실패해도 \.{RESULT}가 $-1$이 된다.
+
+@<장치 1의 레지스터에...@>=
+d := mx.blk
+switch addr - blkBase {
+case blkBlock:
+	d.block = val
+case blkAddr:
+	d.addr = val &^ signBit
+case hioCmd:
+	d.result = negOne
+	if d.block < d.nblk && d.addr&7 == 0 && d.addr+blkSize <= hioBase && (val == 1 || val == 2) {
+		var b [blkSize]byte
+		if val == 1 {
+			@<블록 |d.block|을 메모리 |d.addr|로 읽는다@>
+		} else {
+			@<메모리 |d.addr|를 블록 |d.block|에 쓴다@>
+		}
+	}
+	d.done++
+}
+
+@ @<블록 |d.block|을...@>=
+if _, err := d.f.ReadAt(b[:], int64(d.block)*blkSize); err == nil {
+	for k := 0; k < blkSize; k += 8 {
+		var o Octa
+		for _, c := range b[k : k+8] {
+			o = o<<8 | Octa(c)
+		}
+		mx.magicWrite(d.addr+Octa(k), o)
+	}
+	d.result = 0
+}
+
+@ @<메모리 |d.addr|를...@>=
+for k := 0; k < blkSize; k += 8 {
+	o := mx.magicRead(d.addr + Octa(k))
+	for j := 7; j >= 0; j-- {
+		b[k+j] = byte(o)
+		o >>= 8
+	}
+}
+if _, err := d.f.WriteAt(b[:], int64(d.block)*blkSize); err == nil {
+	d.result = 0
 }
 
 @* 찾아보기.
