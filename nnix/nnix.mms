@@ -19,6 +19,10 @@
 % 5단계: Exec과 Wait. Exec(TRAP 0,12,0)은 디스크의 목적 파일을 지금 프로세스의 새
 %   주소 공간에 싣고 MMIX-SIM과 같은 실행 환경을 차려 실행한다. Wait(TRAP 0,13,0)은
 %   끝난 자식을 거둔다. 이 둘과 Fork로 셸(nnix/sh.mms)이 디스크의 프로그램을 돌린다.
+% 6단계: 프레임 회수와 쓸 때 복사. 프레임마다 참조 계수를 두고, 끝난 프로세스와 Exec이
+%   버린 주소 공간의 프레임을 빈 목록으로 돌려받는다. Fork는 스택 세그먼트 말고는 페이지를
+%   복사하지 않고 함께 쓰며, 쓰기 허가를 끄고 PTE의 x 필드에 COW 표시를 해 둔다. 누가
+%   거기에 쓰면 그때 복사한다.
 %
 %   mmixal -b 250 -o nnix.mmo nnix.mms
 %   mmmix -knnix.mmo plain.mmconfig hello.mmb
@@ -31,10 +35,12 @@
 %   0 .. 4<<32    mmmix가 실은 프로그램 이미지(세그먼트 i가 i<<32에)
 %   4<<32         mmmix의 뼈대 페이지 테이블(부팅 뒤로는 쓰지 않는다)
 %   5<<32         이 커널의 코드와 데이터
-%   6<<32         파일 시스템의 커널 메모리: FAT 16KB, 디렉터리 4KB, 블록 캐시 1KB,
-%                 줄 버퍼 1KB, 그리고 #8000부터 핸들 표(256개 x 64바이트)
+%   6<<32         커널 메모리: FAT 16KB, 디렉터리 4KB, 블록 캐시 1KB, 줄 버퍼 1KB,
+%                 #5800에 Exec의 인자 버퍼, #8000에 핸들 표(256개 x 64바이트),
+%                 #c000에 Exec의 커널 핸들, #10000에 늘 0인 페이지, #18000에 프레임 관리
+%                 (다음 새 프레임, 빈 목록의 머리), #20000부터 프레임마다의 참조 계수
 %   7<<32         프로세스 p의 페이지 테이블이 7<<32+p<<15에. 세그먼트마다 한 페이지
-%   8<<32 ..      빈 프레임 풀. 앞에서부터 하나씩 꺼낸다.
+%   8<<32 ..      프레임 풀. 빈 목록에서 먼저 꺼내고, 없으면 앞에서부터 새로 꺼낸다.
 %   2^48+d<<16    장치 d. d=0은 HIO, d=1은 블록 장치다.
 %
 % 프로세스 p의 rV는 #12340D0700000000+p<<15+(p+1)<<3이다. b1..b4=1,2,3,4, 페이지
@@ -93,6 +99,7 @@ Wait    IS    13                TRAP 0,Wait,0: 끝난 자식 하나를 거두어
 MaxArg  IS    32                Exec의 인자는 32개까지
 EBufOff IS    #5800             Exec이 인자 문자열을 옮겨 두는 곳(4KB)
 IHOff   IS    #c000             Exec이 목적 파일을 읽는 커널 핸들
+COW     IS    #0001             PTE의 x 필드(하드웨어가 무시한다)의 쓸 때 복사 표시. ORH와 ANDNH로 다룬다
 
 % 블록 장치(장치 1)의 레지스터. ID, CMD, RESULT, DONE의 오프셋은 HIO와 같다.
 BLK     IS    #8001             장치 1의 기준 주소는 SETH BLK와 ORML BLKLO로 만든다
@@ -192,6 +199,13 @@ res     IS    $3
         PUT   :rT,t
         GETA  t,:DynEnt
         PUT   :rTT,t
+        SETH  t,#8000
+        ORMH  t,#0006
+        ORML  t,#0001
+        ORL   t,#8000
+        SETH  k,#8000
+        ORMH  k,#0008
+        STO   k,t,0             첫 새 프레임은 8<<32다
         GETA  t,:Procs
         LDO   t,t,:RVO          프로세스 0의 rV
         PUT   :rV,t
@@ -368,8 +382,12 @@ res     IS    $4
         PUT   :rWW,va
 1H      SET   res+1,va
         PUSHJ res,:PageIn
-        BNZ   res,Kill          들일 수 없거나 이미 있다(진짜 보호 위반)
-        GET   q,:rQ
+        BZ    res,2F
+        BN    res,Kill          범위 밖
+        SET   res+1,va
+        PUSHJ res,:CowBreak     이미 있다면 쓸 때 복사하는 페이지인가
+        BNZ   res,Kill          진짜 보호 위반
+2H      GET   q,:rQ
         SETMH t,#00e0
         ANDN  q,q,t
         PUT   :rQ,q
@@ -458,13 +476,158 @@ res     IS    $8
         POP   1,0
         PREFIX :
 
-% AllocFrame(): 빈 프레임 하나의 커널 주소. 꺼내기만 하고 돌려받지 않는다.
-AllocFrame GETA  $1,FreeFrame
-        LDO   $0,$1,0
-        SETL  $2,#2000
-        ADDU  $2,$0,$2
-        STO   $2,$1,0
+% 프레임 관리. 커널 메모리 #8000000600018000에 다음 새 프레임(FMTop)과 빈 목록의
+% 머리(FMFree)를 두고, #8000000600020000부터 프레임마다 참조 계수 바이트를 둔다.
+% 빈 프레임은 그 첫 옥타바이트에 다음 빈 프레임을 적어 목록으로 잇는다.
+% AllocFrame(): 프레임 하나를 꺼내 참조 계수를 1로 하고 그 커널 주소를 돌려준다.
+AllocFrame GET $2,rJ
+        SETH  $1,#8000
+        ORMH  $1,#0006
+        ORML  $1,#0001
+        ORL   $1,#8000          FMTop, FMFree
+        LDO   $0,$1,8
+        BZ    $0,1F
+        LDO   $3,$0,0
+        STO   $3,$1,8           빈 목록에서 꺼낸다
+        JMP   2F
+1H      LDO   $0,$1,0
+        SETL  $3,#2000
+        ADDU  $3,$0,$3
+        STO   $3,$1,0           새로 꺼낸다
+2H      SET   $4,$0
+        PUSHJ $3,RefCnt
+        SETL  $4,1
+        STB   $4,$3,0
+        PUT   rJ,$2
         POP   1,0
+
+% RefCnt(f): 프레임 f(커널 주소)의 참조 계수 바이트의 커널 주소.
+RefCnt  ANDNH $0,#8000
+        SETL  $1,8
+        SLU   $1,$1,32
+        SUBU  $0,$0,$1
+        SRU   $0,$0,13          프레임 번호
+        SETH  $1,#8000
+        ORMH  $1,#0006
+        ORML  $1,#0002
+        ADDU  $0,$0,$1
+        POP   1,0
+
+% IncRef(f), DecRef(f): 참조 계수를 하나 늘리고 줄인다. 0이 되면 빈 목록에 넣는다.
+IncRef  GET   $1,rJ
+        SET   $3,$0
+        PUSHJ $2,RefCnt
+        PUT   rJ,$1
+        LDBU  $3,$2,0
+        ADD   $3,$3,1
+        STB   $3,$2,0
+        POP   0,0
+DecRef  GET   $1,rJ
+        SET   $3,$0
+        PUSHJ $2,RefCnt
+        PUT   rJ,$1
+        LDBU  $3,$2,0
+        SUB   $3,$3,1
+        STB   $3,$2,0
+        BP    $3,9F
+        SETH  $4,#8000
+        ORMH  $4,#0006
+        ORML  $4,#0001
+        ORL   $4,#8000
+        LDO   $5,$4,8
+        STO   $5,$0,0
+        STO   $0,$4,8           빈 목록의 머리가 된다
+9H      POP   0,0
+
+% FreeSpace(): 지금 프로세스의 페이지 테이블을 비우고 프레임들의 참조를 놓는다. 그다음
+% 옛 변환을 변환 캐시에서 지운다.
+FreeSpace GET $4,rJ
+        GET   $0,rV
+        SLU   $0,$0,24
+        SRU   $0,$0,37
+        SLU   $0,$0,13
+        ORH   $0,#8000          테이블 네 장
+        SET   $1,0
+1H      LDO   $2,$0,$1
+        BZ    $2,2F
+        STCO  0,$0,$1
+        SETL  $3,#1fff
+        ANDN  $6,$2,$3
+        ANDNH $6,#ffff
+        ORH   $6,#8000
+        PUSHJ $5,DecRef
+2H      ADDU  $1,$1,8
+        SETL  $3,#8000
+        CMP   $3,$1,$3
+        BN    $3,1B
+        SYNC  6
+        PUT   rJ,$4
+        POP   0,0
+
+% CowBreak(va): 지금 프로세스에서 va가 든 쓸 때 복사 페이지를 쓸 수 있게 한다. 그 프레임을
+% 혼자 쓰고 있으면 쓰기 허가만 되돌리고, 함께 쓰고 있으면 새 프레임에 복사해 그것으로 바꾼다.
+% COW 표시가 없는 페이지면 -1이다(진짜 보호 위반).
+        PREFIX Cow:
+va      IS    $0
+seg     IS    $1
+pg      IS    $2
+pte     IS    $3
+t       IS    $4
+old     IS    $5
+e       IS    $6
+rj      IS    $7
+nf      IS    $8
+res     IS    $9
+:CowBreak BN  va,9F
+        SRU   seg,va,61
+        ANDNH va,#e000
+        SRU   pg,va,:PageS
+        SRU   t,pg,10
+        BNZ   t,9F
+        GET   t,:rV
+        SLU   pte,t,24
+        SRU   pte,pte,37
+        SLU   pte,pte,13
+        ORH   pte,#8000
+        SLU   t,seg,:PageS
+        ADDU  pte,pte,t
+        8ADDU pte,pg,pte        pte=PTE의 주소
+        LDO   e,pte,0
+        SRU   t,e,48
+        AND   t,t,1
+        BZ    t,9F              쓸 때 복사하는 페이지가 아니다
+        GET   rj,:rJ
+        SETL  t,#1fff
+        ANDN  old,e,t
+        ANDNH old,#ffff
+        ORH   old,#8000         지금 프레임
+        SET   res+1,old
+        PUSHJ res,:RefCnt
+        LDBU  t,res,0
+        CMP   t,t,1
+        BZ    t,1F              혼자 쓴다
+        PUSHJ res,:AllocFrame
+        SET   nf,res
+        SET   res+1,old
+        SET   res+2,nf
+        ZSZ   res+3,seg,1       텍스트 세그먼트인가
+        PUSHJ res,:CopyPage
+        SET   res+1,old
+        PUSHJ res,:DecRef
+        SETL  t,#1fff
+        AND   e,e,t             주소 공간 번호와 보호 비트만 남긴다
+        ANDNH nf,#8000
+        OR    e,e,nf
+1H      OR    e,e,2             쓰기 허가
+        ANDNH e,:COW
+        STO   e,pte,0
+        SYNC  6
+        PUT   :rJ,rj
+        SET   $0,0
+        POP   1,0
+9H      NEG   $0,0,1
+        POP   1,0
+        PREFIX :
 
 % CopyPage(src,dst,text): 커널 주소 src의 페이지를 dst로 복사한다. text가 0이
 % 아니면 그 페이지는 명령으로 쓰인다. 복사한 것은 아직 D-캐시에만 있을 수 있고
@@ -486,7 +649,8 @@ CopyPage SET   $3,0
 9H      POP   0,0
 
 % UserPA(va,need): 사용자의 가상 주소 va를 물리 주소로 바꾼다. 페이지가 없으면
-% 들인 뒤 다시 바꾼다. 보호 비트에 need가 없거나 들일 수 없으면 -1이다.
+% 들인 뒤 다시 바꾼다. 쓰려는데 쓸 때 복사하는 페이지면 먼저 복사한다. 보호 비트에
+% need가 없거나 들일 수 없으면 -1이다.
         PREFIX UserPA:
 need    IS    $1
 rj      IS    $2
@@ -498,8 +662,14 @@ res     IS    $3
         BNN   res,9F
         SET   res+1,$0
         PUSHJ res,:PageIn
-        BNZ   res,8F
+        BN    res,8F
+        BZ    res,7F
+        AND   res,need,2        이미 있다. 쓰려는 것이면 쓸 때 복사하는 페이지일 수 있다
+        BZ    res,8F
         SET   res+1,$0
+        PUSHJ res,:CowBreak
+        BNZ   res,8F
+7H      SET   res+1,$0
         SET   res+2,need
         PUSHJ res,:Translate
         JMP   9F
@@ -745,6 +915,8 @@ Reap    STCO  0,q,:ST           좀비를 거둔다
 % Exit: 지금 프로세스를 끝낸다. 종료 코드는 rBB(사용자의 $255)에 있다. 레지스터 스택은
 % 버린다. 이 프로세스의 자식들은 고아가 되고(좀비는 거둔다), 부모가 Wait으로 잠들어
 % 있으면 깨워 이 pid를 돌려주고, 부모가 살아 있으면 좀비로 남아 부모의 Wait을 기다린다.
+% 그다음 이 프로세스의 프레임을 돌려준다. 그 뒤에 쏟아지는 레지스터는 사라질 수 있으므로
+% 다음 pid는 메모리에 두었다가 읽는다.
 % 돌 수 있는 프로세스가 더 없으면 디스크를 맞추고 기계를 멈춘다(mmmix -s의 종료 코드는
 % 이 프로세스의 $255다).
         PREFIX Exit:
@@ -804,7 +976,11 @@ res     IS    $7
         LDO   u,t,0
         BZ    u,Stop
         PUSHJ res,:Next
-        SET   $0,res
+        GETA  t,:ExitNext
+        STO   res,t,0
+        PUSHJ res,:FreeSpace    이 프로세스의 프레임을 돌려준다
+        GETA  t,:ExitNext       레지스터는 이제 믿지 않는다
+        LDO   $0,t,0
         JMP   :Resume
 Stop    PUSHJ res,:SyncFS       디스크를 맞춘다(디스크가 없으면 할 일이 없다)
         GET   $255,:rBB
@@ -843,9 +1019,10 @@ Next    GETA  $1,Cur
         BNZ   $1,1B
         POP   1,0
 
-% CopySpace(prv,crv): rV가 prv인 주소 공간에 들어 있는 페이지를 모두 새 프레임에
-% 복사해, rV가 crv인 주소 공간의 테이블에 같은 자리로 넣는다. 보호 비트는 그대로이고
-% 주소 공간 번호만 바뀐다. 자식의 테이블은 앞서 같은 pid를 쓴 프로세스의 것일 수 있으므로
+% CopySpace(prv,crv): rV가 prv인 주소 공간에 들어 있는 페이지를 rV가 crv인 주소 공간의
+% 테이블의 같은 자리에 넣는다. 스택 세그먼트의 페이지는 새 프레임에 복사한다. 커널이
+% 인터럽트를 끈 채 SAVE로 거기에 쓰므로 쓰기 허가를 끌 수 없기 때문이다. 나머지는 프레임을
+% 함께 쓰고, 쓸 수 있던 페이지는 부모와 자식 모두에서 쓰기 허가를 끄고 COW 표시를 한다. 자식의 테이블은 앞서 같은 pid를 쓴 프로세스의 것일 수 있으므로
 % 부모에게 없는 페이지의 칸도 모두 지운다.
         PREFIX Copy:
 pb      IS    $0
@@ -874,7 +1051,25 @@ res     IS    $9
 1H      LDO   pte,pb,i
         STCO  0,cb,i            앞서 이 자리를 쓴 프로세스의 PTE를 지운다
         BZ    pte,2F
-        PUSHJ res,:AllocFrame
+        SETL  t,#6000
+        CMP   t,i,t
+        BNN   t,Copy            스택 세그먼트는 바로 복사한다
+        AND   t,pte,2
+        BZ    t,Share
+        ANDN  pte,pte,2         쓰기 허가를 끄고
+        ORH   pte,:COW          쓸 때 복사한다고 적는다
+        STO   pte,pb,i          부모도 그렇다
+Share   SETL  t,#1fff
+        ANDN  res+1,pte,t
+        ANDNH res+1,#ffff
+        ORH   res+1,#8000
+        PUSHJ res,:IncRef       프레임을 함께 쓴다
+        SETL  t,#1ff8
+        ANDN  fr,pte,t
+        OR    fr,fr,cn          주소 공간 번호만 자식의 것으로
+        STO   fr,cb,i
+        JMP   2F
+Copy    PUSHJ res,:AllocFrame
         SET   fr,res
         SETL  t,#1fff
         ANDN  res+1,pte,t
@@ -1977,26 +2172,15 @@ Found   SETH  ih,#8000
         PUSHJ res,:ReadTet
         SUB   k,k,1
         JMP   6B
-% 여기부터는 돌아갈 수 없다. 페이지 테이블을 비우고, 비어 있는 페이지는 0으로 채워
-% 들이게 하고, 스택 세그먼트의 앞부분을 들여놓는다. 옛 프레임은 돌려받지 않는다.
+% 여기부터는 돌아갈 수 없다. 옛 주소 공간을 놓고, 비어 있는 페이지는 0으로 채워
+% 들이게 하고, 스택 세그먼트의 앞부분을 들여놓는다.
 Clear   GETA  t,:Cur
         LDO   ent,t,0
         SLU   ent,ent,:PShift
         GETA  t,:Procs
         ADDU  ent,ent,t
         STCO  0,ent,:BACK
-        GET   t,:rV
-        SLU   p,t,24
-        SRU   p,p,37
-        SLU   p,p,13
-        ORH   p,#8000           테이블 네 장
-        SET   k,0
-        SETL  c,#8000
-7H      STCO  0,p,k
-        ADDU  k,k,8
-        CMP   t,k,c
-        BN    t,7B
-        SYNC  6                 옛 변환을 변환 캐시에서 지운다
+        PUSHJ res,:FreeSpace    옛 주소 공간의 프레임을 돌려준다
         NEG   t,0,1
         GETA  c,:URTag
         STO   t,c,0
@@ -2527,7 +2711,7 @@ Ready   AND   $6,base,need
         POP   1,0
         PREFIX :
 
-FreeFrame OCTA  #8000000800000000 다음 빈 프레임의 커널 주소
+ExitNext OCTA  0                Exit이 다음에 돌릴 pid
 Cur     OCTA  0                 지금 도는 프로세스의 pid
 NReady  OCTA  1                 돌 수 있는 프로세스의 수
 Procs   OCTA  1,#12340D0700000008,0,0,0,0,0,0,-1,1 프로세스 0: 돌 수 있고, 테이블은 7<<32, n=1, 부모 없음, 이미지

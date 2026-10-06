@@ -1113,6 +1113,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -1377,7 +1378,8 @@ pid를, 자식에게 0을 돌려준다. 프로그램 \.{fork}에서 부모와 �
 번씩 찍고, 자식은 그 전에 변수 \.{Var}를 \.{C}로 바꾼다. 타이머 인터럽트가 둘을 번갈아 돌리므로
 꼬리표가 섞여 나오고, 주소 공간이 따로이므로 부모는 여전히 \.{A}를 본다. 메타 시뮬레이터는 결정적이라
 섞이는 모양도 늘 같다. 종료 코드는 마지막으로 끝난 프로세스의 \$255다. 프로그램 \.{many}는 \.{Fork}를
-네 번 하는데, 자식들이 오래 살아 있으므로 프로세스 표(넷)가 차서 네 번째는 $-1$을 받는다.
+네 번 하는데, 자식들이 오래 살아 있으므로 프로세스 표(넷)가 차서 네 번째는 $-1$을 받는다. 그 뒤
+자식 셋이 찍는 순서는 타이밍에 달렸으므로(설정마다 다르다) 줄의 집합만 견준다.
 
 @(mmmix_test.go@>=
 const (
@@ -1397,6 +1399,9 @@ const (
 		"0000010000000000000000006000000000000088fe000000000000000000000000000000"
 )
 
+@ 기대하는 출력과 종료 코드는 두 설정에서 같다.
+
+@(mmmix_test.go@>=
 func TestKernelFork(t *testing.T) {
 	k := assembleKernel(t)
 	for _, c := range []struct {
@@ -1409,9 +1414,40 @@ func TestKernelFork(t *testing.T) {
 		p := writeHex(t, c.name, c.hex)
 		for _, cfg := range []string{"plain", "deluxe"} {
 			out, e, code := simulate(t, "", "-s", "-k"+k, "../examples/"+cfg+".mmconfig", p)
+			if c.name == "many.mmb" {
+				lines := strings.SplitAfter(out, "\n")
+				sort.Strings(lines[1:])
+				out = strings.Join(lines, "")
+			}
 			if out != c.out || code != c.code || e != "" {
 				t.Errorf("%s %s: %q %d %q", c.name, cfg, out, code, e)
 			}
+		}
+	}
+}
+
+@ 쓸 때 복사를 시험한다. 프로그램 \.{cow}에서 부모는 버퍼에 \.{parent}를 담은 채 \.{Fork}하고
+\.{Wait}한다. 자식은 함께 쓰는 그 페이지에 \.{Fgets}로 한 줄을 읽는다. 이때는 커널이 페이지를 들여놓으며
+복사하고 장치가 거기에 쓴다. 이어서 자식은 사용자 방식의 저장으로 첫 바이트를 \.{C}로 고쳐 찍는다. 이때는
+\.{w} 결함이 난다. 부모는 그 뒤에 손대지 않은 자기 버퍼를 찍어야 한다.
+
+@(mmmix_test.go@>=
+const cowMMB = "000000000000010000000b0042ff000500000d0023fffe00000007010000000023fffe10" +
+		"000004002300fe00e3010043a101000023fffe0000000701000000000000000000000000" +
+		"2000000000000000706172656e740a000000000000000000200000000000001020000000" +
+		"000000000000000000000010000000000000000040000000000000004000000000000020" +
+		"400000000000001800000000000000004000000000000018636f77000000000000000000" +
+		"000000006000000000000000000000000000000140000000000000080000000000000002" +
+		"2000000000000000000000000000010000000000000000006000000000000088fe000000" +
+		"000000000000000000000000"
+
+func TestKernelCow(t *testing.T) {
+	k := assembleKernel(t)
+	p := writeHex(t, "cow.mmb", cowMMB)
+	for _, cfg := range []string{"plain", "deluxe"} {
+		out, e, code := simulate(t, "child\n", "-s", "-k"+k, "../examples/"+cfg+".mmconfig", p)
+		if out != "StdIn> Child\nparent\n" || e != "" || code != 7 {
+			t.Errorf("%s: %q %q %d", cfg, out, e, code)
 		}
 	}
 }
@@ -1586,6 +1622,7 @@ func TestKernelShell(t *testing.T) {
 		goRun(t, "nnixfs", "put", in("disk.img"), in(prog+".mmo"))
 	}
 	@<셸에서 명령 다섯을 돌리고 출력을 견준다@>
+	@<\.{hello}를 두 번 돌린 뒤와 여섯 번 돌린 뒤의 프레임을 견준다@>
 }
 
 @ @<셸에서 명령 다섯을...@>=
@@ -1598,6 +1635,26 @@ if !strings.HasPrefix(out, head) || !strings.HasSuffix(out, tail) || len(out) < 
 	digest(out[len(head):len(out)-len(tail)]) != "bd64b4848d0e1d0d" ||
 	e != "sh: cannot execute nope\n" || code != 0 {
 	t.Errorf("shell: %q, %q, code %d", out, e, code)
+}
+
+@ 커널은 끝난 프로세스의 프레임을 빈 목록으로 돌려받는다. 그러니 셸에서 \.{hello}를 몇 번 돌리든
+새로 꺼낸 프레임의 끝(커널 메모리 \Hex{8000000600018000}, 물리 주소 \Hex{600018000})은 늘지 않아야
+한다. 대화 방식으로 돌린 뒤 \.{m} 명령으로 그 값을 읽는다. 시뮬레이터의 표준 입력은 대화 명령과
+셸의 입력이 함께 쓴다.
+
+@<\.{hello}를 두 번...@>=
+frames := func(n int) string {
+	input := "100000000\n" + strings.Repeat("hello\n", n) + "exit\nm600018000\nq\n"
+	out, _, _ := simulate(t, input, "-k"+k, "-d"+in("disk.img"), "../examples/plain.mmconfig",
+		in("sh.mmb"))
+	i := strings.Index(out, "m[600018000]=")
+	if i < 0 {
+		t.Fatalf("no frame top in %q", out)
+	}
+	return out[i : i+29]
+}
+if a, b := frames(2), frames(6); a != b || a == "m[600018000]=0000000000000000" {
+	t.Errorf("frames leak: %s, then %s", a, b)
 }
 
 @ 커널 파일이나 디스크 이미지를 열 수 없거나 커널의 형식이 틀렸을 때다.
