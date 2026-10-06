@@ -9,6 +9,9 @@
 % 2단계: 커널이 먼저 부팅하고, 진짜 페이지 테이블과 요구 페이징을 쓴다.
 %   mmmix가 실어 둔 프로그램 이미지는 ``디스크의 실행 파일''로 치고, 사용자가
 %   처음 건드리는 페이지마다 새 프레임을 꺼내 이미지에서 복사해 들인다.
+% 3단계: 프로세스 여럿. 새 시스템 호출 Fork(TRAP 0,11,0)가 주소 공간을 복사해
+%   자식을 만들고, 구간 계수기 rI의 타이머 인터럽트가 SAVE와 UNSAVE로 프로세스를
+%   번갈아 돌린다. Halt는 그 프로세스만 끝내고, 마지막 프로세스가 끝나면 멈춘다.
 %
 %   mmixal -b 250 -o nnix.mmo nnix.mms
 %   mmmix -knnix.mmo plain.mmconfig hello.mmb
@@ -21,13 +24,14 @@
 %   0 .. 4<<32    mmmix가 실은 프로그램 이미지(세그먼트 i가 i<<32에)
 %   4<<32         mmmix의 뼈대 페이지 테이블(부팅 뒤로는 쓰지 않는다)
 %   5<<32         이 커널의 코드와 데이터
-%   7<<32         사용자의 페이지 테이블. 세그먼트마다 한 페이지(PTE 1024개)
+%   7<<32         프로세스 p의 페이지 테이블이 7<<32+p<<15에. 세그먼트마다 한 페이지
 %   8<<32 ..      빈 프레임 풀. 앞에서부터 하나씩 꺼낸다.
 %   2^48+d<<16    장치 d. 지금은 d=0인 HIO 하나뿐이다.
 %
-% 사용자의 rV는 #12340D0700000008이다. b1..b4=1,2,3,4, 페이지 크기 2^13,
-% 테이블 뿌리 r=7<<32, 주소 공간 번호 n=1, 하드웨어 변환(f=0)이다. 세그먼트마다
-% 테이블이 한 페이지뿐이라 세그먼트마다 처음 1024페이지(8MB)만 쓸 수 있다.
+% 프로세스 p의 rV는 #12340D0700000000+p<<15+(p+1)<<3이다. b1..b4=1,2,3,4, 페이지
+% 크기 2^13, 테이블 뿌리 r=7<<32+p<<15, 주소 공간 번호 n=p+1, 하드웨어 변환(f=0)이다.
+% 주소 공간 번호가 프로세스마다 다르므로 프로세스를 바꿀 때 변환 캐시를 비우지 않는다.
+% 세그먼트마다 테이블이 한 페이지뿐이라 세그먼트마다 처음 1024페이지(8MB)만 쓸 수 있다.
 %
 % 커널은 인터럽트를 끈 채로 돈다. 그래서 커널이 하드웨어 변환으로 비어 있는
 % 사용자 페이지를 읽으면 폴트가 나지 않고 조용히 0이 읽힌다. 그러므로 커널은
@@ -59,6 +63,19 @@ RV      IS    #30               읽고 쓰기: 주소를 변환할 rV 값
 % 연산 코드는 TRAP의 Y와 같다(Fopen=1 .. Ftell=10). 0은 트립 경고다.
 TripWarn IS    0
 MaxOp   IS    10
+Fork    IS    11                TRAP 0,Fork,0: 부모는 자식의 pid를, 자식은 0을 받는다
+
+% 프로세스 표. 항목마다 옥타바이트 여덟 개다.
+NProc   IS    4                 프로세스는 넷까지(2의 거듭제곱이어야 한다)
+ST      IS    0                 0이면 빈 자리, 1이면 돌 수 있다
+RVO     IS    8                 이 프로세스의 rV
+CTX     IS    16                SAVE가 돌려준 문맥의 주소(이 프로세스의 가상 주소)
+BBO     IS    24                rBB (사용자의 $255)
+WWO     IS    32                rWW
+XXO     IS    40                rXX
+YYO     IS    48                rYY
+ZZO     IS    56                rZZ
+Quantum IS    10000             타이머의 한 조각(사이클)
 
 PageS   IS    13                페이지 크기는 2^13바이트
 StackPages IS    4              부팅할 때 들여놓는 스택 세그먼트의 페이지 수
@@ -77,21 +94,49 @@ Boot    PUT   rK,0              커널은 인터럽트를 끈 채로 돈다
 Main    IS    Boot
 
 % 트랩 입구. TRAP은 사용자의 $255를 rBB로 옮기고 $255를 rJ로 정한 뒤 여기로 온다.
-% 처리기가 마음대로 쓸 수 있는 것은 $255뿐이므로, PUSHJ $255로 사용자의 지역
-% 레지스터를 모두 숨기고 새 틀에서 일한다. 전역 레지스터는 건드리지 않는다.
-TrapEnt PUSHJ $255,Syscall
-        PUT   rJ,$255           TRAP이 $255에 넣어 둔 사용자의 rJ를 되돌린다
+% rJ는 그대로 있으므로 $255는 마음대로 써도 된다. Fork면 곧바로 문맥을 저장하고,
+% 아니면 PUSHJ $255로 사용자의 지역 레지스터를 모두 숨기고 새 틀에서 일한다.
+% 전역 레지스터는 건드리지 않는다.
+TrapEnt GET   $255,rXX
+        SLU   $255,$255,32
+        SRU   $255,$255,40      $255=rXX의 아랫 테트라에서 opcode, X, Y
+        CMP   $255,$255,Fork
+        BZ    $255,DoFork
+        GET   $255,rJ
+        PUSHJ $255,Syscall
+        PUT   rJ,$255           사용자의 rJ를 되돌린다
         NEG   $255,0,1          돌아갈 때의 rK: 모두 허용(원시 처리기와 같다)
         RESUME 1                rK<-$255, $255<-rBB
 
-% 동적 트랩 입구. 레지스터를 넘겨받는 모양은 TRAP과 같다.
-DynEnt  PUSHJ $255,Fault
+% 동적 트랩 입구. 레지스터를 넘겨받는 모양은 TRAP과 같다. 보호 결함(r, w, x)을
+% 먼저 본다. 타이머라면 돌 수 있는 프로세스가 둘 이상일 때만 프로세스를 바꾸고,
+% 혼자면 타이머를 끈다(rI를 다시 걸지 않는다). 나머지는 Fault가 지운다.
+DynEnt  GET   $255,rQ
+        SRU   $255,$255,32
+        AND   $255,$255,#e0
+        BNZ   $255,1F           보호 결함
+        GET   $255,rQ
+        AND   $255,$255,#40     구간 인터럽트
+        BZ    $255,1F
+        GETA  $255,NReady
+        LDO   $255,$255,0
+        CMP   $255,$255,1
+        BP    $255,Tick
+        GET   $255,rQ
+        ANDN  $255,$255,#40
+        PUT   rQ,$255
+        NEG   $255,0,1
+        RESUME 1
+1H      GET   $255,rJ
+        PUSHJ $255,Fault
         PUT   rJ,$255
         NEG   $255,0,1
         RESUME 1
 
-% Init: 트랩 주소를 정하고, 스택 세그먼트의 앞부분을 들여놓고, rV와 장치의 RV를
-% 사용자의 페이지 테이블로 바꾼다. 테이블은 처음에 비어 있다(메모리는 0이다).
+% Init: 트랩 주소를 정하고, rV와 장치의 RV를 프로세스 0의 페이지 테이블로 바꾸고,
+% 스택 세그먼트의 앞부분을 들여놓는다. 테이블은 처음에 비어 있다(메모리는 0이다).
+% 부팅 때 레지스터 고리는 거의 비어 있으므로, rV를 바꾼 뒤에 지역 레지스터가
+% 아직 들이지 않은 스택 페이지로 쏟아질 일은 없다.
         PREFIX Init:
 t       IS    $0
 k       IS    $1
@@ -102,6 +147,11 @@ res     IS    $3
         PUT   :rT,t
         GETA  t,:DynEnt
         PUT   :rTT,t
+        GETA  t,:Procs
+        LDO   t,t,:RVO          프로세스 0의 rV
+        PUT   :rV,t
+        SETH  k,:HIO
+        STO   t,k,:RV
         SET   k,0
 1H      SETH  res+1,#6000
         SLU   t,k,:PageS
@@ -110,13 +160,6 @@ res     IS    $3
         ADD   k,k,1
         CMP   t,k,:StackPages
         BN    t,1B
-        SETH  t,#1234
-        ORMH  t,#0D07
-        ORL   t,#0008           t=사용자의 rV
-        PUT   :rV,t
-        SETH  k,:HIO
-        STO   t,k,:RV
-        SYNC  6                 변환 캐시를 지운다
         PUT   :rJ,rj
         POP   0,0
         PREFIX :
@@ -205,10 +248,25 @@ Bad     NEG   t,0,1
         PUT   :rBB,t
         JMP   Done
 
-% Stop: Halt. Z=0이면 멈추고, Z=1이면 기본 트립 처리기(TRAP 1)가 부른 것이므로
+% Stop: Halt. Z=0이면 이 프로세스를 끝내고(마지막 프로세스면 기계를 멈추고), Z=1이면 기본 트립 처리기(TRAP 1)가 부른 것이므로
 % 트립 경고를 찍는다. 마법처럼 rBB는 그대로 둔다.
 Stop    BNZ   h,Warn
-        GET   $255,:rBB         종료 코드는 Halt할 때의 사용자 $255다(mmmix -s)
+        GETA  t,:NReady
+        LDO   a0,t,0
+        CMP   a1,a0,1
+        BNP   a1,Last
+        SUB   a0,a0,1           이 프로세스만 끝낸다
+        STO   a0,t,0
+        GETA  t,:Cur
+        LDO   a1,t,0
+        SLU   a1,a1,6
+        GETA  t,:Procs
+        ADDU  a1,a1,t
+        STCO  0,a1,:ST
+        PUSHJ res,:Next
+        SET   t,res
+        JMP   :Resume           이 레지스터 스택은 버린다
+Last    GET   $255,:rBB         종료 코드는 Halt할 때의 사용자 $255다(mmmix -s)
 :Halt5  SYNC  5                 쓰기 버퍼를 비운다
 1H      SYNC  4
         JMP   1B
@@ -271,60 +329,56 @@ Kill    GETA  res+1,:KillMsg
         JMP   :Halt5
         PREFIX :
 
-% PageIn(va): va가 든 페이지를 들인다. 빈 프레임을 하나 꺼내, 프로그램 이미지의
-% 같은 페이지(세그먼트 i의 페이지 p라면 물리 주소 i<<32+p<<13)를 복사하고, PTE를
-% 쓴다. 텍스트 세그먼트는 rwx, 나머지는 rw-다(뼈대 페이지 테이블과 같다).
+% PageIn(va): 지금 프로세스에서 va가 든 페이지를 들인다. 빈 프레임을 하나 꺼내,
+% 프로그램 이미지의 같은 페이지(세그먼트 i의 페이지 p라면 물리 주소 i<<32+p<<13)를
+% 복사하고, PTE를 쓴다. 테이블과 주소 공간 번호는 rV에서 얻는다. 텍스트 세그먼트는
+% rwx, 나머지는 rw-다(뼈대 페이지 테이블과 같다).
 % 돌려주는 값: 0이면 들였고, 1이면 이미 있었고, -1이면 범위 밖이다.
         PREFIX PageIn:
 seg     IS    $1
 pg      IS    $2
 pte     IS    $3
-frame   IS    $5
-src     IS    $6
-lim     IS    $8
+t       IS    $4
+rv      IS    $5
+rj      IS    $6
+frame   IS    $7
+res     IS    $8
 :PageIn BN    $0,9F             사용자의 주소는 음이 아니어야 한다
         SRU   seg,$0,61
         ANDNH $0,#e000
         SRU   pg,$0,:PageS
-        SRU   $4,pg,10
-        BNZ   $4,9F             세그먼트마다 처음 1024페이지뿐이다
-        SETH  pte,#8000
-        ORMH  pte,#0007         테이블의 커널 주소
-        SLU   $4,seg,:PageS
-        ADDU  pte,pte,$4
+        SRU   t,pg,10
+        BNZ   t,9F              세그먼트마다 처음 1024페이지뿐이다
+        GET   rv,:rV
+        SLU   pte,rv,24
+        SRU   pte,pte,37
+        SLU   pte,pte,13
+        ORH   pte,#8000         테이블 뿌리의 커널 주소
+        SLU   t,seg,:PageS
+        ADDU  pte,pte,t
         8ADDU pte,pg,pte        pte=PTE의 주소
-        LDO   $4,pte,0
-        BNZ   $4,8F
-        GETA  $4,:FreeFrame
-        LDO   frame,$4,0
-        SETL  lim,#2000
-        ADDU  $7,frame,lim
-        STO   $7,$4,0           다음 빈 프레임
-        SETH  src,#8000
-        SLU   $4,seg,32
-        OR    src,src,$4
-        SLU   $4,pg,:PageS
-        OR    src,src,$4        src=이미지 안의 같은 페이지
-        SET   $7,0
-1H      LDO   $4,src,$7
-        STO   $4,frame,$7
-        ADDU  $7,$7,8
-        CMP   $4,$7,lim
-        BN    $4,1B
-        BNZ   seg,3F
-% 텍스트 페이지는 명령으로 쓰인다. 복사한 것은 아직 D-캐시에만 있을 수 있고 I-캐시는
-% 메모리에서 채우므로, 음수 주소의 SYNCD로 메모리에 내려보내고 캐시에서 없앤다.
-        SET   $7,0
-4H      SYNCD #ff,frame,$7
-        INCL  $7,#100
-        CMP   $4,$7,lim
-        BN    $4,4B
-3H      ANDNH frame,#8000       물리 주소
-        ORL   frame,#8          n=1
-        SET   $4,6              rw-
+        LDO   t,pte,0
+        BNZ   t,8F
+        GET   rj,:rJ
+        PUSHJ res,:AllocFrame
+        SET   frame,res
+        SETH  res+1,#8000
+        SLU   t,seg,32
+        OR    res+1,res+1,t
+        SLU   t,pg,:PageS
+        OR    res+1,res+1,t     이미지 안의 같은 페이지
+        SET   res+2,frame
+        ZSZ   res+3,seg,1       텍스트 세그먼트인가
+        PUSHJ res,:CopyPage
+        PUT   :rJ,rj
+        ANDNH frame,#8000       물리 주소
+        SETL  t,#1ff8
+        AND   t,rv,t
+        OR    frame,frame,t     주소 공간 번호
+        SET   t,6               rw-
         BNZ   seg,2F
-        SET   $4,7              rwx
-2H      OR    frame,frame,$4
+        SET   t,7               rwx
+2H      OR    frame,frame,t
         STO   frame,pte,0
         SET   $0,0
         POP   1,0
@@ -333,6 +387,33 @@ lim     IS    $8
 9H      NEG   $0,0,1
         POP   1,0
         PREFIX :
+
+% AllocFrame(): 빈 프레임 하나의 커널 주소. 꺼내기만 하고 돌려받지 않는다.
+AllocFrame GETA  $1,FreeFrame
+        LDO   $0,$1,0
+        SETL  $2,#2000
+        ADDU  $2,$0,$2
+        STO   $2,$1,0
+        POP   1,0
+
+% CopyPage(src,dst,text): 커널 주소 src의 페이지를 dst로 복사한다. text가 0이
+% 아니면 그 페이지는 명령으로 쓰인다. 복사한 것은 아직 D-캐시에만 있을 수 있고
+% I-캐시는 메모리에서 채우므로, 음수 주소의 SYNCD로 메모리에 내려보내고 캐시에서
+% 없앤다.
+CopyPage SET   $3,0
+        SETL  $4,#2000
+1H      LDO   $5,$0,$3
+        STO   $5,$1,$3
+        ADDU  $3,$3,8
+        CMP   $5,$3,$4
+        BN    $5,1B
+        BZ    $2,9F
+        SET   $3,0
+2H      SYNCD #ff,$1,$3
+        INCL  $3,#100
+        CMP   $5,$3,$4
+        BN    $5,2B
+9H      POP   0,0
 
 % UserPA(va,need): 사용자의 가상 주소 va를 물리 주소로 바꾼다. 페이지가 없으면
 % 들인 뒤 다시 바꾼다. 보호 비트에 need가 없거나 들일 수 없으면 -1이다.
@@ -418,6 +499,200 @@ res     IS    $6
 9H      PUT   :rJ,rj
         SET   $0,res
         POP   1,0
+        PREFIX :
+
+% 문맥 바꾸기. Tick(타이머)과 DoFork(Fork)는 입구에서 곧바로 온다. 그때 rJ와 지역
+% 레지스터는 사용자의 것이고, 사용자의 $255는 rBB에, 재개 정보는 rWW..rZZ에 있다.
+% SAVE $255,0은 나머지를 모두 이 프로세스의 레지스터 스택(스택 세그먼트)에 저장하고
+% 문맥의 주소를 $255에 돌려준다. 그 뒤로 레지스터 스택은 비어 있으므로 커널은
+% 지역 레지스터를 마음대로 쓰고 서브루틴을 부를 수 있다. 다만 그 아래로 POP하면
+% 안 된다. Resume은 다른 프로세스의 rV로 바꾸고 그 재개 정보를 되돌린 뒤, UNSAVE로
+% 그 문맥을 되살리고 RESUME 1로 넘어간다.
+        PREFIX Sched:
+t       IS    $0
+e       IS    $1
+c       IS    $2
+cp      IS    $3
+u       IS    $4
+res     IS    $5
+:Tick   SAVE  $255,0
+        GET   t,:rQ
+        ANDN  t,t,#40
+        PUT   :rQ,t             구간 인터럽트를 지운다
+        SETL  t,:Quantum
+        PUT   :rI,t             다음 조각
+        SET   res+1,$255
+        PUSHJ res,:Store
+        PUSHJ res,:Next
+        SET   t,res
+        JMP   :Resume
+
+% DoFork: 지금 프로세스의 문맥을 저장하고 빈 자리에 자식을 만든다. 자식은 부모와
+% 같은 문맥 주소와 재개 정보를 갖고, 주소 공간은 들여놓은 페이지를 모두 새 프레임에
+% 복사해 만든다. 그래서 자식의 스택 세그먼트에도 같은 문맥이 같은 주소에 있다.
+% 부모의 rBB는 자식의 pid, 자식의 rBB는 0이다. 빈 자리가 없으면 부모에게 -1을 준다.
+:DoFork SAVE  $255,0
+        SET   res+1,$255
+        PUSHJ res,:Store        부모의 상태
+        GETA  t,:Cur
+        LDO   t,t,0
+        SLU   e,t,6
+        GETA  u,:Procs
+        ADDU  e,e,u             e=부모의 항목
+        SET   cp,0
+1H      ADD   cp,cp,1
+        CMP   t,cp,:NProc
+        BNN   t,Full
+        SLU   c,cp,6
+        ADDU  c,c,u             c=자식 후보의 항목
+        LDO   t,c,:ST
+        BNZ   t,1B
+        SETL  t,1
+        STO   t,c,:ST
+        SETH  t,#1234
+        ORMH  t,#0D07
+        SLU   u,cp,15
+        ADDU  t,t,u
+        ADD   u,cp,1
+        SLU   u,u,3
+        ADDU  t,t,u             t=자식의 rV
+        STO   t,c,:RVO
+        LDO   t,e,:CTX
+        STO   t,c,:CTX
+        LDO   t,e,:WWO
+        STO   t,c,:WWO
+        LDO   t,e,:XXO
+        STO   t,c,:XXO
+        LDO   t,e,:YYO
+        STO   t,c,:YYO
+        LDO   t,e,:ZZO
+        STO   t,c,:ZZO
+        STCO  0,c,:BBO          자식에게는 0
+        STO   cp,e,:BBO         부모에게는 자식의 pid
+        GETA  u,:NReady
+        LDO   t,u,0
+        ADD   t,t,1
+        STO   t,u,0
+        LDO   res+1,e,:RVO
+        LDO   res+2,c,:RVO
+        PUSHJ res,:CopySpace
+        SETL  t,:Quantum
+        PUT   :rI,t             타이머를 건다
+        JMP   2F
+Full    NEG   t,0,1
+        STO   t,e,:BBO
+2H      GETA  t,:Cur
+        LDO   t,t,0
+        JMP   :Resume           부모로 돌아간다
+
+% Resume(pid=$0): 레지스터 스택을 버리고 프로세스 pid로 넘어간다. rV를 바꾼 뒤로는
+% 서브루틴을 부르지 않는다. 레지스터가 쏟아지면 새 주소 공간에 쓰일 것이기 때문이다.
+:Resume GETA  u,:Cur
+        STO   t,u,0
+        SLU   e,t,6
+        GETA  u,:Procs
+        ADDU  e,e,u
+        LDO   t,e,:RVO
+        PUT   :rV,t
+        SETH  u,:HIO
+        STO   t,u,:RV           장치도 같은 주소 공간을 본다
+        LDO   t,e,:BBO
+        PUT   :rBB,t
+        LDO   t,e,:WWO
+        PUT   :rWW,t
+        LDO   t,e,:XXO
+        PUT   :rXX,t
+        LDO   t,e,:YYO
+        PUT   :rYY,t
+        LDO   t,e,:ZZO
+        PUT   :rZZ,t
+        LDO   $255,e,:CTX
+        UNSAVE $255
+        NEG   $255,0,1
+        RESUME 1
+        PREFIX :
+
+% Store(ctx): 지금 프로세스의 항목에 문맥의 주소와 rBB, rWW..rZZ를 적는다.
+Store   GETA  $1,Cur
+        LDO   $1,$1,0
+        SLU   $1,$1,6
+        GETA  $2,Procs
+        ADDU  $1,$1,$2
+        STO   $0,$1,CTX
+        GET   $2,rBB
+        STO   $2,$1,BBO
+        GET   $2,rWW
+        STO   $2,$1,WWO
+        GET   $2,rXX
+        STO   $2,$1,XXO
+        GET   $2,rYY
+        STO   $2,$1,YYO
+        GET   $2,rZZ
+        STO   $2,$1,ZZO
+        POP   0,0
+
+% Next(): 지금 프로세스 다음부터 돌아가며 찾은, 돌 수 있는 프로세스의 pid.
+% 돌 수 있는 프로세스가 적어도 하나는 있어야 한다(지금 프로세스여도 된다).
+Next    GETA  $1,Cur
+        LDO   $0,$1,0
+        GETA  $2,Procs
+1H      ADD   $0,$0,1
+        AND   $0,$0,NProc-1
+        SLU   $1,$0,6
+        LDO   $1,$2,$1
+        BZ    $1,1B
+        POP   1,0
+
+% CopySpace(prv,crv): rV가 prv인 주소 공간에 들어 있는 페이지를 모두 새 프레임에
+% 복사해, rV가 crv인 주소 공간의 테이블에 같은 자리로 넣는다. 보호 비트는 그대로이고
+% 주소 공간 번호만 바뀐다.
+        PREFIX Copy:
+pb      IS    $0
+cb      IS    $1
+cn      IS    $2
+i       IS    $3
+pte     IS    $4
+t       IS    $5
+lim     IS    $6
+rj      IS    $7
+fr      IS    $8
+res     IS    $9
+:CopySpace GET   rj,:rJ
+        SETL  t,#1ff8
+        AND   cn,cb,t           자식의 주소 공간 번호(n<<3)
+        SLU   pb,pb,24
+        SRU   pb,pb,37
+        SLU   pb,pb,13
+        ORH   pb,#8000          부모의 테이블
+        SLU   cb,cb,24
+        SRU   cb,cb,37
+        SLU   cb,cb,13
+        ORH   cb,#8000          자식의 테이블
+        SET   i,0
+        SETL  lim,#8000         테이블 네 장
+1H      LDO   pte,pb,i
+        BZ    pte,2F
+        PUSHJ res,:AllocFrame
+        SET   fr,res
+        SETL  t,#1fff
+        ANDN  res+1,pte,t
+        ANDNH res+1,#ffff
+        ORH   res+1,#8000       부모의 프레임
+        SET   res+2,fr
+        SETL  t,#2000
+        CMP   t,i,t
+        ZSN   res+3,t,1         텍스트 세그먼트인가
+        PUSHJ res,:CopyPage
+        ANDNH fr,#8000
+        OR    fr,fr,cn
+        AND   t,pte,7
+        OR    fr,fr,t
+        STO   fr,cb,i
+2H      ADDU  i,i,8
+        CMP   t,i,lim
+        BN    t,1B
+        PUT   :rJ,rj
+        POP   0,0
         PREFIX :
 
 % Device(a0,a1,cmd): HIO에 명령 하나를 시키고 그 결과를 돌려준다.
@@ -563,5 +838,9 @@ Ready   AND   $6,base,need
         PREFIX :
 
 FreeFrame OCTA  #8000000800000000 다음 빈 프레임의 커널 주소
+Cur     OCTA  0                 지금 도는 프로세스의 pid
+NReady  OCTA  1                 돌 수 있는 프로세스의 수
+Procs   OCTA  1,#12340D0700000008 프로세스 0: 돌 수 있고, 테이블은 7<<32, n=1
+        LOC   Procs+NProc*64
 KillMsg BYTE  "NNIX: page fault I can't serve",#a,0
 ArgKind BYTE  0,1,0,2,2,2,3,4,5,6,0
