@@ -1,6 +1,6 @@
 % MMIX logo (Fig. 13 of TAOCP Vol. 1, Fascicle 1), from figs/mmix.eps
 % Adobe Illustrator paths converted to MetaPost; units = bp of the original.
-% mmixdoc/mmixdoc.w가 림보에서 input으로 읽으므로 끝에 end.를 두지 않는다.
+% mmixdoc.w가 림보에서 input으로 읽으므로 끝에 end.를 두지 않는다.
 % README용 SVG는 이렇게 뽑는다(다크 모드 <style>은 손으로 덧붙임):
 %   mpost -s outputformat='"svg"' -s outputtemplate='"mmix-logo.svg"' '\input mmix-logo end'
 beginfig(1);

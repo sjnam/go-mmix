@@ -19,9 +19,9 @@ PKGS := mmixarith abstime mmixal mmotype mmixio mmixsim mmmix
 # 디렉터리마다 든 .w 파일들. 따로 적지 않으면 디렉터리 이름과 같은 .w 하나다.
 WEBS_mmmix := mmixpipe mmixconfig mmixmem mmmix
 webs = $(or $(WEBS_$(1)),$(1))
-# 코드가 없어 태글하지 않고 조판만 하는 문서들.
+# 코드가 없어 태글하지 않고 조판만 하는 문서들. 꾸러미가 아니므로 루트에 둔다.
 DOCONLY := mmixdoc
-DOCS := $(foreach p,$(PKGS) $(DOCONLY),$(foreach w,$(call webs,$(p)),$(p)/$(w)))
+DOCS := $(foreach p,$(PKGS),$(foreach w,$(call webs,$(p)),$(p)/$(w))) $(addprefix ./,$(DOCONLY))
 
 .PHONY: all tangle doc intro test clean $(PKGS) mmixsim-abstime mmmix-abstime
 .DEFAULT_GOAL := all
@@ -50,13 +50,13 @@ test:
 # 조판 경고(Overfull, Underfull, Error, Missing, Undefined)는 0이어야 한다.
 doc:
 	@perl -CSD -ne 'if (/\\[A-Za-z]+\\\p{Hangul}/) { print "$$ARGV:$$.: $$_"; $$bad=1 } \
-	  close ARGV if eof; END { exit $$bad }' */*.w || \
+	  close ARGV if eof; END { exit $$bad }' *.w */*.w || \
 	  (echo '위 줄: \\MMIX\\의 꼴은 \\의가 제어 순서가 된다. \\MMIX의로 쓸 것'; false)
 	@for d in $(DOCS); do \
 	  p=$${d%/*}; w=$${d#*/}; \
 	  (cd $$p && $(GWEAVE) $$w.w && \
 	   luatex --interaction=nonstopmode $$w.tex >/dev/null; \
-	   printf '%s: 조판 경고 %s개\n' $$d \
+	   printf '%s: 조판 경고 %s개\n' $${d#./} \
 	     $$(grep -ac 'Overfull\|Underfull\|Error\|Missing\|Undefined' $$w.log)); \
 	done
 
@@ -79,4 +79,5 @@ intro:
 	done
 
 clean:
+	rm -f *.tex *.idx *.scn *.toc *.log *.pdf *.dvi
 	rm -f */*.tex */*.idx */*.scn */*.toc */*.log */*.pdf */*.dvi

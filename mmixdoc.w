@@ -1,6 +1,6 @@
 % 이 파일은 MMIXware의 mmix-doc.w((c) 1999 Donald E. Knuth)를 한글 GWEB로
 % 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
-@i ../boilerplate.w
+@i boilerplate.w
 
 \input kotexgweb
 \input luamplib.sty
@@ -8,10 +8,10 @@
 
 % 목차 쪽 제목 자리에 놓는 MMIX 로고. TAOCP 1권 분책 1의 그림 13 위에 놓인 배너로, 크누스가
 % Adobe Illustrator로 그린 figs/mmix.eps의 경로 13개를 MetaPost로 일대일로 옮긴 것이다.
-% 경로 데이터가 수백 줄이라 저장소 최상위의 mmix-logo.mp에 따로 두고 읽는다
+% 경로 데이터가 수백 줄이라 같은 디렉터리의 mmix-logo.mp에 따로 두고 읽는다
 % (README의 SVG 로고도 그 파일에서 뽑는다).
 \newbox\mmixlogo
-\setbox\mmixlogo=\hbox{\mplibcode input ../mmix-logo; \endmplibcode}
+\setbox\mmixlogo=\hbox{\mplibcode input mmix-logo; \endmplibcode}
 \def\topofcontents{\centerline{\box\mmixlogo}\vskip .5in \vfill} % 제목 대신 로고
 
 \font\logo=logo10
