@@ -16,6 +16,9 @@
 %   nnixfs로 만든다)를 부팅할 때 마운트하고, 파일 연산을 커널이 직접 한다.
 %   표준 입출력(핸들 0, 1, 2)은 그대로 HIO로 보낸다. 디스크가 없으면 3단계처럼
 %   모든 입출력을 HIO로 보낸다.
+% 5단계: Exec과 Wait. Exec(TRAP 0,12,0)은 디스크의 목적 파일을 지금 프로세스의 새
+%   주소 공간에 싣고 MMIX-SIM과 같은 실행 환경을 차려 실행한다. Wait(TRAP 0,13,0)은
+%   끝난 자식을 거둔다. 이 둘과 Fork로 셸(nnix/sh.mms)이 디스크의 프로그램을 돌린다.
 %
 %   mmixal -b 250 -o nnix.mmo nnix.mms
 %   mmmix -knnix.mmo plain.mmconfig hello.mmb
@@ -73,7 +76,7 @@ Fork    IS    11                TRAP 0,Fork,0: 부모는 자식의 pid를, 자�
 
 % 프로세스 표. 항목마다 옥타바이트 여덟 개다.
 NProc   IS    4                 프로세스는 넷까지(2의 거듭제곱이어야 한다)
-ST      IS    0                 0이면 빈 자리, 1이면 돌 수 있다
+ST      IS    0                 0: 빈 자리, 1: 돌 수 있다, 2: 좀비, 3: Wait으로 잠들었다
 RVO     IS    8                 이 프로세스의 rV
 CTX     IS    16                SAVE가 돌려준 문맥의 주소(이 프로세스의 가상 주소)
 BBO     IS    24                rBB (사용자의 $255)
@@ -82,6 +85,14 @@ XXO     IS    40                rXX
 YYO     IS    48                rYY
 ZZO     IS    56                rZZ
 Quantum IS    10000             타이머의 한 조각(사이클)
+PAR     IS    64                부모의 pid(없으면 -1)
+BACK    IS    72                1이면 비어 있는 페이지를 프로그램 이미지에서, 0이면 0으로 채워 들인다
+PShift  IS    7                 항목은 128바이트다
+Exec    IS    12                TRAP 0,Exec,0: $255는 널로 끝나는 argv 배열. 성공하면 돌아오지 않는다
+Wait    IS    13                TRAP 0,Wait,0: 끝난 자식 하나를 거두어 그 pid를(자식이 없으면 -1)
+MaxArg  IS    32                Exec의 인자는 32개까지
+EBufOff IS    #5800             Exec이 인자 문자열을 옮겨 두는 곳(4KB)
+IHOff   IS    #c000             Exec이 목적 파일을 읽는 커널 핸들
 
 % 블록 장치(장치 1)의 레지스터. ID, CMD, RESULT, DONE의 오프셋은 HIO와 같다.
 BLK     IS    #8001             장치 1의 기준 주소는 SETH BLK와 ORML BLKLO로 만든다
@@ -123,7 +134,7 @@ Boot    PUT   rK,0              커널은 인터럽트를 끈 채로 돈다
 Main    IS    Boot
 
 % 트랩 입구. TRAP은 사용자의 $255를 rBB로 옮기고 $255를 rJ로 정한 뒤 여기로 온다.
-% rJ는 그대로 있으므로 $255는 마음대로 써도 된다. Fork면 곧바로 문맥을 저장하고,
+% rJ는 그대로 있으므로 $255는 마음대로 써도 된다. Fork와 Wait이면 곧바로 문맥을 저장하고,
 % 아니면 PUSHJ $255로 사용자의 지역 레지스터를 모두 숨기고 새 틀에서 일한다.
 % 전역 레지스터는 건드리지 않는다.
 TrapEnt GET   $255,rXX
@@ -131,6 +142,11 @@ TrapEnt GET   $255,rXX
         SRU   $255,$255,40      $255=rXX의 아랫 테트라에서 opcode, X, Y
         CMP   $255,$255,Fork
         BZ    $255,DoFork
+        GET   $255,rXX
+        SLU   $255,$255,32
+        SRU   $255,$255,40
+        CMP   $255,$255,Wait
+        BZ    $255,DoWait
         GET   $255,rJ
         PUSHJ $255,Syscall
         PUT   rJ,$255           사용자의 rJ를 되돌린다
@@ -214,9 +230,14 @@ res     IS    $8                부르는 서브루틴의 결과 자리
         BNZ   op,Done           opcode나 X가 0이 아니면 TRAP 0,Y,Z가 아니다
         SRU   op,t,8            op = Y
         AND   h,t,#ff           h = Z
-        CMP   t,op,:MaxOp
-        BP    t,Done
         BZ    op,Stop
+        CMP   t,op,:Exec
+        BNZ   t,4F
+        GET   res+1,:rBB
+        PUSHJ res,:DoExec       돌아오면 실패한 것이다
+        JMP   Ret
+4H      CMP   t,op,:MaxOp
+        BP    t,Done
 % 인자를 가져온다. 방식은 ArgKind 표에 있다.
 %   0: 인자 없음
 %   1: 사용자의 M[rBB], M[rBB+8]을 읽고, 앞의 것이 가리키는 바이트 문자열을 들인다
@@ -301,26 +322,10 @@ Bad     NEG   t,0,1
         PUT   :rBB,t
         JMP   Done
 
-% Stop: Halt. Z=0이면 이 프로세스를 끝내고(마지막 프로세스면 기계를 멈추고), Z=1이면 기본 트립 처리기(TRAP 1)가 부른 것이므로
+% Stop: Halt. Z=0이면 Exit으로 이 프로세스를 끝내고, Z=1이면 기본 트립 처리기(TRAP 1)가 부른 것이므로
 % 트립 경고를 찍는다. 마법처럼 rBB는 그대로 둔다.
 Stop    BNZ   h,Warn
-        GETA  t,:NReady
-        LDO   a0,t,0
-        CMP   a1,a0,1
-        BNP   a1,Last
-        SUB   a0,a0,1           이 프로세스만 끝낸다
-        STO   a0,t,0
-        GETA  t,:Cur
-        LDO   a1,t,0
-        SLU   a1,a1,6
-        GETA  t,:Procs
-        ADDU  a1,a1,t
-        STCO  0,a1,:ST
-        PUSHJ res,:Next
-        SET   t,res
-        JMP   :Resume           이 레지스터 스택은 버린다
-Last    PUSHJ res,:SyncFS       디스크를 맞춘다(디스크가 없으면 할 일이 없다)
-        GET   $255,:rBB         종료 코드는 Halt할 때의 사용자 $255다(mmmix -s)
+        JMP   :Exit             종료 코드는 Halt할 때의 사용자 $255, 곧 rBB다
 :Halt5  SYNC  5                 쓰기 버퍼를 비운다
 1H      SYNC  4
         JMP   1B
@@ -374,18 +379,19 @@ res     IS    $4
 Other   PUT   :rQ,0
         PUT   :rJ,rj
         POP   0,0
-% 들일 수 없는 폴트. 표준 오류에 알리고 멈춘다. 장치는 음수 주소를 물리 주소로 본다.
+% 들일 수 없는 폴트. 표준 오류에 알리고 이 프로세스를 끝낸다. 장치는 음수 주소를 물리 주소로 본다.
 Kill    GETA  res+1,:KillMsg
         SET   res+2,0
         SETL  res+3,:Fputs<<8|:StdErr
         PUSHJ res,:Device
-        NEG   $255,0,1
-        JMP   :Halt5
+        NEG   t,0,1
+        PUT   :rBB,t
+        JMP   :Exit             이 프로세스를 -1로 끝낸다
         PREFIX :
 
 % PageIn(va): 지금 프로세스에서 va가 든 페이지를 들인다. 빈 프레임을 하나 꺼내,
 % 프로그램 이미지의 같은 페이지(세그먼트 i의 페이지 p라면 물리 주소 i<<32+p<<13)를
-% 복사하고, PTE를 쓴다. 테이블과 주소 공간 번호는 rV에서 얻는다. 텍스트 세그먼트는
+% 복사하고(Exec한 프로세스라면 0으로 채우고), PTE를 쓴다. 테이블과 주소 공간 번호는 rV에서 얻는다. 텍스트 세그먼트는
 % rwx, 나머지는 rw-다(뼈대 페이지 테이블과 같다).
 % 돌려주는 값: 0이면 들였고, 1이면 이미 있었고, -1이면 범위 밖이다.
         PREFIX PageIn:
@@ -416,12 +422,22 @@ res     IS    $8
         GET   rj,:rJ
         PUSHJ res,:AllocFrame
         SET   frame,res
+        GETA  t,:Cur
+        LDO   t,t,0
+        SLU   t,t,:PShift
+        GETA  res+1,:Procs
+        ADDU  t,t,res+1
+        LDO   t,t,:BACK
         SETH  res+1,#8000
+        BZ    t,1F
         SLU   t,seg,32
         OR    res+1,res+1,t
         SLU   t,pg,:PageS
         OR    res+1,res+1,t     이미지 안의 같은 페이지
-        SET   res+2,frame
+        JMP   3F
+1H      ORMH  res+1,#0006
+        ORML  res+1,#0001       늘 0인 페이지(Exec한 프로세스)
+3H      SET   res+2,frame
         ZSZ   res+3,seg,1       텍스트 세그먼트인가
         PUSHJ res,:CopyPage
         PUT   :rJ,rj
@@ -590,14 +606,14 @@ res     IS    $5
         PUSHJ res,:Store        부모의 상태
         GETA  t,:Cur
         LDO   t,t,0
-        SLU   e,t,6
+        SLU   e,t,:PShift
         GETA  u,:Procs
         ADDU  e,e,u             e=부모의 항목
         SET   cp,0
 1H      ADD   cp,cp,1
         CMP   t,cp,:NProc
         BNN   t,Full
-        SLU   c,cp,6
+        SLU   c,cp,:PShift
         ADDU  c,c,u             c=자식 후보의 항목
         LDO   t,c,:ST
         BNZ   t,1B
@@ -623,6 +639,11 @@ res     IS    $5
         STO   t,c,:ZZO
         STCO  0,c,:BBO          자식에게는 0
         STO   cp,e,:BBO         부모에게는 자식의 pid
+        GETA  u,:Cur
+        LDO   u,u,0
+        STO   u,c,:PAR
+        LDO   u,e,:BACK
+        STO   u,c,:BACK         뒷받침은 부모와 같다
         GETA  u,:NReady
         LDO   t,u,0
         ADD   t,t,1
@@ -630,6 +651,7 @@ res     IS    $5
         LDO   res+1,e,:RVO
         LDO   res+2,c,:RVO
         PUSHJ res,:CopySpace
+        SYNC  6                 같은 주소 공간 번호를 쓴 옛 프로세스의 변환을 지운다
         SETL  t,:Quantum
         PUT   :rI,t             타이머를 건다
         JMP   2F
@@ -643,7 +665,7 @@ Full    NEG   t,0,1
 % 서브루틴을 부르지 않는다. 레지스터가 쏟아지면 새 주소 공간에 쓰일 것이기 때문이다.
 :Resume GETA  u,:Cur
         STO   t,u,0
-        SLU   e,t,6
+        SLU   e,t,:PShift
         GETA  u,:Procs
         ADDU  e,e,u
         LDO   t,e,:RVO
@@ -666,10 +688,133 @@ Full    NEG   t,0,1
         RESUME 1
         PREFIX :
 
+% DoWait: Wait. 문맥을 저장한 뒤 이 프로세스의 자식을 훑는다. 좀비가 있으면 거두어
+% 그 pid를 돌려준다. 살아 있는 자식만 있으면 잠들고(상태 3) 다른 프로세스로 넘어간다.
+% 자식이 끝날 때 Exit이 깨워 준다. 자식이 하나도 없으면 -1이다.
+        PREFIX Wait:
+x       IS    $0
+e       IS    $1
+p       IS    $2
+q       IS    $3
+t       IS    $4
+base    IS    $5
+alive   IS    $6
+res     IS    $7
+:DoWait SAVE  $255,0
+        SET   res+1,$255
+        PUSHJ res,:Store
+        GETA  t,:Cur
+        LDO   x,t,0
+        GETA  base,:Procs
+        SLU   e,x,:PShift
+        ADDU  e,e,base          e=이 프로세스의 항목
+        SET   alive,0
+        SET   p,0
+1H      SLU   q,p,:PShift
+        ADDU  q,q,base
+        LDO   t,q,:ST
+        BZ    t,2F              빈 자리의 부모 칸은 옛 값이다
+        LDO   t,q,:PAR
+        CMP   t,t,x
+        BNZ   t,2F
+        LDO   t,q,:ST
+        CMP   t,t,2
+        BZ    t,Reap
+        SETL  alive,1
+2H      ADD   p,p,1
+        CMP   t,p,:NProc
+        BN    t,1B
+        NEG   t,0,1
+        BZ    alive,3F          자식이 없다
+        SETL  t,3
+        STO   t,e,:ST           잠든다
+        GETA  t,:NReady
+        LDO   q,t,0
+        SUB   q,q,1
+        STO   q,t,0
+        PUSHJ res,:Next
+        SET   $0,res
+        JMP   :Resume
+Reap    STCO  0,q,:ST           좀비를 거둔다
+        SET   t,p
+3H      STO   t,e,:BBO
+        SET   $0,x
+        JMP   :Resume
+        PREFIX :
+
+% Exit: 지금 프로세스를 끝낸다. 종료 코드는 rBB(사용자의 $255)에 있다. 레지스터 스택은
+% 버린다. 이 프로세스의 자식들은 고아가 되고(좀비는 거둔다), 부모가 Wait으로 잠들어
+% 있으면 깨워 이 pid를 돌려주고, 부모가 살아 있으면 좀비로 남아 부모의 Wait을 기다린다.
+% 돌 수 있는 프로세스가 더 없으면 디스크를 맞추고 기계를 멈춘다(mmmix -s의 종료 코드는
+% 이 프로세스의 $255다).
+        PREFIX Exit:
+x       IS    $0
+e       IS    $1
+p       IS    $2
+q       IS    $3
+t       IS    $4
+base    IS    $5
+u       IS    $6
+res     IS    $7
+:Exit   GETA  t,:Cur
+        LDO   x,t,0
+        GETA  base,:Procs
+        SLU   e,x,:PShift
+        ADDU  e,e,base          e=이 프로세스의 항목
+        GETA  t,:NReady
+        LDO   u,t,0
+        SUB   u,u,1
+        STO   u,t,0
+        SET   p,0
+1H      SLU   q,p,:PShift
+        ADDU  q,q,base
+        LDO   t,q,:PAR
+        CMP   t,t,x
+        BNZ   t,2F
+        NEG   t,0,1
+        STO   t,q,:PAR          고아가 된다
+        LDO   t,q,:ST
+        CMP   t,t,2
+        BNZ   t,2F
+        STCO  0,q,:ST           좀비는 거둔다
+2H      ADD   p,p,1
+        CMP   t,p,:NProc
+        BN    t,1B
+        STCO  0,e,:ST
+        LDO   p,e,:PAR
+        BN    p,4F              부모가 없다
+        SLU   q,p,:PShift
+        ADDU  q,q,base          q=부모의 항목
+        LDO   t,q,:ST
+        CMP   u,t,3
+        BZ    u,3F
+        CMP   u,t,1
+        BNZ   u,4F
+        SETL  t,2
+        STO   t,e,:ST           부모가 거둘 때까지 좀비로 남는다
+        JMP   4F
+3H      SETL  t,1
+        STO   t,q,:ST           부모를 깨운다
+        STO   x,q,:BBO          부모의 Wait이 돌려줄 값
+        GETA  t,:NReady
+        LDO   u,t,0
+        ADD   u,u,1
+        STO   u,t,0
+4H      GETA  t,:NReady
+        LDO   u,t,0
+        BZ    u,Stop
+        PUSHJ res,:Next
+        SET   $0,res
+        JMP   :Resume
+Stop    PUSHJ res,:SyncFS       디스크를 맞춘다(디스크가 없으면 할 일이 없다)
+        GET   $255,:rBB
+        JMP   :Halt5
+        PREFIX :
+
 % Store(ctx): 지금 프로세스의 항목에 문맥의 주소와 rBB, rWW..rZZ를 적는다.
 Store   GETA  $1,Cur
         LDO   $1,$1,0
-        SLU   $1,$1,6
+        SLU   $1,$1,PShift
         GETA  $2,Procs
         ADDU  $1,$1,$2
         STO   $0,$1,CTX
@@ -685,21 +830,23 @@ Store   GETA  $1,Cur
         STO   $2,$1,ZZO
         POP   0,0
 
-% Next(): 지금 프로세스 다음부터 돌아가며 찾은, 돌 수 있는 프로세스의 pid.
+% Next(): 지금 프로세스 다음부터 돌아가며 찾은, 돌 수 있는(상태가 1인) 프로세스의 pid.
 % 돌 수 있는 프로세스가 적어도 하나는 있어야 한다(지금 프로세스여도 된다).
 Next    GETA  $1,Cur
         LDO   $0,$1,0
         GETA  $2,Procs
 1H      ADD   $0,$0,1
         AND   $0,$0,NProc-1
-        SLU   $1,$0,6
+        SLU   $1,$0,PShift
         LDO   $1,$2,$1
-        BZ    $1,1B
+        CMP   $1,$1,1
+        BNZ   $1,1B
         POP   1,0
 
 % CopySpace(prv,crv): rV가 prv인 주소 공간에 들어 있는 페이지를 모두 새 프레임에
 % 복사해, rV가 crv인 주소 공간의 테이블에 같은 자리로 넣는다. 보호 비트는 그대로이고
-% 주소 공간 번호만 바뀐다.
+% 주소 공간 번호만 바뀐다. 자식의 테이블은 앞서 같은 pid를 쓴 프로세스의 것일 수 있으므로
+% 부모에게 없는 페이지의 칸도 모두 지운다.
         PREFIX Copy:
 pb      IS    $0
 cb      IS    $1
@@ -725,6 +872,7 @@ res     IS    $9
         SET   i,0
         SETL  lim,#8000         테이블 네 장
 1H      LDO   pte,pb,i
+        STCO  0,cb,i            앞서 이 자리를 쓴 프로세스의 PTE를 지운다
         BZ    pte,2F
         PUSHJ res,:AllocFrame
         SET   fr,res
@@ -831,24 +979,14 @@ Open    CMPU  t,a1,4
         ORMH  s,#0006
         SETL  t,:DirOff
         ADDU  s,s,t             s=디렉터리
-        SET   n,0
-3H      SLU   t,n,6
+        SET   res+1,ln
+        PUSHJ res,:Lookup
+        SET   n,res
+        BN    n,5F
+        SLU   t,n,6
         ADDU  c,s,t             c=항목 n
-        LDBU  t,c,0
-        BZ    t,5F
-        SET   o,0
-4H      LDBU  t,c,o
-        LDBU  eof,ln,o
-        CMP   t,t,eof
-        BNZ   t,5F
-        ADD   o,o,1
-        CMP   t,o,k
-        BNP   t,4B
         JMP   Found
-5H      ADD   n,n,1
-        CMP   t,n,:NEnt
-        BN    t,3B
-        CMP   t,a1,0            없다
+5H      CMP   t,a1,0            없다
         BZ    t,Abort
         CMP   t,a1,2
         BZ    t,Abort
@@ -1714,6 +1852,539 @@ res     IS    $4
         POP   0,0
         PREFIX :
 
+% ---- Exec ----
+% DoExec(argv): 디스크의 목적 파일 argv[0](없으면 argv[0].mmo)을 지금 프로세스의 새
+% 주소 공간에 싣고 실행한다. 실행 환경은 MMIX-SIM이 차리는 것(mmixsim.w의 "목적 파일
+% 싣기" 장)과 똑같다. 풀 세그먼트의 맨 앞 옥타바이트에는 비어 있는 첫 자리가, 그 뒤에는
+% argv[k]의 포인터들이 오고, 문자열은 옥타바이트 단위로 맞춰 그 뒤에 둔다. 스택
+% 세그먼트의 맨 앞에는 UNSAVE할 문맥을 쌓는다: $0=argc, $1=Pool_Segment+8, rL=2,
+% 목적 파일의 후기가 주는 전역 레지스터 $G..$255, 0인 특수 레지스터 열둘, 그리고
+% rG와 rA. 시작 주소는 후기의 $255(곧 Main)이고, #F0에 무언가 있으면 #F0이다.
+% 그다음 프로세스 표의 문맥 주소를 그 UNSAVE 프레임으로 정하고 Resume으로 넘어간다.
+%
+% 인자를 옮기고 파일과 서문을 확인하기까지 실패하면 -1을 돌려준다. 그 뒤로는 옛 주소
+% 공간을 버렸으므로, 목적 파일이 망가졌으면 알리고 이 프로세스를 -1로 끝낸다.
+        PREFIX Exec:
+argv    IS    $0
+argc    IS    $1
+eb      IS    $2                인자 버퍼의 커널 주소
+n       IS    $3
+p       IS    $4
+c       IS    $5
+t       IS    $6
+ih      IS    $7                목적 파일을 읽는 커널 핸들
+loc     IS    $8                싣는 위치
+tet     IS    $9
+g       IS    $10               후기의 G
+k       IS    $11
+ent     IS    $12               이 프로세스의 항목
+main    IS    $13
+rj      IS    $14
+res     IS    $15
+:DoExec GET   rj,:rJ
+        GETA  t,:Mounted
+        LDO   t,t,0
+        BZ    t,Fail            디스크가 없으면 실행할 파일도 없다
+        NEG   t,0,1
+        GETA  c,:URTag
+        STO   t,c,0
+        SETH  eb,#8000
+        ORMH  eb,#0006
+        SETL  t,:EBufOff
+        ADDU  eb,eb,t
+% 인자 문자열을 커널 버퍼로 옮긴다. 옛 주소 공간은 곧 사라진다.
+        SET   argc,0
+        SET   n,0
+1H      SLU   res+1,argc,3
+        ADDU  res+1,argv,res+1
+        SETL  res+2,4
+        PUSHJ res,:UserPA
+        BN    res,Fail
+        ORH   res,#8000
+        LDO   p,res,0           p=argv[argc]
+        BZ    p,3F
+        CMP   t,argc,:MaxArg
+        BNN   t,Fail
+2H      SET   res+1,p
+        PUSHJ res,:UGet
+        BN    res,Fail
+        STB   res,eb,n
+        ADD   n,n,1
+        SETL  t,#1000
+        CMP   t,n,t
+        BNN   t,Fail            인자가 모두 4KB를 넘는다
+        ADD   p,p,1
+        BNZ   res,2B
+        ADD   argc,argc,1
+        JMP   1B
+3H      BZ    argc,Fail
+% 파일을 찾는다. 없으면 ".mmo"를 붙여 본다(MMIX-SIM과 같다).
+        SET   res+1,eb
+        PUSHJ res,:Lookup
+        BNN   res,Found
+        SETH  p,#8000
+        ORMH  p,#0006
+        SETL  t,:LineOff
+        ADDU  p,p,t             줄 버퍼에 이름을 만든다
+        SET   k,0
+4H      LDBU  c,eb,k
+        BZ    c,5F
+        STB   c,p,k
+        ADD   k,k,1
+        CMP   t,k,:NameMax
+        BP    t,Fail
+        JMP   4B
+5H      SETL  c,'.'
+        STB   c,p,k
+        ADD   k,k,1
+        SETL  c,'m'
+        STB   c,p,k
+        ADD   k,k,1
+        STB   c,p,k
+        ADD   k,k,1
+        SETL  c,'o'
+        STB   c,p,k
+        ADD   k,k,1
+        SET   c,0
+        STB   c,p,k
+        SET   res+1,p
+        PUSHJ res,:Lookup
+        BN    res,Fail
+Found   SETH  ih,#8000
+        ORMH  ih,#0006
+        SETL  t,:IHOff
+        ADDU  ih,ih,t
+        SETL  t,2
+        STO   t,ih,:HKIND
+        SETL  t,5
+        STO   t,ih,:HMODE       이진 읽기
+        STO   res,ih,:HENT
+        STCO  0,ih,:HPOS
+        STCO  0,ih,:HCBLK
+        STCO  0,ih,:HCIDX
+        SET   res+1,ih
+        PUSHJ res,:ReadTet
+        BN    res,Fail
+        SRU   t,res,8
+        SETL  c,#9809
+        SLU   c,c,8
+        OR    c,c,1
+        CMP   t,t,c
+        BNZ   t,Fail            서문이 아니다
+        AND   k,res,#ff         만든 시각의 테트라 수
+6H      BZ    k,Clear
+        SET   res+1,ih
+        PUSHJ res,:ReadTet
+        SUB   k,k,1
+        JMP   6B
+% 여기부터는 돌아갈 수 없다. 페이지 테이블을 비우고, 비어 있는 페이지는 0으로 채워
+% 들이게 하고, 스택 세그먼트의 앞부분을 들여놓는다. 옛 프레임은 돌려받지 않는다.
+Clear   GETA  t,:Cur
+        LDO   ent,t,0
+        SLU   ent,ent,:PShift
+        GETA  t,:Procs
+        ADDU  ent,ent,t
+        STCO  0,ent,:BACK
+        GET   t,:rV
+        SLU   p,t,24
+        SRU   p,p,37
+        SLU   p,p,13
+        ORH   p,#8000           테이블 네 장
+        SET   k,0
+        SETL  c,#8000
+7H      STCO  0,p,k
+        ADDU  k,k,8
+        CMP   t,k,c
+        BN    t,7B
+        SYNC  6                 옛 변환을 변환 캐시에서 지운다
+        NEG   t,0,1
+        GETA  c,:URTag
+        STO   t,c,0
+        GETA  c,:UWTag
+        STO   t,c,0
+        SET   k,0
+8H      SETH  res+1,#6000
+        SLU   t,k,:PageS
+        OR    res+1,res+1,t
+        PUSHJ res,:PageIn
+        ADD   k,k,1
+        CMP   t,k,:StackPages
+        BN    t,8B
+% 목적 파일을 싣는다. mmixsim의 적재기와 같은 일을 한다. 보통의 테트라와 고치기는
+% 모두 배타적 논리합으로 싣는다(새 주소 공간은 0이다).
+        SET   loc,0
+Item    SET   res+1,ih
+        PUSHJ res,:ReadTet
+        BN    res,Bad
+        SET   tet,res
+Disp    SRU   t,tet,24
+        CMP   t,t,#98
+        BNZ   t,Load
+        SRU   c,tet,16
+        AND   c,c,#ff           lopcode
+        SETL  t,#ffff
+        AND   k,tet,t           YZ
+        BZ    c,Quote
+        CMP   t,c,1
+        BZ    t,Loc
+        CMP   t,c,2
+        BZ    t,Skip
+        CMP   t,c,3
+        BZ    t,Fixo
+        CMP   t,c,4
+        BZ    t,Fixr
+        CMP   t,c,5
+        BZ    t,Fixrx
+        CMP   t,c,6
+        BZ    t,File
+        CMP   t,c,7
+        BZ    t,Item            lop_line은 무시한다
+        CMP   t,c,8
+        BZ    t,Spec
+        CMP   t,c,10
+        BZ    t,Post
+        JMP   Bad
+Quote   CMP   t,k,1
+        BNZ   t,Bad
+        SET   res+1,ih
+        PUSHJ res,:ReadTet
+        BN    res,Bad
+        SET   tet,res
+Load    ANDN  loc,loc,3
+        SET   res+1,loc
+        SET   res+2,tet
+        PUSHJ res,:XorT
+        BN    res,Bad
+        ADDU  loc,loc,4
+        JMP   Item
+Loc     SET   res+1,ih
+        SET   res+2,tet
+        PUSHJ res,:ReadAddr
+        BN    res,Bad
+        SET   loc,res
+        JMP   Item
+Skip    ADDU  loc,loc,k
+        JMP   Item
+Fixo    SET   res+1,ih
+        SET   res+2,tet
+        PUSHJ res,:ReadAddr
+        BN    res,Bad
+        SET   p,res
+        SET   res+1,p
+        SRU   res+2,loc,32
+        PUSHJ res,:XorT
+        BN    res,Bad
+        ADDU  res+1,p,4
+        SLU   res+2,loc,32
+        SRU   res+2,res+2,32
+        PUSHJ res,:XorT
+        BN    res,Bad
+        JMP   Item
+Fixr    SET   p,k               delta
+        SET   c,k               차이 d
+        JMP   FixIt
+Fixrx   CMP   t,k,16
+        BZ    t,1F
+        CMP   t,k,24
+        BNZ   t,Bad
+1H      SET   res+1,ih
+        PUSHJ res,:ReadTet
+        BN    res,Bad
+        SET   p,res
+        SRU   t,p,25
+        BNZ   t,Bad
+        SET   c,p
+        SRU   t,p,24
+        BZ    t,FixIt
+        SETML t,#ff
+        ORL   t,#ffff
+        AND   c,p,t
+        SETL  t,1
+        SLU   t,t,k
+        SUB   c,c,t             뒤쪽을 가리키는 k비트 차이
+FixIt   SLU   t,c,2
+        SUBU  res+1,loc,t
+        SET   res+2,p
+        PUSHJ res,:XorT
+        BN    res,Bad
+        JMP   Item
+File    AND   k,tet,#ff
+9H      BZ    k,Item
+        SET   res+1,ih
+        PUSHJ res,:ReadTet
+        BN    res,Bad
+        SUB   k,k,1
+        JMP   9B
+Spec    SET   res+1,ih
+        PUSHJ res,:ReadTet
+        BN    res,Bad
+        SET   tet,res
+        SRU   t,tet,24
+        CMP   t,t,#98
+        BNZ   t,Spec
+        SRU   t,tet,16
+        AND   t,t,#ff
+        BNZ   t,Disp            특수 데이터가 끝났다
+        SETL  c,#ffff
+        AND   c,tet,c
+        CMP   c,c,1
+        BNZ   c,Disp
+        SET   res+1,ih
+        PUSHJ res,:ReadTet      인용된 테트라를 건너뛴다
+        BN    res,Bad
+        JMP   Spec
+% 후기. 스택 세그먼트에 UNSAVE할 문맥을 쌓는다.
+Post    AND   g,tet,#ff
+        CMP   t,g,32
+        BN    t,Bad
+        SETH  p,#6000
+        SET   res+1,p
+        SET   res+2,argc
+        PUSHJ res,:PutO         $0=argc
+        BN    res,Bad
+        ADDU  res+1,p,8
+        SETH  res+2,#4000
+        ORL   res+2,8
+        PUSHJ res,:PutO         $1=Pool_Segment+8
+        BN    res,Bad
+        ADDU  res+1,p,16
+        SETL  res+2,2
+        PUSHJ res,:PutO         rL=2
+        BN    res,Bad
+        ADDU  p,p,24
+        SET   k,g
+PostL   SET   res+1,ih
+        PUSHJ res,:ReadTet
+        BN    res,Bad
+        SLU   main,res,32
+        SET   res+1,ih
+        PUSHJ res,:ReadTet
+        BN    res,Bad
+        OR    main,main,res
+        SET   res+1,p
+        SET   res+2,main
+        PUSHJ res,:PutO         $k
+        BN    res,Bad
+        ADDU  p,p,8
+        ADD   k,k,1
+        SETL  t,256
+        CMP   t,k,t
+        BN    t,PostL           마지막 main이 곧 $255, Main이다
+        ADDU  p,p,96            특수 레지스터 열둘은 0이다
+        SET   res+1,p
+        SLU   res+2,g,56
+        PUSHJ res,:PutO         rG와 rA
+        BN    res,Bad
+% 풀 세그먼트에 argv를 둔다.
+        SETH  t,#4000
+        ADD   c,argc,2
+        SLU   c,c,3
+        ADDU  loc,t,c           첫 문자열의 자리
+        SET   k,0
+        SET   n,0
+ArgL    CMP   t,k,argc
+        BNN   t,ArgD
+        SETH  res+1,#4000
+        ADD   t,k,1
+        SLU   t,t,3
+        ADDU  res+1,res+1,t
+        SET   res+2,loc
+        PUSHJ res,:PutO         argv[k]
+        BN    res,Bad
+        SET   tet,0
+ArgC    LDBU  c,eb,n
+        ADDU  res+1,loc,tet
+        SET   res+2,c
+        PUSHJ res,:UPut
+        BN    res,Bad
+        ADD   n,n,1
+        BZ    c,ArgE
+        ADD   tet,tet,1
+        JMP   ArgC
+ArgE    ANDN  tet,tet,7
+        ADD   tet,tet,8
+        ADDU  loc,loc,tet
+        ADD   k,k,1
+        JMP   ArgL
+ArgD    SETH  res+1,#4000
+        SET   res+2,loc
+        PUSHJ res,:PutO         비어 있는 첫 자리
+        BN    res,Bad
+% 시작 주소. #F0에 무언가 있으면 거기서 시작한다.
+        SETL  res+1,#f0
+        SETL  res+2,4
+        PUSHJ res,:UserPA
+        BN    res,Bad
+        ORH   res,#8000
+        LDTU  t,res,0
+        SET   c,main
+        BZ    t,1F
+        SETL  c,#f0
+1H      PUSHJ res,:FlushText
+        STCO  0,ih,:HKIND
+        STO   p,ent,:CTX
+        STO   main,ent,:BBO     처음의 $255는 Main이다
+        STO   c,ent,:WWO
+        SETH  t,#8000
+        STO   t,ent,:XXO        RESUME이 명령을 끼워 넣지 않는다
+        STCO  0,ent,:YYO
+        STCO  0,ent,:ZZO
+        GETA  t,:Cur
+        LDO   $0,t,0
+        JMP   :Resume
+Bad     STCO  0,ih,:HKIND
+        GETA  res+1,:ExecMsg
+        SET   res+2,0
+        SETL  res+3,:Fputs<<8|:StdErr
+        PUSHJ res,:Device
+        NEG   t,0,1
+        PUT   :rBB,t
+        JMP   :Exit
+Fail    NEG   $0,0,1
+        PUT   :rJ,rj
+        POP   1,0
+        PREFIX :
+
+% Lookup(name): 커널 주소 name의 이름(널로 끝남)을 디렉터리에서 찾아 항목 번호를
+% 돌려준다. 없으면 -1이다.
+        PREFIX Lookup:
+name    IS    $0
+s       IS    $1
+i       IS    $2
+e       IS    $3
+k       IS    $4
+c       IS    $5
+d       IS    $6
+:Lookup SETH  s,#8000
+        ORMH  s,#0006
+        SETL  c,:DirOff
+        ADDU  s,s,c
+        SET   i,0
+1H      SLU   e,i,6
+        ADDU  e,s,e
+        LDBU  c,e,0
+        BZ    c,4F
+        SET   k,0
+2H      LDBU  c,e,k
+        LDBU  d,name,k
+        CMP   c,c,d
+        BNZ   c,4F
+        BZ    d,3F
+        ADD   k,k,1
+        CMP   c,k,48
+        BN    c,2B
+        JMP   4F
+3H      SET   $0,i
+        POP   1,0
+4H      ADD   i,i,1
+        CMP   c,i,:NEnt
+        BN    c,1B
+        NEG   $0,0,1
+        POP   1,0
+        PREFIX :
+
+% ReadTet(H): 핸들 H에서 큰 쪽 먼저로 테트라바이트 하나를 읽는다. 파일이 끝났으면 -1.
+ReadTet GET   $1,rJ
+        SET   $2,0
+        SET   $3,4
+1H      SET   $5,$0
+        PUSHJ $4,Getc
+        BN    $4,9F
+        SLU   $2,$2,8
+        OR    $2,$2,$4
+        SUB   $3,$3,1
+        BP    $3,1B
+        PUT   rJ,$1
+        SET   $0,$2
+        POP   1,0
+9H      PUT   rJ,$1
+        NEG   $0,0,1
+        POP   1,0
+
+% ReadAddr(H,tet): lop_loc이나 lop_fixo가 가리키는 주소를 읽는다. Z 바이트가 2이면
+% Y 바이트가 윗 테트라의 맨 윗 바이트가 되고 다음 테트라가 거기에 더해지며, 1이면
+% Y 바이트만 쓴다. 그다음 테트라가 아랫 테트라다. 잘못되었으면 -1(사용자의 주소는
+% 음이 아니다).
+ReadAddr GET  $2,rJ
+        SRU   $3,$1,8
+        AND   $3,$3,#ff
+        SLU   $3,$3,24
+        AND   $4,$1,#ff
+        CMP   $5,$4,1
+        BZ    $5,1F
+        CMP   $5,$4,2
+        BNZ   $5,9F
+        SET   $6,$0
+        PUSHJ $5,ReadTet
+        BN    $5,9F
+        ADDU  $3,$3,$5
+1H      SET   $6,$0
+        PUSHJ $5,ReadTet
+        BN    $5,9F
+        SLU   $3,$3,32
+        OR    $3,$3,$5
+        PUT   rJ,$2
+        SET   $0,$3
+        POP   1,0
+9H      PUT   rJ,$2
+        NEG   $0,0,1
+        POP   1,0
+
+% XorT(va,val): 사용자 주소 va의 테트라에 val을 배타적 논리합으로 싣는다.
+% PutO(va,val): 사용자 주소 va에 옥타바이트 val을 쓴다. 둘 다 실패하면 -1.
+XorT    GET   $2,rJ
+        SET   $4,$0
+        SETL  $5,2
+        PUSHJ $3,UserPA
+        PUT   rJ,$2
+        BN    $3,9F
+        ORH   $3,#8000
+        LDTU  $4,$3,0
+        XOR   $4,$4,$1
+        STTU  $4,$3,0
+        SET   $0,0
+        POP   1,0
+9H      NEG   $0,0,1
+        POP   1,0
+PutO    GET   $2,rJ
+        SET   $4,$0
+        SETL  $5,2
+        PUSHJ $3,UserPA
+        PUT   rJ,$2
+        BN    $3,9F
+        ORH   $3,#8000
+        STO   $1,$3,0
+        SET   $0,0
+        POP   1,0
+9H      NEG   $0,0,1
+        POP   1,0
+
+% FlushText(): 텍스트 세그먼트의 들어 있는 프레임을 모두 SYNCD로 메모리에 내려보낸다.
+% 커널이 STTU로 실은 명령은 아직 D-캐시에만 있을 수 있기 때문이다(CopyPage를 보라).
+FlushText GET $0,rV
+        SLU   $0,$0,24
+        SRU   $0,$0,37
+        SLU   $0,$0,13
+        ORH   $0,#8000          세그먼트 0의 테이블
+        SET   $1,0
+1H      LDO   $2,$0,$1
+        BZ    $2,3F
+        SETL  $3,#1fff
+        ANDN  $2,$2,$3
+        ANDNH $2,#ffff
+        ORH   $2,#8000          프레임의 커널 주소
+        SET   $3,0
+2H      SYNCD #ff,$2,$3
+        INCL  $3,#100
+        SETL  $4,#2000
+        CMP   $4,$3,$4
+        BN    $4,2B
+3H      ADDU  $1,$1,8
+        SETL  $4,#2000
+        CMP   $4,$1,$4
+        BN    $4,1B
+        POP   0,0
+
 % Device(a0,a1,cmd): HIO에 명령 하나를 시키고 그 결과를 돌려준다.
 % 앞 명령이 끝났으므로 쓰기 버퍼에 이 장치로 가는 저장은 남아 있지 않다.
 % DONE은 순수하게 읽히므로 투기적으로 읽혀도 상관없고, 값이 바뀔 때까지 돈다.
@@ -1859,9 +2530,11 @@ Ready   AND   $6,base,need
 FreeFrame OCTA  #8000000800000000 다음 빈 프레임의 커널 주소
 Cur     OCTA  0                 지금 도는 프로세스의 pid
 NReady  OCTA  1                 돌 수 있는 프로세스의 수
-Procs   OCTA  1,#12340D0700000008 프로세스 0: 돌 수 있고, 테이블은 7<<32, n=1
-        LOC   Procs+NProc*64
+Procs   OCTA  1,#12340D0700000008,0,0,0,0,0,0,-1,1 프로세스 0: 돌 수 있고, 테이블은 7<<32, n=1, 부모 없음, 이미지
+        LOC   Procs+NProc*128
 KillMsg BYTE  "NNIX: page fault I can't serve",#a,0
+        LOC   (@+3)&-4
+ExecMsg BYTE  "NNIX: exec failed",#a,0
         LOC   (@+3)&-4          GETA로 가리키는 곳은 테트라 경계여야 한다
 ArgKind BYTE  0,1,0,2,2,2,3,4,5,6,0
         LOC   (@+3)&-4

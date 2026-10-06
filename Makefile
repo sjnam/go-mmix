@@ -4,7 +4,7 @@
 #   make tangle     # 각 .w -> .go (+ _test.go)
 #   make doc        # 각 .w의 .pdf 조판 (한글이라 luatex)
 #   make intro      # 어셈블러와 시뮬레이터의 앞머리 안내서 (*-intro.pdf)
-#   make nnix       # NNIX 커널 nnix/nnix.mms -> nnix/nnix.mmo (mmmix -k로 싣는다)
+#   make nnix       # NNIX 커널 nnix/nnix.mmo(mmmix -k로 싣는다)와 셸 nnix/sh.mmo
 #   make test       # go vet + go test
 #   make clean      # 조판 생성물 삭제 (.w 원본은 남김)
 #
@@ -82,6 +82,7 @@ intro:
 # 커널의 한글 주석 때문에 줄이 길어 mmixal의 입력 버퍼를 늘린다.
 nnix:
 	go run ./mmixal -b 250 -o nnix/nnix.mmo nnix/nnix.mms
+	go run ./mmixal -b 250 -o nnix/sh.mmo nnix/sh.mms
 
 clean:
 	rm -f *.tex *.idx *.scn *.toc *.log *.pdf *.dvi

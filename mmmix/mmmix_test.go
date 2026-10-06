@@ -406,7 +406,44 @@ func TestKernelFS(t *testing.T) {
 //line mmmix.w:1523
 }
 
-//line mmmix.w:1560
+//line mmmix.w:1568
+func goRun(t *testing.T, tool string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("go", append([]string{"run", "../" + tool}, args...)...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("%s %v: %v\n%s", tool, args, err, out)
+	}
+}
+
+//line mmmix.w:1577
+func TestKernelShell(t *testing.T) {
+	k := assembleKernel(t)
+	dir := t.TempDir()
+	in := func(name string) string { return filepath.Join(dir, name) }
+	goRun(t, "mmixal", "-b", "250", "-o", in("sh.mmo"), "../nnix/sh.mms")
+	goRun(t, "mmixsim", "-D"+in("sh.mmb"), in("sh.mmo"))
+	goRun(t, "nnixfs", "mkfs", in("disk.img"))
+	for _, prog := range []string{"hello", "echo", "primes"} {
+		goRun(t, "mmixal", "-o", in(prog+".mmo"), "../examples/"+prog+".mms")
+		goRun(t, "nnixfs", "put", in("disk.img"), in(prog+".mmo"))
+	}
+
+//line mmmix.w:1592
+	out, e, code := simulate(t, "hello\necho one two three\nprimes\nnope\nexit\n", "-s", "-k"+k,
+		"-d"+in("disk.img"), "../examples/plain.mmconfig", in("sh.mmb"))
+	const prompt = "nnix$ StdIn> "
+	head := prompt + "hello, world\n" + prompt + "one two three\n" + prompt
+	tail := prompt + prompt
+	if !strings.HasPrefix(out, head) || !strings.HasSuffix(out, tail) || len(out) < len(head)+len(tail) ||
+		digest(out[len(head):len(out)-len(tail)]) != "bd64b4848d0e1d0d" ||
+		e != "sh: cannot execute nope\n" || code != 0 {
+		t.Errorf("shell: %q, %q, code %d", out, e, code)
+	}
+
+//line mmmix.w:1589
+}
+
+//line mmmix.w:1606
 func TestKernelErrors(t *testing.T) {
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "bad.mmo")

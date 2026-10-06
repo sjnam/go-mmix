@@ -1554,6 +1554,52 @@ if b, _ := os.ReadFile(got); out != string(pattern) || code != 4500 || e != "" |
 	t.Errorf("big: %d bytes out, code %d, %q, %d bytes on disk", len(out), code, e, len(b))
 }
 
+@ 마지막으로 셸을 시험한다. 저장소의 \.{nnix/sh.mms}는 줄을 읽어 낱말로 나눈 뒤 \.{Fork}하고,
+자식은 커널의 새 시스템 호출 \.{TRAP}~\.{0,12,0}(\.{Exec})으로 디스크의 목적 파일을 실행하고, 부모는
+\.{TRAP}~\.{0,13,0}(\.{Wait})으로 기다린다. 커널은 목적 파일을 새 주소 공간에 싣고 {\mc MMIX-SIM}과
+똑같은 실행 환경(풀 세그먼트의 \.{argv}, 스택의 \.{UNSAVE} 문맥)을 차린다. 셸 자신은 \.{mmmix}가 싣는
+첫 프로그램이므로 \.{mmixsim}~\.{-D}로 덤프하고, 실행할 \.{hello}, \.{echo}, \.{primes}는 크누스의
+예제를 어셈블해 디스크에 넣는다. \.{hello}는 \.{argv[0]}을, \.{echo}는 나머지 인자를 찍으므로 셸이
+넘긴 인자가 제대로 가는지 보인다. \.{primes}의 출력은 마법으로 돌린 것과 같아야 한다(|TestPrimes|와
+같은 요약값). 없는 명령은 표준 오류로 알린다. 출력의 \.{StdIn>}은 시뮬레이터가 표준 입력을 읽을 때
+찍는 프롬프트다.
+
+@(mmmix_test.go@>=
+func goRun(t *testing.T, tool string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("go", append([]string{"run", "../" + tool}, args...)...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("%s %v: %v\n%s", tool, args, err, out)
+	}
+}
+
+@ @(mmmix_test.go@>=
+func TestKernelShell(t *testing.T) {
+	k := assembleKernel(t)
+	dir := t.TempDir()
+	in := func(name string) string { return filepath.Join(dir, name) }
+	goRun(t, "mmixal", "-b", "250", "-o", in("sh.mmo"), "../nnix/sh.mms")
+	goRun(t, "mmixsim", "-D"+in("sh.mmb"), in("sh.mmo"))
+	goRun(t, "nnixfs", "mkfs", in("disk.img"))
+	for _, prog := range []string{"hello", "echo", "primes"} {
+		goRun(t, "mmixal", "-o", in(prog+".mmo"), "../examples/"+prog+".mms")
+		goRun(t, "nnixfs", "put", in("disk.img"), in(prog+".mmo"))
+	}
+	@<셸에서 명령 다섯을 돌리고 출력을 견준다@>
+}
+
+@ @<셸에서 명령 다섯을...@>=
+out, e, code := simulate(t, "hello\necho one two three\nprimes\nnope\nexit\n", "-s", "-k"+k,
+	"-d"+in("disk.img"), "../examples/plain.mmconfig", in("sh.mmb"))
+const prompt = "nnix$ StdIn> "
+head := prompt + "hello, world\n" + prompt + "one two three\n" + prompt
+tail := prompt + prompt
+if !strings.HasPrefix(out, head) || !strings.HasSuffix(out, tail) || len(out) < len(head)+len(tail) ||
+	digest(out[len(head):len(out)-len(tail)]) != "bd64b4848d0e1d0d" ||
+	e != "sh: cannot execute nope\n" || code != 0 {
+	t.Errorf("shell: %q, %q, code %d", out, e, code)
+}
+
 @ 커널 파일이나 디스크 이미지를 열 수 없거나 커널의 형식이 틀렸을 때다.
 
 @(mmmix_test.go@>=
