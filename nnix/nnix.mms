@@ -23,6 +23,9 @@
 %   버린 주소 공간의 프레임을 빈 목록으로 돌려받는다. Fork는 스택 세그먼트 말고는 페이지를
 %   복사하지 않고 함께 쓰며, 쓰기 허가를 끄고 PTE의 x 필드에 COW 표시를 해 둔다. 누가
 %   거기에 쓰면 그때 복사한다.
+% 7단계: 인터럽트로 하는 입출력. 블록 장치는 명령마다 시간이 걸리고, 끝나면 rQ의 입출력
+%   비트를 켠다. 디스크를 기다리는 프로세스는 커널 안에서 SAVE하고 잠들며(커널 연속),
+%   그동안 다른 프로세스가 돈다. 블록 캐시를 함께 쓰므로 파일 시스템에는 자물쇠를 둔다.
 %
 %   mmixal -b 250 -o nnix.mmo nnix.mms
 %   mmmix -knnix.mmo plain.mmconfig hello.mmb
@@ -82,7 +85,7 @@ Fork    IS    11                TRAP 0,Fork,0: 부모는 자식의 pid를, 자�
 
 % 프로세스 표. 항목마다 옥타바이트 여덟 개다.
 NProc   IS    4                 프로세스는 넷까지(2의 거듭제곱이어야 한다)
-ST      IS    0                 0: 빈 자리, 1: 돌 수 있다, 2: 좀비, 3: Wait으로 잠들었다
+ST      IS    0                 0: 빈 자리, 1: 돌 수 있다, 2: 좀비, 3: Wait으로 잠들었다, 4: 커널 안에서 잠들었다
 RVO     IS    8                 이 프로세스의 rV
 CTX     IS    16                SAVE가 돌려준 문맥의 주소(이 프로세스의 가상 주소)
 BBO     IS    24                rBB (사용자의 $255)
@@ -94,6 +97,10 @@ Quantum IS    10000             타이머의 한 조각(사이클)
 PAR     IS    64                부모의 pid(없으면 -1)
 BACK    IS    72                1이면 비어 있는 페이지를 프로그램 이미지에서, 0이면 0으로 채워 들인다
 PShift  IS    7                 항목은 128바이트다
+SCHAN   IS    80                상태 4일 때 기다리는 것(1: 디스크, 2: 파일 시스템 자물쇠)
+KPC     IS    88                커널 안에서 잠들었으면 깨어나 돌아갈 커널 주소(아니면 0)
+S255    IS    96                그때의 $255
+DiskBit IS    #100              블록 장치가 명령을 끝내면 켜는 rQ의 비트(ANDNL로 지운다)
 Exec    IS    12                TRAP 0,Exec,0: $255는 널로 끝나는 argv 배열. 성공하면 돌아오지 않는다
 Wait    IS    13                TRAP 0,Wait,0: 끝난 자식 하나를 거두어 그 pid를(자식이 없으면 -1)
 MaxArg  IS    32                Exec의 인자는 32개까지
@@ -161,12 +168,16 @@ TrapEnt GET   $255,rXX
         RESUME 1                rK<-$255, $255<-rBB
 
 % 동적 트랩 입구. 레지스터를 넘겨받는 모양은 TRAP과 같다. 보호 결함(r, w, x)을
-% 먼저 본다. 타이머라면 돌 수 있는 프로세스가 둘 이상일 때만 프로세스를 바꾸고,
+% 먼저 보고, 그다음 디스크를 본다. 타이머라면 돌 수 있는 프로세스가 둘 이상일 때만 프로세스를 바꾸고,
 % 혼자면 타이머를 끈다(rI를 다시 걸지 않는다). 나머지는 Fault가 지운다.
 DynEnt  GET   $255,rQ
         SRU   $255,$255,32
         AND   $255,$255,#e0
         BNZ   $255,1F           보호 결함
+        GET   $255,rQ
+        SRU   $255,$255,8
+        AND   $255,$255,1
+        BNZ   $255,DiskTick     디스크가 명령을 끝냈다
         GET   $255,rQ
         AND   $255,$255,#40     구간 인터럽트
         BZ    $255,1F
@@ -767,6 +778,22 @@ res     IS    $5
         SET   t,res
         JMP   :Resume
 
+% DiskTick: 디스크가 명령을 끝냈다는 인터럽트. rQ의 비트를 지우고 디스크를 기다리던
+% 프로세스를 깨운 뒤 곧바로 그쪽으로 넘어간다(Next는 지금 프로세스 다음부터 찾는다). 깨어난
+% 프로세스는 대개 조금 계산하고 다음 블록을 요청하며 다시 잠드므로, 다음 틱까지 기다리게
+% 하면 디스크가 놀게 된다. 깨울 프로세스가 없으면 Next가 지금 프로세스를 돌려준다.
+:DiskTick SAVE $255,0
+        GET   t,:rQ
+        ANDNL t,:DiskBit
+        PUT   :rQ,t
+        SET   res+1,$255
+        PUSHJ res,:Store
+        SETL  res+1,1
+        PUSHJ res,:Wakeup
+        PUSHJ res,:Next
+        SET   t,res
+        JMP   :Resume
+
 % DoFork: 지금 프로세스의 문맥을 저장하고 빈 자리에 자식을 만든다. 자식은 부모와
 % 같은 문맥 주소와 재개 정보를 갖고, 주소 공간은 들여놓은 페이지를 모두 새 프레임에
 % 복사해 만든다. 그래서 자식의 스택 세그먼트에도 같은 문맥이 같은 주소에 있다.
@@ -833,6 +860,9 @@ Full    NEG   t,0,1
 
 % Resume(pid=$0): 레지스터 스택을 버리고 프로세스 pid로 넘어간다. rV를 바꾼 뒤로는
 % 서브루틴을 부르지 않는다. 레지스터가 쏟아지면 새 주소 공간에 쓰일 것이기 때문이다.
+% 그 프로세스가 커널 안에서 잠들었다면(KPC가 0이 아니면) RESUME 대신 커널로 돌아간다.
+% SAVE한 문맥의 $255 자리(꼭대기에서 104바이트 아래)에 돌아갈 주소를 써 두면, UNSAVE가
+% 그것을 $255에 넣으므로 GO로 갈 수 있다. 원래의 $255는 S255에 두었다가 Sleep이 되돌린다.
 :Resume GETA  u,:Cur
         STO   t,u,0
         SLU   e,t,:PShift
@@ -853,7 +883,16 @@ Full    NEG   t,0,1
         LDO   t,e,:ZZO
         PUT   :rZZ,t
         LDO   $255,e,:CTX
+        LDO   t,e,:KPC
+        BZ    t,1F
+        STCO  0,e,:KPC          커널 안에서 잠들었다
+        SUBU  u,$255,104        SAVE한 문맥에서 $255의 자리
+        LDO   c,u,0
+        STO   c,e,:S255
+        STO   t,u,0             UNSAVE가 $255에 돌아갈 곳을 넣게 한다
         UNSAVE $255
+        GO    $255,$255,0       Sleep으로 돌아간다
+1H      UNSAVE $255
         NEG   $255,0,1
         RESUME 1
         PREFIX :
@@ -917,7 +956,7 @@ Reap    STCO  0,q,:ST           좀비를 거둔다
 % 있으면 깨워 이 pid를 돌려주고, 부모가 살아 있으면 좀비로 남아 부모의 Wait을 기다린다.
 % 그다음 이 프로세스의 프레임을 돌려준다. 그 뒤에 쏟아지는 레지스터는 사라질 수 있으므로
 % 다음 pid는 메모리에 두었다가 읽는다.
-% 돌 수 있는 프로세스가 더 없으면 디스크를 맞추고 기계를 멈춘다(mmmix -s의 종료 코드는
+% 살아 있는 프로세스가 더 없으면 디스크를 맞추고 기계를 멈춘다(mmmix -s의 종료 코드는
 % 이 프로세스의 $255다).
         PREFIX Exit:
 x       IS    $0
@@ -960,8 +999,9 @@ res     IS    $7
         LDO   t,q,:ST
         CMP   u,t,3
         BZ    u,3F
-        CMP   u,t,1
-        BNZ   u,4F
+        BZ    t,4F
+        CMP   u,t,2
+        BZ    u,4F              부모가 없거나 좀비다
         SETL  t,2
         STO   t,e,:ST           부모가 거둘 때까지 좀비로 남는다
         JMP   4F
@@ -972,10 +1012,21 @@ res     IS    $7
         LDO   u,t,0
         ADD   u,u,1
         STO   u,t,0
-4H      GETA  t,:NReady
-        LDO   u,t,0
-        BZ    u,Stop
-        PUSHJ res,:Next
+4H      SET   p,0               살아 있는(1, 3, 4) 프로세스가 남았는가
+5H      SLU   q,p,:PShift
+        ADDU  q,q,base
+        LDO   t,q,:ST
+        CMP   u,t,1
+        BZ    u,6F
+        CMP   u,t,3
+        BZ    u,6F
+        CMP   u,t,4
+        BZ    u,6F
+        ADD   p,p,1
+        CMP   t,p,:NProc
+        BN    t,5B
+        JMP   Stop
+6H      PUSHJ res,:Next
         GETA  t,:ExitNext
         STO   res,t,0
         PUSHJ res,:FreeSpace    이 프로세스의 프레임을 돌려준다
@@ -1007,17 +1058,34 @@ Store   GETA  $1,Cur
         POP   0,0
 
 % Next(): 지금 프로세스 다음부터 돌아가며 찾은, 돌 수 있는(상태가 1인) 프로세스의 pid.
-% 돌 수 있는 프로세스가 적어도 하나는 있어야 한다(지금 프로세스여도 된다).
+% 하나도 없으면 모두 디스크를 기다리며 잠든 것이므로, 커널은 놀면서 rQ의 디스크 비트를
+% 직접 지켜보다가 그 프로세스들을 깨운다(커널은 인터럽트를 끈 채로 돌지만 rQ는 켜진다).
 Next    GETA  $1,Cur
         LDO   $0,$1,0
         GETA  $2,Procs
+        SET   $3,NProc
 1H      ADD   $0,$0,1
         AND   $0,$0,NProc-1
         SLU   $1,$0,PShift
         LDO   $1,$2,$1
         CMP   $1,$1,1
-        BNZ   $1,1B
-        POP   1,0
+        BZ    $1,9F
+        SUB   $3,$3,1
+        BP    $3,1B
+        GET   $4,rJ             돌 수 있는 프로세스가 없다
+2H      GET   $1,rQ
+        SRU   $1,$1,8
+        AND   $1,$1,1
+        BZ    $1,2B             디스크의 인터럽트를 rQ에서 직접 기다린다
+        GET   $1,rQ
+        ANDNL $1,DiskBit
+        PUT   rQ,$1
+        SETL  $6,1
+        PUSHJ $5,Wakeup
+        PUT   rJ,$4
+        SET   $3,NProc
+        JMP   1B
+9H      POP   1,0
 
 % CopySpace(prv,crv): rV가 prv인 주소 공간에 들어 있는 페이지를 rV가 crv인 주소 공간의
 % 테이블의 같은 자리에 넣는다. 스택 세그먼트의 페이지는 새 프레임에 복사한다. 커널이
@@ -1117,6 +1185,7 @@ eof     IS    $12
 ln      IS    $13               줄 버퍼의 커널 주소
 res     IS    $14
 :FsOp   GET   rj,:rJ
+        PUSHJ res,:FsLock
         NEG   t,0,1
         GETA  res,:URTag        사용자 페이지의 캐시를 비운다
         STO   t,res,0
@@ -1147,7 +1216,8 @@ res     IS    $14
         BZ    t,Seek
         JMP   Tell
 Neg1    NEG   o,0,1
-Ret     SET   $0,o
+Ret     PUSHJ res,:FsUnlock
+        SET   $0,o
         PUT   :rJ,rj
         POP   1,0
 
@@ -1873,7 +1943,8 @@ res     IS    $2
         PREFIX :
 
 % BlkIO(blk,addr,cmd): 블록 장치에 명령 하나(1: 읽기, 2: 쓰기)를 시키고 결과(0이나
-% -1)를 돌려준다. 규약은 Device와 같다. 장치는 음수 주소를 물리 주소로 본다.
+% -1)를 돌려준다. 규약은 Device와 같다. 장치는 음수 주소를 물리 주소로 본다. 명령에는
+% 시간이 걸리므로, 돌 수 있는 다른 프로세스가 있으면 끝날 때까지 잠든다.
 BlkIO   SETH  $3,BLK
         ORML  $3,BLKLO
         LDO   $4,$3,DONE
@@ -1882,8 +1953,17 @@ BlkIO   SETH  $3,BLK
         STO   $2,$3,CMD
 1H      LDO   $5,$3,DONE
         CMPU  $5,$5,$4
-        BZ    $5,1B
-        SYNC  2
+        BNZ   $5,2F
+        GETA  $5,NReady
+        LDO   $5,$5,0
+        CMP   $5,$5,1
+        BNP   $5,1B             혼자면 바쁘게 기다린다
+        GET   $6,rJ
+        SETL  $8,1
+        PUSHJ $7,Sleep          디스크를 기다리며 잠든다
+        PUT   rJ,$6
+        JMP   1B
+2H      SYNC  2
         LDO   $0,$3,RESULT
         POP   1,0
 
@@ -2079,7 +2159,8 @@ res     IS    $15
 :DoExec GET   rj,:rJ
         GETA  t,:Mounted
         LDO   t,t,0
-        BZ    t,Fail            디스크가 없으면 실행할 파일도 없다
+        BZ    t,Fail0           디스크가 없으면 실행할 파일도 없다
+        PUSHJ res,:FsLock
         NEG   t,0,1
         GETA  c,:URTag
         STO   t,c,0
@@ -2406,6 +2487,7 @@ ArgD    SETH  res+1,#4000
         SETL  c,#f0
 1H      PUSHJ res,:FlushText
         STCO  0,ih,:HKIND
+        PUSHJ res,:FsUnlock
         STO   p,ent,:CTX
         STO   main,ent,:BBO     처음의 $255는 Main이다
         STO   c,ent,:WWO
@@ -2417,6 +2499,7 @@ ArgD    SETH  res+1,#4000
         LDO   $0,t,0
         JMP   :Resume
 Bad     STCO  0,ih,:HKIND
+        PUSHJ res,:FsUnlock
         GETA  res+1,:ExecMsg
         SET   res+2,0
         SETL  res+3,:Fputs<<8|:StdErr
@@ -2424,7 +2507,8 @@ Bad     STCO  0,ih,:HKIND
         NEG   t,0,1
         PUT   :rBB,t
         JMP   :Exit
-Fail    NEG   $0,0,1
+Fail    PUSHJ res,:FsUnlock
+Fail0   NEG   $0,0,1
         PUT   :rJ,rj
         POP   1,0
         PREFIX :
@@ -2567,6 +2651,95 @@ FlushText GET $0,rV
         SETL  $4,#2000
         CMP   $4,$1,$4
         BN    $4,1B
+        POP   0,0
+
+% ---- 잠들기와 깨우기 ----
+% Sleep(chan): 지금 프로세스를 chan(1: 디스크, 2: 파일 시스템 자물쇠)에서 잠재우고 다른
+% 프로세스로 넘어간다. 커널 안 어디서든 부를 수 있다. SAVE는 사용자의 레지스터뿐 아니라
+% 그 위에 쌓인 커널의 틀까지 모두 저장하므로, 깨어나면 Resume이 UNSAVE한 뒤 이곳의 Cont로
+% 돌아와 부른 곳으로 POP한다. 그때 $255는 S255에서 되돌린다.
+        PREFIX Sleep:
+chan    IS    $0
+e       IS    $1
+t       IS    $2
+res     IS    $3
+:Sleep  GETA  t,:Cur
+        LDO   e,t,0
+        SLU   e,e,:PShift
+        GETA  t,:Procs
+        ADDU  e,e,t             e=이 프로세스의 항목
+        STO   chan,e,:SCHAN
+        SETL  t,4
+        STO   t,e,:ST
+        GETA  t,:NReady
+        LDO   res,t,0
+        SUB   res,res,1
+        STO   res,t,0
+        GETA  t,Cont
+        STO   t,e,:KPC
+        SAVE  $255,0
+        SET   res+1,$255
+        PUSHJ res,:Store
+        PUSHJ res,:Next
+        SET   $0,res
+        JMP   :Resume
+Cont    LDO   $255,e,:S255      깨어났다
+        POP   0,0
+        PREFIX :
+
+% Wakeup(chan): chan에서 잠든 프로세스를 모두 깨운다. 돌 수 있는 프로세스가 둘 이상이
+% 되면 타이머를 건다(혼자일 때 꺼 두었을 수 있다).
+Wakeup  GETA  $1,Procs
+        SET   $2,0
+        SET   $5,0              깨운 수
+1H      SLU   $3,$2,PShift
+        ADDU  $3,$3,$1
+        LDO   $4,$3,ST
+        CMP   $4,$4,4
+        BNZ   $4,2F
+        LDO   $4,$3,SCHAN
+        CMP   $4,$4,$0
+        BNZ   $4,2F
+        SETL  $4,1
+        STO   $4,$3,ST
+        ADD   $5,$5,1
+2H      ADD   $2,$2,1
+        CMP   $4,$2,NProc
+        BN    $4,1B
+        BZ    $5,9F
+        GETA  $4,NReady
+        LDO   $6,$4,0
+        ADD   $6,$6,$5
+        STO   $6,$4,0
+        CMP   $6,$6,1
+        BNP   $6,9F
+        SETL  $4,Quantum
+        PUT   rI,$4
+9H      POP   0,0
+
+% FsLock(), FsUnlock(): 파일 시스템의 자물쇠. 블록 캐시와 핸들 표를 함께 쓰므로, 한
+% 프로세스가 파일 연산 도중에 디스크를 기다리며 잠든 사이에 다른 프로세스가 들어오면 안
+% 된다. 자물쇠가 잠겨 있으면 풀릴 때까지 잠든다. 커널은 선점되지 않으므로 자물쇠를 쥔
+% 프로세스는 디스크를 기다리며 잠든 것뿐이다.
+FsLock  GET   $0,rJ
+1H      GETA  $1,FsOwner
+        LDO   $2,$1,0
+        BN    $2,2F
+        SETL  $4,2
+        PUSHJ $3,Sleep
+        JMP   1B
+2H      GETA  $2,Cur
+        LDO   $2,$2,0
+        STO   $2,$1,0
+        PUT   rJ,$0
+        POP   0,0
+FsUnlock GETA $1,FsOwner
+        NEG   $2,0,1
+        STO   $2,$1,0
+        GET   $0,rJ
+        SETL  $4,2
+        PUSHJ $3,Wakeup
+        PUT   rJ,$0
         POP   0,0
 
 % Device(a0,a1,cmd): HIO에 명령 하나를 시키고 그 결과를 돌려준다.
@@ -2712,6 +2885,7 @@ Ready   AND   $6,base,need
         PREFIX :
 
 ExitNext OCTA  0                Exit이 다음에 돌릴 pid
+FsOwner OCTA  -1                파일 시스템 자물쇠를 쥔 pid(없으면 -1)
 Cur     OCTA  0                 지금 도는 프로세스의 pid
 NReady  OCTA  1                 돌 수 있는 프로세스의 수
 Procs   OCTA  1,#12340D0700000008,0,0,0,0,0,0,-1,1 프로세스 0: 돌 수 있고, 테이블은 7<<32, n=1, 부모 없음, 이미지

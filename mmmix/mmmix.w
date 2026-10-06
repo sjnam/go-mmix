@@ -1110,6 +1110,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	hexenc "encoding/hex"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1377,7 +1378,9 @@ func TestKernelPaging(t *testing.T) {
 pid를, 자식에게 0을 돌려준다. 프로그램 \.{fork}에서 부모와 자식은 바쁜 루프를 돌며 꼬리표를 다섯
 번씩 찍고, 자식은 그 전에 변수 \.{Var}를 \.{C}로 바꾼다. 타이머 인터럽트가 둘을 번갈아 돌리므로
 꼬리표가 섞여 나오고, 주소 공간이 따로이므로 부모는 여전히 \.{A}를 본다. 메타 시뮬레이터는 결정적이라
-섞이는 모양도 늘 같다. 종료 코드는 마지막으로 끝난 프로세스의 \$255다. 프로그램 \.{many}는 \.{Fork}를
+섞이는 모양도 늘 같지만, 그 모양은 커널의 코드가 조금만 바뀌어도 캐시와 타이밍을 따라 달라진다. 그래서
+부모의 꼬리표와 자식의 꼬리표가 각자 차례대로 나오는지, 그리고 부모가 끝나기 전에 자식이 끼어드는지만
+견준다. 종료 코드는 마지막으로 끝난 프로세스의 \$255다. 프로그램 \.{many}는 \.{Fork}를
 네 번 하는데, 자식들이 오래 살아 있으므로 프로세스 표(넷)가 차서 네 번째는 $-1$을 받는다. 그 뒤
 자식 셋이 찍는 순서는 타이밍에 달렸으므로(설정마다 다르다) 줄의 집합만 견준다.
 
@@ -1414,7 +1417,10 @@ func TestKernelFork(t *testing.T) {
 		p := writeHex(t, c.name, c.hex)
 		for _, cfg := range []string{"plain", "deluxe"} {
 			out, e, code := simulate(t, "", "-s", "-k"+k, "../examples/"+cfg+".mmconfig", p)
-			if c.name == "many.mmb" {
+			switch c.name {
+			case "fork.mmb":
+				@<꼬리표가 차례대로 섞여 나왔으면 |out|을 기대값으로 바꾼다@>
+			case "many.mmb":
 				lines := strings.SplitAfter(out, "\n")
 				sort.Strings(lines[1:])
 				out = strings.Join(lines, "")
@@ -1424,6 +1430,30 @@ func TestKernelFork(t *testing.T) {
 			}
 		}
 	}
+}
+
+@ 부모의 꼬리표(\.{P}로 시작하는 것과 \.{A})와 자식의 꼬리표가 각자 차례대로 나오고, 자식의
+첫 꼬리표가 \.{P4}보다 앞서야 한다.
+
+@<꼬리표가 차례대로...@>=
+var ps, cs []string
+first, p4 := -1, -1
+for i, w := range strings.Fields(out) {
+	if w[0] == 'C' {
+		cs = append(cs, w)
+		if first < 0 {
+			first = i
+		}
+	} else {
+		ps = append(ps, w)
+		if w == "P4" {
+			p4 = i
+		}
+	}
+}
+if strings.Join(ps, " ") == "P0 P1 P2 P3 P4 A" &&
+	strings.Join(cs, " ") == "C0 C1 C2 C3 C4 C" && first < p4 {
+	out = c.out
 }
 
 @ 쓸 때 복사를 시험한다. 프로그램 \.{cow}에서 부모는 버퍼에 \.{parent}를 담은 채 \.{Fork}하고
@@ -1655,6 +1685,139 @@ frames := func(n int) string {
 }
 if a, b := frames(2), frames(6); a != b || a == "m[600018000]=0000000000000000" {
 	t.Errorf("frames leak: %s, then %s", a, b)
+}
+
+@ 인터럽트로 하는 입출력을 시험한다. 블록 장치는 명령 하나에 |blkLatency|사이클이 걸린다. 프로그램
+\.{io}는 인자 없이 돌면 \.{Fork}해서, 자식은 16블록짜리 파일 \.{data}의 블록마다 찾아가 8바이트씩
+읽어 그 합을 검사하고(\.{R ok}), 부모는 바쁜 계산을 20번 하며 그때마다 \.{c}를 찍는다. \.{io r}은
+읽기만, \.{io c}는 계산만 한다. 커널은 디스크를 기다리는 프로세스를 재우고 다른 프로세스를 돌리므로,
+함께 돌린 시간은 따로 돌린 두 시간의 합보다 디스크 시간 전체(16블록 곱하기 |blkLatency|) 넘게 짧아야
+한다. 두 실행이 함께 쓰는 부팅 시간만큼은 바쁘게 기다리는 커널도 줄어들지만, 그것만으로는 이 기준에
+모자란다. 시간은 대화 방식이 알리는 \.{Halted} \.{at} \.{time}에서 읽는다.
+
+@(mmmix_test.go@>=
+const ioMMS = ioHead + ioCompute + ioReader
+
+const ioHead = `% io: overlap disk waits with computation.
+Fork    IS    11
+Wait    IS    13
+argc    IS    $0
+argv    IS    $1
+        LOC   Data_Segment
+        GREG  @@
+Name    BYTE  "data",0
+Ok      BYTE  "R ok",#a,0
+Bad     BYTE  "R bad",#a,0
+Cmsg    BYTE  "c",0
+NL      BYTE  #a,0
+        LOC   (@@+7)&-8
+OpenA   OCTA  Name,BinaryRead
+ReadA   OCTA  Buf,8
+Buf     LOC   @@+1024
+        LOC   #100
+Main    CMP   $2,argc,2
+        BN    $2,1F
+        LDOU  $2,argv,8
+        LDBU  $2,$2,0
+        CMP   $3,$2,'r'
+        BZ    $3,Reader
+        JMP   Compute
+1H      TRAP  0,Fork,0
+        BZ    $255,Reader
+        PUSHJ $4,Compute
+        TRAP  0,Wait,0
+        TRAP  0,Halt,0
+`
+
+@ 부모가 하는 바쁜 계산이다. \.{io c}로 혼자 돌면 끝나고 멈춘다.
+
+@(mmmix_test.go@>=
+const ioCompute = `% Compute: 20 rounds of busy work, a "c" after each.
+Compute SET   $5,20
+2H      SETL  $6,3000
+3H      SUB   $6,$6,1
+        PBP   $6,3B
+        LDA   $255,Cmsg
+        TRAP  0,Fputs,StdOut
+        SUB   $5,$5,1
+        PBP   $5,2B
+        LDA   $255,NL
+        TRAP  0,Fputs,StdOut
+        CMP   $2,argc,2
+        BNN   $2,9F
+        POP   0,0
+9H      TRAP  0,Halt,0
+`
+
+@ 자식이 하는 읽기다. 블록마다 찾아가 8바이트를 읽고, 합이 $16\times(0+1+\cdots+7)=448$인지 본다.
+
+@(mmmix_test.go@>=
+const ioReader = `Reader  LDA   $255,OpenA
+        TRAP  0,Fopen,3
+        SET   $7,0              sum
+        SET   $8,0              block
+4H      SLU   $255,$8,10
+        TRAP  0,Fseek,3
+        LDA   $255,ReadA
+        TRAP  0,Fread,3
+        LDA   $9,Buf
+        SET   $10,0
+5H      LDBU  $11,$9,$10
+        ADD   $7,$7,$11
+        ADD   $10,$10,1
+        CMP   $11,$10,8
+        PBN   $11,5B
+        ADD   $8,$8,1
+        CMP   $11,$8,16
+        PBN   $11,4B
+        LDA   $255,Ok
+        SETL  $11,448           16 x (0+1+...+7)
+        CMP   $11,$7,$11
+        BZ    $11,6F
+        LDA   $255,Bad
+6H      TRAP  0,Fputs,StdOut
+        TRAP  0,Halt,0
+`
+
+@ 시험은 원시 파일을 어셈블하고 인자를 바꿔 가며 세 번 덤프한다.
+
+@(mmmix_test.go@>=
+func TestKernelSleep(t *testing.T) {
+	k := assembleKernel(t)
+	dir := t.TempDir()
+	in := func(name string) string { return filepath.Join(dir, name) }
+	os.WriteFile(in("io.mms"), []byte(ioMMS), 0o644)
+	data := make([]byte, 16384)
+	for i := range data {
+		data[i] = byte(i)
+	}
+	os.WriteFile(in("data"), data, 0o644)
+	goRun(t, "mmixal", "-b", "250", "-o", in("io.mmo"), in("io.mms"))
+	goRun(t, "nnixfs", "mkfs", in("disk.img"))
+	goRun(t, "nnixfs", "put", in("disk.img"), in("data"))
+	@<\.{io}, \.{io r}, \.{io c}를 돌리고 시간을 견준다@>
+}
+
+@ @<\.{io}, \.{io r}...@>=
+run := func(args ...string) (string, int) {
+	mmb := in("io" + strings.Join(args, "") + ".mmb")
+	goRun(t, "mmixsim", append([]string{"-D" + mmb, in("io.mmo")}, args...)...)
+	out, _, _ := simulate(t, "100000000\nq\n", "-k"+k, "-d"+in("disk.img"),
+		"../examples/plain.mmconfig", mmb)
+	var n int
+	i, j := strings.Index(out, "time 0\n"), strings.Index(out, "Halted at time ")
+	if i < 0 || j < i {
+		t.Fatalf("io %v: %q", args, out)
+	}
+	fmt.Sscanf(out[j:], "Halted at time %d", &n)
+	return out[i+7 : j], n // 프로그램이 찍은 것
+}
+outB, both := run()
+outR, reader := run("r")
+_, computer := run("c")
+if !strings.Contains(outB, "R ok") || strings.Count(outB, "c") != 20 ||
+	!strings.Contains(outR, "R ok") || reader+computer-both <= 16*blkLatency {
+	t.Errorf("both %d, reader %d, computer %d: %q", both, reader, computer, outB)
 }
 
 @ 커널 파일이나 디스크 이미지를 열 수 없거나 커널의 형식이 틀렸을 때다.

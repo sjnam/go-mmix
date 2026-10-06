@@ -23,14 +23,16 @@ const (
 	hioMagic  = 0x4e4e49582d48494f // \.{"NNIX-HIO"}
 )
 
-//line mmixmem.w:372
+//line mmixmem.w:377
 const (
-	blkBase  = hioBase + hioSize  // 장치 1의 물리 주소
-	blkSize  = 1024               // 블록의 바이트 수
-	blkBlock = 0x08               // 레지스터 \.{BLOCK}의 오프셋
-	blkAddr  = 0x10               // 레지스터 \.{ADDR}의 오프셋
-	blkNblk  = 0x30               // 레지스터 \.{NBLK}의 오프셋
-	blkMagic = 0x4e4e49582d424c4b // \.{"NNIX-BLK"}
+	blkBase    = hioBase + hioSize  // 장치 1의 물리 주소
+	blkSize    = 1024               // 블록의 바이트 수
+	blkBlock   = 0x08               // 레지스터 \.{BLOCK}의 오프셋
+	blkAddr    = 0x10               // 레지스터 \.{ADDR}의 오프셋
+	blkNblk    = 0x30               // 레지스터 \.{NBLK}의 오프셋
+	blkMagic   = 0x4e4e49582d424c4b // \.{"NNIX-BLK"}
+	blkLatency = 10000              // 명령 하나에 걸리는 사이클
+	blkInt     = 1 << 8             // 명령이 끝나면 켜는 rQ의 비트
 )
 
 //line mmixmem.w:166
@@ -44,7 +46,7 @@ type hio struct {
 	rv     Octa // 레지스터 \.{RV}
 }
 
-//line mmixmem.w:382
+//line mmixmem.w:389
 type blk struct {
 	mx     *machine
 	f      *os.File // 디스크 이미지
@@ -53,6 +55,8 @@ type blk struct {
 	addr   Octa     // 레지스터 \.{ADDR}
 	result Octa     // 레지스터 \.{RESULT}
 	done   Octa     // 레지스터 \.{DONE}
+	cmd    Octa     // 진행 중인 명령(없으면 0)
+	count  int      // 그 명령이 끝날 때까지 남은 사이클
 }
 
 //line mmixmem.w:58
@@ -79,7 +83,7 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 //line mmixmem.w:64
 	} else if mx.blk != nil && addr-blkBase < hioSize {
 
-//line mmixmem.w:395
+//line mmixmem.w:404
 		var reg Octa
 		switch addr&^7 - blkBase {
 		case hioID:
@@ -197,7 +201,7 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 	}
 	if mx.blk != nil && addr-blkBase < hioSize && size == 3 && addr&7 == 0 {
 
-//line mmixmem.w:413
+//line mmixmem.w:422
 		d := mx.blk
 		switch addr - blkBase {
 		case blkBlock:
@@ -205,42 +209,9 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 		case blkAddr:
 			d.addr = val &^ signBit
 		case hioCmd:
-			d.result = negOne
-			if d.block < d.nblk && d.addr&7 == 0 && d.addr+blkSize <= hioBase && (val == 1 || val == 2) {
-				var b [blkSize]byte
-				if val == 1 {
-
-//line mmixmem.w:433
-					if _, err := d.f.ReadAt(b[:], int64(d.block)*blkSize); err == nil {
-						for k := 0; k < blkSize; k += 8 {
-							var o Octa
-							for _, c := range b[k : k+8] {
-								o = o<<8 | Octa(c)
-							}
-							mx.magicWrite(d.addr+Octa(k), o)
-						}
-						d.result = 0
-					}
-
-//line mmixmem.w:425
-				} else {
-
-//line mmixmem.w:445
-					for k := 0; k < blkSize; k += 8 {
-						o := mx.magicRead(d.addr + Octa(k))
-						for j := 7; j >= 0; j-- {
-							b[k+j] = byte(o)
-							o >>= 8
-						}
-					}
-					if _, err := d.f.WriteAt(b[:], int64(d.block)*blkSize); err == nil {
-						d.result = 0
-					}
-
-//line mmixmem.w:427
-				}
+			if d.cmd == 0 {
+				d.cmd, d.count = val, blkLatency
 			}
-			d.done++
 		}
 
 //line mmixmem.w:120
@@ -338,4 +309,54 @@ func (h *hio) MMPutChars(buf []byte, size int, addr Octa) {
 		h.mx.putChars(buf[k:], n, pa)
 		k += n
 	}
+}
+
+//line mmixmem.w:439
+func (d *blk) tick() {
+	if d.cmd == 0 {
+		return
+	}
+	if d.count--; d.count > 0 {
+		return
+	}
+	mx, val := d.mx, d.cmd
+	d.cmd = 0
+	d.result = negOne
+	if d.block < d.nblk && d.addr&7 == 0 && d.addr+blkSize <= hioBase && (val == 1 || val == 2) {
+		var b [blkSize]byte
+		if val == 1 {
+
+//line mmixmem.w:463
+			if _, err := d.f.ReadAt(b[:], int64(d.block)*blkSize); err == nil {
+				for k := 0; k < blkSize; k += 8 {
+					var o Octa
+					for _, c := range b[k : k+8] {
+						o = o<<8 | Octa(c)
+					}
+					mx.magicWrite(d.addr+Octa(k), o)
+				}
+				d.result = 0
+			}
+
+//line mmixmem.w:453
+		} else {
+
+//line mmixmem.w:475
+			for k := 0; k < blkSize; k += 8 {
+				o := mx.magicRead(d.addr + Octa(k))
+				for j := 7; j >= 0; j-- {
+					b[k+j] = byte(o)
+					o >>= 8
+				}
+			}
+			if _, err := d.f.WriteAt(b[:], int64(d.block)*blkSize); err == nil {
+				d.result = 0
+			}
+
+//line mmixmem.w:455
+		}
+	}
+	d.done++
+	mx.g[rQ].o |= blkInt
+	mx.newQ |= blkInt
 }

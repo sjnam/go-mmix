@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	hexenc "encoding/hex"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,12 +26,12 @@ func digest(s string) string {
 	return hexenc.EncodeToString(h[:8])
 }
 
-//line mmmix.w:1138
+//line mmmix.w:1139
 const (
 	script1 = "@8000000000010000\nv1ff\n2000\np\ns\nq\n"
 	script2 = "@8000000000010000\n100000\ns\nD*\nS*\ng255\nm10000\nq\n"
 
-//line mmmix.w:1141
+//line mmmix.w:1142
 )
 
 func TestKnuthFiles(t *testing.T) {
@@ -53,7 +54,7 @@ func TestKnuthFiles(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1169
+//line mmmix.w:1170
 const (
 	helloMMB = "00000000000001008fff010000000701f4ff000300000701000000002c20776f726c640a" +
 		"0000000000000000000000004000000000000000400000000000002840000000000000180000" +
@@ -67,7 +68,7 @@ const (
 		"Predictions: 0 in agreement, 0 in opposition; 0 good, 0 bad\n" +
 		"Instructions issued per cycle:\n  0   380\n  1   26\n"
 
-//line mmmix.w:1181
+//line mmmix.w:1182
 )
 
 func writeHex(t *testing.T, name, h string) string {
@@ -95,7 +96,7 @@ func TestHello(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1211
+//line mmmix.w:1212
 const primesMMB = "0000000000000100e3fe0003c1fbf700a6fef8fbe7fb000242fb0013e7fe0002c1faf70086f9" +
 	"f8fa1cfdfef9fefc000643fcfffb30fffdf94dfffff6e7fa0002f1fffff9466972737420466976" +
 	"652048756e64726564205072696d65730a00202020000023fff6000000070135fa000220fafaf7" +
@@ -118,7 +119,7 @@ func TestPrimes(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1236
+//line mmmix.w:1237
 func TestErrors(t *testing.T) {
 	dir := t.TempDir()
 	file := func(name, text string) string {
@@ -160,7 +161,7 @@ func TestErrors(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1281
+//line mmmix.w:1282
 func assembleKernel(t *testing.T) string {
 	t.Helper()
 	mmo := filepath.Join(t.TempDir(), "nnix.mmo")
@@ -171,7 +172,7 @@ func assembleKernel(t *testing.T) string {
 	return mmo
 }
 
-//line mmmix.w:1295
+//line mmmix.w:1296
 func TestKernelMatchesMagic(t *testing.T) {
 	k := assembleKernel(t)
 	for _, prog := range []struct{ name, hex string }{
@@ -190,7 +191,7 @@ func TestKernelMatchesMagic(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1319
+//line mmmix.w:1320
 func TestKernelUsesDevice(t *testing.T) {
 	k := assembleKernel(t)
 	p := writeHex(t, "hello.mmb", helloMMB)
@@ -207,7 +208,7 @@ func TestKernelUsesDevice(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1343
+//line mmmix.w:1344
 const (
 	spanMMB = "0000000000000100e0002000eb001ff081010018e0024000a1010200c1ff000000000701e0ff" +
 		"2000ebff500000000400e0ff2000ebff3ffc0000070100000000000000000000000020000000" +
@@ -223,7 +224,7 @@ const (
 		"000000000002000000000000010000000000000000006000000000000080ff00000000000000" +
 		"0000000000000000"
 
-//line mmmix.w:1357
+//line mmmix.w:1358
 )
 
 func TestKernelPaging(t *testing.T) {
@@ -243,7 +244,7 @@ func TestKernelPaging(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1385
+//line mmmix.w:1388
 const (
 	forkMMB = "000000000000010000000b00c105ff00e30100504a050004e30100432303fe00a10103002303" +
 		"fe03a1010300e304000021020430a1020301e30603e8250606015506ffff23fffe0300000701" +
@@ -260,10 +261,10 @@ const (
 		"0000000000000000000140000000000000080000000000000002200000000000000000000000" +
 		"0000010000000000000000006000000000000088fe000000000000000000000000000000"
 
-//line mmmix.w:1400
+//line mmmix.w:1403
 )
 
-//line mmmix.w:1405
+//line mmmix.w:1408
 func TestKernelFork(t *testing.T) {
 	k := assembleKernel(t)
 	for _, c := range []struct {
@@ -276,7 +277,32 @@ func TestKernelFork(t *testing.T) {
 		p := writeHex(t, c.name, c.hex)
 		for _, cfg := range []string{"plain", "deluxe"} {
 			out, e, code := simulate(t, "", "-s", "-k"+k, "../examples/"+cfg+".mmconfig", p)
-			if c.name == "many.mmb" {
+			switch c.name {
+			case "fork.mmb":
+
+//line mmmix.w:1439
+				var ps, cs []string
+				first, p4 := -1, -1
+				for i, w := range strings.Fields(out) {
+					if w[0] == 'C' {
+						cs = append(cs, w)
+						if first < 0 {
+							first = i
+						}
+					} else {
+						ps = append(ps, w)
+						if w == "P4" {
+							p4 = i
+						}
+					}
+				}
+				if strings.Join(ps, " ") == "P0 P1 P2 P3 P4 A" &&
+					strings.Join(cs, " ") == "C0 C1 C2 C3 C4 C" && first < p4 {
+					out = c.out
+				}
+
+//line mmmix.w:1423
+			case "many.mmb":
 				lines := strings.SplitAfter(out, "\n")
 				sort.Strings(lines[1:])
 				out = strings.Join(lines, "")
@@ -288,7 +314,7 @@ func TestKernelFork(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1435
+//line mmmix.w:1465
 const cowMMB = "000000000000010000000b0042ff000500000d0023fffe00000007010000000023fffe10" +
 	"000004002300fe00e3010043a101000023fffe0000000701000000000000000000000000" +
 	"2000000000000000706172656e740a000000000000000000200000000000001020000000" +
@@ -309,7 +335,7 @@ func TestKernelCow(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1464
+//line mmmix.w:1494
 const (
 	copyMMB = "000000000000020031ff000252ff000ef4ff0008000007028fff010000000702f4ff00060000" +
 		"070235ff00010000000055736167653a20002066696c656e616d650a00008f020108af02fe03" +
@@ -325,10 +351,10 @@ const (
 		"0000000000022000000000000005000000000000020000000000000000006000000000000088" +
 		"fe000000000000000000000000000000"
 
-//line mmmix.w:1478
+//line mmmix.w:1508
 )
 
-//line mmmix.w:1483
+//line mmmix.w:1513
 const (
 	iotest2MMB = "00000000000001000000020323fffe580000010323fffe000000080300000a03e3ff03e80000" +
 		"090300000a03e3ff00010000090300000a0323fffe680000040323fffe780000040323fffe88" +
@@ -358,10 +384,10 @@ const (
 		"0000111178787979000a000031313232333334343535000a000044443131323233333434" +
 		"353536360000666666707100777777777777777788888888888888889999999999999999"
 
-//line mmmix.w:1511
+//line mmmix.w:1541
 )
 
-//line mmmix.w:1519
+//line mmmix.w:1549
 const bigMMB = "00000000000001002300fd00e3010000c90201ffa002000121010101e303138830030103" +
 	"5103fffb23fffe080000010323fffe1800000603e3ff00000000090323fffe2800000303" +
 	"c104ff0023fffe3800000303c105ff0035ff00010000090300000a03c106ff0000000203" +
@@ -374,7 +400,7 @@ const bigMMB = "00000000000001002300fd00e3010000c90201ffa002000121010101e3031388
 	"0000000220000000000000002000000000002af800000000000001000000000000000000" +
 	"6000000000000090fd000000000000000000000000000000"
 
-//line mmmix.w:1535
+//line mmmix.w:1565
 func nnixfsTool(t *testing.T, args ...string) {
 	t.Helper()
 	cmd := exec.Command("go", append([]string{"run", "../nnixfs"}, args...)...)
@@ -383,7 +409,7 @@ func nnixfsTool(t *testing.T, args ...string) {
 	}
 }
 
-//line mmmix.w:1546
+//line mmmix.w:1576
 func TestKernelFS(t *testing.T) {
 	k := assembleKernel(t)
 	dir := t.TempDir()
@@ -395,16 +421,16 @@ func TestKernelFS(t *testing.T) {
 	nnixfsTool(t, "put", img, src)
 	c := "../examples/plain.mmconfig"
 
-//line mmmix.w:1562
+//line mmmix.w:1592
 	p := writeHex(t, "copy.mmb", copyMMB)
 	out, e, code := simulate(t, "", "-s", "-k"+k, "-d"+img, c, p)
 	if out != text || code != 0 || e != "" {
 		t.Errorf("copy: %q %d %q", out, code, e)
 	}
 
-//line mmmix.w:1557
+//line mmmix.w:1587
 
-//line mmmix.w:1569
+//line mmmix.w:1599
 	p = writeHex(t, "iotest2.mmb", iotest2MMB)
 	out, e, code = simulate(t, "", "-s", "-k"+k, "-d"+img, c, p)
 	if out != "" || code != 0 || e != "" {
@@ -416,9 +442,9 @@ func TestKernelFS(t *testing.T) {
 		t.Errorf("ioscr.tmp: %x", b)
 	}
 
-//line mmmix.w:1558
+//line mmmix.w:1588
 
-//line mmmix.w:1581
+//line mmmix.w:1611
 	p = writeHex(t, "big.mmb", bigMMB)
 	out, e, code = simulate(t, "", "-s", "-k"+k, "-d"+img, c, p)
 	pattern := make([]byte, 5000)
@@ -431,10 +457,10 @@ func TestKernelFS(t *testing.T) {
 		t.Errorf("big: %d bytes out, code %d, %q, %d bytes on disk", len(out), code, e, len(b))
 	}
 
-//line mmmix.w:1559
+//line mmmix.w:1589
 }
 
-//line mmmix.w:1604
+//line mmmix.w:1634
 func goRun(t *testing.T, tool string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("go", append([]string{"run", "../" + tool}, args...)...)
@@ -443,7 +469,7 @@ func goRun(t *testing.T, tool string, args ...string) {
 	}
 }
 
-//line mmmix.w:1613
+//line mmmix.w:1643
 func TestKernelShell(t *testing.T) {
 	k := assembleKernel(t)
 	dir := t.TempDir()
@@ -456,7 +482,7 @@ func TestKernelShell(t *testing.T) {
 		goRun(t, "nnixfs", "put", in("disk.img"), in(prog+".mmo"))
 	}
 
-//line mmmix.w:1629
+//line mmmix.w:1659
 	out, e, code := simulate(t, "hello\necho one two three\nprimes\nnope\nexit\n", "-s", "-k"+k,
 		"-d"+in("disk.img"), "../examples/plain.mmconfig", in("sh.mmb"))
 	const prompt = "nnix$ StdIn> "
@@ -468,9 +494,9 @@ func TestKernelShell(t *testing.T) {
 		t.Errorf("shell: %q, %q, code %d", out, e, code)
 	}
 
-//line mmmix.w:1625
+//line mmmix.w:1655
 
-//line mmmix.w:1646
+//line mmmix.w:1676
 	frames := func(n int) string {
 		input := "100000000\n" + strings.Repeat("hello\n", n) + "exit\nm600018000\nq\n"
 		out, _, _ := simulate(t, input, "-k"+k, "-d"+in("disk.img"), "../examples/plain.mmconfig",
@@ -485,10 +511,130 @@ func TestKernelShell(t *testing.T) {
 		t.Errorf("frames leak: %s, then %s", a, b)
 	}
 
-//line mmmix.w:1626
+//line mmmix.w:1656
 }
 
-//line mmmix.w:1663
+//line mmmix.w:1699
+const ioMMS = ioHead + ioCompute + ioReader
+
+const ioHead = `% io: overlap disk waits with computation.
+Fork    IS    11
+Wait    IS    13
+argc    IS    $0
+argv    IS    $1
+        LOC   Data_Segment
+        GREG  @
+Name    BYTE  "data",0
+Ok      BYTE  "R ok",#a,0
+Bad     BYTE  "R bad",#a,0
+Cmsg    BYTE  "c",0
+NL      BYTE  #a,0
+        LOC   (@+7)&-8
+OpenA   OCTA  Name,BinaryRead
+ReadA   OCTA  Buf,8
+Buf     LOC   @+1024
+        LOC   #100
+Main    CMP   $2,argc,2
+        BN    $2,1F
+        LDOU  $2,argv,8
+        LDBU  $2,$2,0
+        CMP   $3,$2,'r'
+        BZ    $3,Reader
+        JMP   Compute
+1H      TRAP  0,Fork,0
+        BZ    $255,Reader
+        PUSHJ $4,Compute
+        TRAP  0,Wait,0
+        TRAP  0,Halt,0
+`
+
+//line mmmix.w:1735
+const ioCompute = `% Compute: 20 rounds of busy work, a "c" after each.
+Compute SET   $5,20
+2H      SETL  $6,3000
+3H      SUB   $6,$6,1
+        PBP   $6,3B
+        LDA   $255,Cmsg
+        TRAP  0,Fputs,StdOut
+        SUB   $5,$5,1
+        PBP   $5,2B
+        LDA   $255,NL
+        TRAP  0,Fputs,StdOut
+        CMP   $2,argc,2
+        BNN   $2,9F
+        POP   0,0
+9H      TRAP  0,Halt,0
+`
+
+//line mmmix.w:1755
+const ioReader = `Reader  LDA   $255,OpenA
+        TRAP  0,Fopen,3
+        SET   $7,0              sum
+        SET   $8,0              block
+4H      SLU   $255,$8,10
+        TRAP  0,Fseek,3
+        LDA   $255,ReadA
+        TRAP  0,Fread,3
+        LDA   $9,Buf
+        SET   $10,0
+5H      LDBU  $11,$9,$10
+        ADD   $7,$7,$11
+        ADD   $10,$10,1
+        CMP   $11,$10,8
+        PBN   $11,5B
+        ADD   $8,$8,1
+        CMP   $11,$8,16
+        PBN   $11,4B
+        LDA   $255,Ok
+        SETL  $11,448           16 x (0+1+...+7)
+        CMP   $11,$7,$11
+        BZ    $11,6F
+        LDA   $255,Bad
+6H      TRAP  0,Fputs,StdOut
+        TRAP  0,Halt,0
+`
+
+//line mmmix.w:1785
+func TestKernelSleep(t *testing.T) {
+	k := assembleKernel(t)
+	dir := t.TempDir()
+	in := func(name string) string { return filepath.Join(dir, name) }
+	os.WriteFile(in("io.mms"), []byte(ioMMS), 0o644)
+	data := make([]byte, 16384)
+	for i := range data {
+		data[i] = byte(i)
+	}
+	os.WriteFile(in("data"), data, 0o644)
+	goRun(t, "mmixal", "-b", "250", "-o", in("io.mmo"), in("io.mms"))
+	goRun(t, "nnixfs", "mkfs", in("disk.img"))
+	goRun(t, "nnixfs", "put", in("disk.img"), in("data"))
+
+//line mmmix.w:1802
+	run := func(args ...string) (string, int) {
+		mmb := in("io" + strings.Join(args, "") + ".mmb")
+		goRun(t, "mmixsim", append([]string{"-D" + mmb, in("io.mmo")}, args...)...)
+		out, _, _ := simulate(t, "100000000\nq\n", "-k"+k, "-d"+in("disk.img"),
+			"../examples/plain.mmconfig", mmb)
+		var n int
+		i, j := strings.Index(out, "time 0\n"), strings.Index(out, "Halted at time ")
+		if i < 0 || j < i {
+			t.Fatalf("io %v: %q", args, out)
+		}
+		fmt.Sscanf(out[j:], "Halted at time %d", &n)
+		return out[i+7 : j], n // 프로그램이 찍은 것
+	}
+	outB, both := run()
+	outR, reader := run("r")
+	_, computer := run("c")
+	if !strings.Contains(outB, "R ok") || strings.Count(outB, "c") != 20 ||
+		!strings.Contains(outR, "R ok") || reader+computer-both <= 16*blkLatency {
+		t.Errorf("both %d, reader %d, computer %d: %q", both, reader, computer, outB)
+	}
+
+//line mmmix.w:1799
+}
+
+//line mmmix.w:1826
 func TestKernelErrors(t *testing.T) {
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "bad.mmo")

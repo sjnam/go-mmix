@@ -160,7 +160,7 @@ type writeNode struct {
 	idx   int   // 쓰기 버퍼 안의 위치
 }
 
-//line mmixpipe.w:8596
+//line mmixpipe.w:8599
 type machine struct {
 
 //line mmixpipe.w:139
@@ -330,20 +330,20 @@ type machine struct {
 //line mmixpipe.w:6503
 	sleepy bool // 페이지 테이블 에뮬레이션 호출을 막 내보냈는가?
 
-//line mmixpipe.w:6753
+//line mmixpipe.w:6756
 	tryingToInterrupt bool // 가로막을 수 있는 연산들에게 멈추기를 권하는가?
 	nullifying        bool // 적재/저장 명령을 무효로 만들려고 배정을 멈추는가?
 
-//line mmixpipe.w:7709
+//line mmixpipe.w:7712
 	fremMax                     int
 	deninPenalty, denoutPenalty int
 
-//line mmixpipe.w:8584
+//line mmixpipe.w:8587
 	stdinBuf      [256]byte // 모의 프로그램의 표준 입력
 	stdinBufStart int       // 그 버퍼에서의 현재 위치
 	stdinBufEnd   int       // 그 버퍼의 현재 끝
 
-//line mmixpipe.w:8598
+//line mmixpipe.w:8601
 	out     *bufio.Writer // 표준 출력
 	stderr  io.Writer     // 표준 오류
 	io      *mmixio.IO    // 모의 프로그램의 파일들
@@ -353,7 +353,7 @@ type machine struct {
 	blk     *blk          // \.{mmixmem.w}의 블록 장치(\.{-d}를 주었을 때만)
 }
 
-//line mmixpipe.w:8611
+//line mmixpipe.w:8614
 type exitSignal int
 
 //line mmixpipe.w:126
@@ -909,7 +909,7 @@ const (
 //line mmixpipe.w:6567
 	lEmulateVirt // 원본의 |emulate_virt|
 
-//line mmixpipe.w:8234
+//line mmixpipe.w:8237
 	lSyncCheck // 원본의 |sync_check|
 
 //line mmixpipe.w:2536
@@ -1021,7 +1021,7 @@ const (
 	lState5 = stage1St + 5 // 원본의 |state_5|
 )
 
-//line mmixpipe.w:6831
+//line mmixpipe.w:6834
 const (
 	resumeAgain = 0 // rX의 명령을 위치 $\rm rW-4$에 있는 것처럼 되풀이한다
 	resumeCont  = 1 // 같지만, 피연산자 대신 rY와 rZ를 쓴다
@@ -1029,20 +1029,20 @@ const (
 	resumeTrans = 3 // $\rm(rY,rZ)$를 IT-캐시나 DT-캐시에 넣고 |resumeAgain|을 한다
 )
 
-//line mmixpipe.w:7084
+//line mmixpipe.w:7087
 const (
 	doResumeTrans = 17                       // |resumeTrans| 동작을 하는 |state|
 	lResumeTrans  = stage1St + doResumeTrans // 원본의 |resume_trans|
 )
 
-//line mmixpipe.w:8044
+//line mmixpipe.w:8047
 const (
 	lDoSyncid = stage2St + 30 // 원본의 |do_syncid|
 	lDoSyncd  = stage2St + 33 // 원본의 |do_syncd|
 	lNextSync = stage2St + 35 // 원본의 |next_sync|
 )
 
-//line mmixpipe.w:8256
+//line mmixpipe.w:8259
 const (
 	Halt = iota
 	Fopen
@@ -1056,7 +1056,7 @@ const (
 	Fseek
 	Ftell
 
-//line mmixpipe.w:8268
+//line mmixpipe.w:8271
 )
 
 const maxSysCall = Ftell
@@ -1225,7 +1225,7 @@ var thirdOperand = [256]byte{
 //line mmixpipe.w:6532
 var badInstMask = [4]Tetra{0xfffffe, 0xffff, 0xffff00, 0xfffff8}
 
-//line mmixpipe.w:8320
+//line mmixpipe.w:8323
 var argCount = [11]int{1, 3, 1, 3, 3, 3, 3, 2, 2, 2, 1}
 
 //line mmixpipe.w:156
@@ -1729,6 +1729,9 @@ func (mx *machine) cycle() {
 			mx.printf("\n")
 		}
 	}
+	if mx.blk != nil {
+		mx.blk.tick() // 보충: \.{mmixmem.w}의 블록 장치가 시간을 보낸다
+	}
 	mx.tryingToInterrupt = false
 	if mx.g[rQ].o&mx.g[rK].o != 0 && mx.cool != mx.hot &&
 		mx.hot.interrupt&(eBit+fBit+hBit) == 0 && mx.doingInterrupt == 0 &&
@@ -1738,7 +1741,7 @@ func (mx *machine) cycle() {
 		} else {
 			mx.hot.interrupt |= eBit
 
-//line mmixpipe.w:6764
+//line mmixpipe.w:6767
 			i = mx.issuedBetween(mx.hot, mx.cool)
 			if i >= mx.deissues {
 				mx.deissues = i
@@ -1753,13 +1756,13 @@ func (mx *machine) cycle() {
 				mx.unschedule(&mx.fetchCo)
 				mx.startup(&mx.fetchCo, 1)
 
-//line mmixpipe.w:6770
+//line mmixpipe.w:6773
 				if isLoadStore(mx.hot.i) {
 					mx.nullifying = true
 				}
 			}
 
-//line mmixpipe.w:6748
+//line mmixpipe.w:6751
 			mx.instPtr = spec{o: mx.g[rTT].o}
 		}
 	}
@@ -1771,13 +1774,13 @@ func (mx *machine) cycle() {
 	mx.suppressDispatch = mx.deissues != 0 || mx.dispatchLock != nil
 	if mx.doingInterrupt != 0 {
 
-//line mmixpipe.w:6795
+//line mmixpipe.w:6798
 		d := mx.doingInterrupt
 		mx.doingInterrupt--
 		switch d {
 		case 3:
 
-//line mmixpipe.w:6808
+//line mmixpipe.w:6811
 			j = int(mx.hot.interrupt & hBit)
 			if j != 0 {
 				mx.g[rB].o = mx.g[255].o
@@ -1798,10 +1801,10 @@ func (mx *machine) cycle() {
 				mx.printf("\n")
 			}
 
-//line mmixpipe.w:6800
+//line mmixpipe.w:6803
 		case 2:
 
-//line mmixpipe.w:6844
+//line mmixpipe.w:6847
 			{
 				hot := mx.hot
 				j = int(packBytes(hot.op, int(hot.xx), int(hot.yy), int(hot.zz)))
@@ -1819,7 +1822,7 @@ func (mx *machine) cycle() {
 					mx.g[rWW].o = hot.goLoc.o
 					mx.g[rXX].o = mx.g[rXX].o&^0xffffffff | Octa(Tetra(j))
 
-//line mmixpipe.w:6873
+//line mmixpipe.w:6876
 					if hot.interrupt&fBit != 0 { // 강제
 						if hot.i != trap {
 							j = resumeTrans // 페이지 변환을 에뮬레이트한다
@@ -1844,7 +1847,7 @@ func (mx *machine) cycle() {
 						}
 					}
 
-//line mmixpipe.w:6861
+//line mmixpipe.w:6864
 					mx.g[rXX].o = mx.g[rXX].o&0xffffffff | Octa(Tetra(j<<24)+hot.interrupt&0xff)<<32
 					if mx.verbose&issueBit != 0 {
 						mx.printf(" setting rWW=")
@@ -1856,10 +1859,10 @@ func (mx *machine) cycle() {
 				}
 			}
 
-//line mmixpipe.w:6802
+//line mmixpipe.w:6805
 		case 1:
 
-//line mmixpipe.w:6898
+//line mmixpipe.w:6901
 			{
 				hot := mx.hot
 				j = int(hot.interrupt & hBit)
@@ -1894,7 +1897,7 @@ func (mx *machine) cycle() {
 				}
 			}
 
-//line mmixpipe.w:6804
+//line mmixpipe.w:6807
 			mx.hot = mx.prevCtl(mx.hot)
 		}
 
@@ -2123,7 +2126,7 @@ func (mx *machine) cycle() {
 			}
 			if hot.interrupt >= hBit {
 
-//line mmixpipe.w:6779
+//line mmixpipe.w:6782
 				if hot.interrupt&hBit == 0 {
 					mx.g[rK].o = 0 // 트랩
 				}
@@ -2344,7 +2347,7 @@ func (mx *machine) cycle() {
 //line mmixpipe.w:1946
 				if mx.resuming != 0 {
 
-//line mmixpipe.w:7069
+//line mmixpipe.w:7072
 					if mx.resuming&1 != 0 {
 						cool.y = mx.specval(&mx.g[rY])
 						cool.z = mx.specval(&mx.g[rZ])
@@ -2825,7 +2828,7 @@ func (mx *machine) cycle() {
 							mx.specInstall(&mx.g[rB], &cool.a)
 						}
 
-//line mmixpipe.w:6938
+//line mmixpipe.w:6941
 					case resume:
 						if cool != mx.oldHot {
 							break stall
@@ -2849,13 +2852,13 @@ func (mx *machine) cycle() {
 							cool.goLoc.o = mx.instPtr.o
 							if cool.zz != 0 {
 
-//line mmixpipe.w:8276
+//line mmixpipe.w:8279
 								if cool.loc == mx.g[rT].o {
 									if xl := Tetra(mx.g[rXX].o); xl&0xffff0000 == 0 && byte(xl>>8) <= maxSysCall {
 										yy, zz := byte(xl>>8), byte(xl)
 										var ma, mb Octa
 
-//line mmixpipe.w:8411
+//line mmixpipe.w:8414
 										if argCount[yy] == 3 {
 											if argLoc := mx.g[rBB].o; argLoc>>32&0x9fffffff == 0 {
 												mb = mx.magicRead(magicAddr(argLoc))
@@ -2865,11 +2868,11 @@ func (mx *machine) cycle() {
 											}
 										}
 
-//line mmixpipe.w:8281
+//line mmixpipe.w:8284
 										switch yy {
 										case Halt:
 
-//line mmixpipe.w:8310
+//line mmixpipe.w:8313
 											if zz == 0 {
 												mx.halted = true
 											} else if zz == 1 {
@@ -2879,7 +2882,7 @@ func (mx *machine) cycle() {
 												}
 											}
 
-//line mmixpipe.w:8284
+//line mmixpipe.w:8287
 										case Fopen:
 											mx.g[rBB].o = mx.io.Fopen(zz, mb, ma)
 										case Fclose:
@@ -2905,7 +2908,7 @@ func (mx *machine) cycle() {
 									mx.g[255].o = negOne // 이것이 인터럽트를 허용한다
 								}
 
-//line mmixpipe.w:6961
+//line mmixpipe.w:6964
 								cool.renA = true
 								mx.specInstall(&mx.g[rK], &cool.a)
 								cool.a.known, cool.a.o = true, mx.g[255].o
@@ -2920,7 +2923,7 @@ func (mx *machine) cycle() {
 							}
 							if cool.b.o&signBit == 0 {
 
-//line mmixpipe.w:6992
+//line mmixpipe.w:6995
 								cool.xx = byte(cool.b.o >> 56)
 								cool.i = resum
 								mx.head.loc = mx.instPtr.o - 4
@@ -2936,7 +2939,7 @@ func (mx *machine) cycle() {
 										mx.resuming += 1 + int(cool.zz)
 										if (Tetra(cool.b.o)>>24)&0xfa != 0xb8 { // |syncd|나 |syncid|가 아니다
 
-//line mmixpipe.w:7045
+//line mmixpipe.w:7048
 											m = int(Tetra(cool.b.o) >> 28)
 											if (1<<m)&0x8f30 != 0 {
 												bad = true
@@ -2948,14 +2951,14 @@ func (mx *machine) cycle() {
 												break
 											}
 
-//line mmixpipe.w:7007
+//line mmixpipe.w:7010
 										}
 										again = true
 									case resumeAgain:
 										again = true
 									case resumeTrans:
 
-//line mmixpipe.w:7033
+//line mmixpipe.w:7036
 										if cool.zz != 0 {
 											cool.y, cool.z = mx.specval(&mx.g[rYY]), mx.specval(&mx.g[rZZ])
 											if Tetra(cool.b.o)>>24 != SWYM {
@@ -2967,15 +2970,15 @@ func (mx *machine) cycle() {
 										}
 										bad = true
 
-//line mmixpipe.w:7013
+//line mmixpipe.w:7016
 									default:
 										bad = true
 									}
 
-//line mmixpipe.w:7020
+//line mmixpipe.w:7023
 									if again {
 
-//line mmixpipe.w:7057
+//line mmixpipe.w:7060
 										mx.head.inst = Tetra(cool.b.o)
 										m = int(mx.head.inst >> 24)
 										if m == RESUME {
@@ -2987,7 +2990,7 @@ func (mx *machine) cycle() {
 											mx.head.noted = false
 										}
 
-//line mmixpipe.w:7022
+//line mmixpipe.w:7025
 									}
 									if bad {
 										cool.interrupt |= bBit
@@ -2995,14 +2998,14 @@ func (mx *machine) cycle() {
 										mx.resuming = 0
 									}
 
-//line mmixpipe.w:7017
+//line mmixpipe.w:7020
 								}
 
-//line mmixpipe.w:6975
+//line mmixpipe.w:6978
 							}
 						}
 
-//line mmixpipe.w:7279
+//line mmixpipe.w:7282
 					case unsave:
 						if cool.interrupt&bBit != 0 {
 							cool.i = noop
@@ -3016,7 +3019,7 @@ func (mx *machine) cycle() {
 									break stall
 								}
 
-//line mmixpipe.w:7312
+//line mmixpipe.w:7315
 								cool.renX = true
 								mx.specInstall(&mx.g[rG], &cool.x)
 								cool.renA = true
@@ -3027,10 +3030,10 @@ func (mx *machine) cycle() {
 								mx.specInstall(&mx.g[rL], &cool.rl)
 								cool.ptrA = mx.mem.up
 
-//line mmixpipe.w:7292
+//line mmixpipe.w:7295
 							case 1, 2:
 
-//line mmixpipe.w:7304
+//line mmixpipe.w:7307
 								cool.renX = true
 								mx.specInstall(&mx.g[cool.yy], &cool.x)
 								mx.newO = mx.coolO - 1
@@ -3038,7 +3041,7 @@ func (mx *machine) cycle() {
 								cool.z.o = mx.newO << 3
 								cool.ptrA = mx.mem.up
 
-//line mmixpipe.w:7294
+//line mmixpipe.w:7297
 							case 3:
 								cool.i, cool.interim, op = unsave, false, UNSAVE
 
@@ -3144,14 +3147,14 @@ func (mx *machine) cycle() {
 									break special
 								}
 
-//line mmixpipe.w:7297
+//line mmixpipe.w:7300
 							default:
 								cool.interim, cool.i = false, noop
 								cool.interrupt |= bBit
 							}
 						} // 이것이 우리를 |dispatchDone|으로 데려간다
 
-//line mmixpipe.w:7359
+//line mmixpipe.w:7362
 					case save:
 						if int(cool.xx) < mx.coolG {
 							cool.interrupt |= bBit
@@ -3174,14 +3177,14 @@ func (mx *machine) cycle() {
 							cool.stackAlert = cool.y.o&signBit == 0
 							break dispatchDone
 
-//line mmixpipe.w:7367
+//line mmixpipe.w:7370
 						} else {
 							cool.interim = true
 							cool.i = sav
 							switch cool.zz {
 							case 0:
 
-//line mmixpipe.w:7393
+//line mmixpipe.w:7396
 								cool.zz = 1
 								cool.renX = true
 								mx.specInstall(mx.lr(Tetra(mx.coolO)+Tetra(mx.coolL)), &cool.x)
@@ -3190,7 +3193,7 @@ func (mx *machine) cycle() {
 								mx.specInstall(&mx.g[rL], &cool.rl)
 								mx.newO = mx.coolO + Octa(mx.coolL+1)
 
-//line mmixpipe.w:7373
+//line mmixpipe.w:7376
 							case 1:
 								if Tetra(mx.coolO) != Tetra(mx.coolS) {
 
@@ -3208,14 +3211,14 @@ func (mx *machine) cycle() {
 									cool.stackAlert = cool.y.o&signBit == 0
 									break dispatchDone
 
-//line mmixpipe.w:7376
+//line mmixpipe.w:7379
 								}
 								cool.zz = 2
 								cool.yy = byte(mx.coolG)
 								fallthrough
 							case 2, 3:
 
-//line mmixpipe.w:7402
+//line mmixpipe.w:7405
 								op = STOU // 이 명령은 적재/저장 장치가 다루어야 한다
 								cool.memX = true
 								mx.specInstall(&mx.mem, &cool.x)
@@ -3224,25 +3227,25 @@ func (mx *machine) cycle() {
 								mx.newS = mx.newO
 								if cool.zz == 3 && cool.yy > rZ {
 
-//line mmixpipe.w:7417
+//line mmixpipe.w:7420
 									cool.i = save
 									cool.interim = false
 									cool.renA = true
 									mx.specInstall(&mx.g[cool.xx], &cool.a)
 
-//line mmixpipe.w:7410
+//line mmixpipe.w:7413
 								} else {
 									cool.b = mx.specval(&mx.g[cool.yy])
 								}
 
-//line mmixpipe.w:7382
+//line mmixpipe.w:7385
 							default:
 								cool.interim, cool.i = false, noop
 								cool.interrupt |= bBit
 							}
 						}
 
-//line mmixpipe.w:7650
+//line mmixpipe.w:7653
 					case fsqrt, fint, fix, flot:
 						if Tetra(cool.y.o) > 4 {
 
@@ -3251,10 +3254,10 @@ func (mx *machine) cycle() {
 							cool.i = noop
 							break special
 
-//line mmixpipe.w:7653
+//line mmixpipe.w:7656
 						}
 
-//line mmixpipe.w:7829
+//line mmixpipe.w:7832
 					case sync:
 						if cool.zz > 3 {
 							if cool.loc&signBit == 0 {
@@ -3264,7 +3267,7 @@ func (mx *machine) cycle() {
 								cool.i = noop
 								break special
 
-//line mmixpipe.w:7833
+//line mmixpipe.w:7836
 							}
 							if cool.zz == 4 {
 								freezeDispatch = true
@@ -3381,7 +3384,7 @@ func (mx *machine) cycle() {
 					cool.usage = false
 					if cool.op == SAVE {
 
-//line mmixpipe.w:7423
+//line mmixpipe.w:7426
 						switch cool.zz {
 						case 1:
 							mx.head.inst = packBytes(SAVE, int(cool.xx), 0, 1)
@@ -3402,7 +3405,7 @@ func (mx *machine) cycle() {
 //line mmixpipe.w:1565
 					} else if cool.op == UNSAVE {
 
-//line mmixpipe.w:7323
+//line mmixpipe.w:7326
 						switch cool.xx {
 						case 0:
 							mx.head.inst = packBytes(UNSAVE, 1, rZ, 0)
@@ -4236,11 +4239,11 @@ func (mx *machine) step(self *coroutine) bool {
 					data.x.o = 1
 				}
 
-//line mmixpipe.w:7460
+//line mmixpipe.w:7463
 			case mulu:
 				data.a.o, data.x.o = bits.Mul64(data.y.o, data.z.o)
 
-//line mmixpipe.w:7490
+//line mmixpipe.w:7493
 				{
 					aux := data.z.o
 					for j = mul0; aux != 0; j++ {
@@ -4249,7 +4252,7 @@ func (mx *machine) step(self *coroutine) bool {
 					data.i = j // |j|는 |mul0|이나 |mul1|이나 \dots~|mul8|이다
 				}
 
-//line mmixpipe.w:7463
+//line mmixpipe.w:7466
 			case mul:
 				{
 					x, overflow := mmixarith.SignedMult(data.y.o, data.z.o)
@@ -4259,7 +4262,7 @@ func (mx *machine) step(self *coroutine) bool {
 					}
 				}
 
-//line mmixpipe.w:7490
+//line mmixpipe.w:7493
 				{
 					aux := data.z.o
 					for j = mul0; aux != 0; j++ {
@@ -4268,7 +4271,7 @@ func (mx *machine) step(self *coroutine) bool {
 					data.i = j // |j|는 |mul0|이나 |mul1|이나 \dots~|mul8|이다
 				}
 
-//line mmixpipe.w:7472
+//line mmixpipe.w:7475
 			case divu:
 				data.x.o, data.a.o = mmixarith.Div(data.b.o, data.y.o, data.z.o)
 				data.i = div
@@ -4286,7 +4289,7 @@ func (mx *machine) step(self *coroutine) bool {
 					data.a.o = r
 				}
 
-//line mmixpipe.w:7504
+//line mmixpipe.w:7507
 			case sadd:
 				data.x.o = Octa(bits.OnesCount64(data.y.o &^ data.z.o))
 			case mor:
@@ -4307,7 +4310,7 @@ func (mx *machine) step(self *coroutine) bool {
 					data.x.o = data.y.o - data.z.o
 				}
 
-//line mmixpipe.w:7536
+//line mmixpipe.w:7539
 			case zset:
 				if registerTruth(data.y.o, data.op) != 0 {
 					data.x.o = data.z.o
@@ -4326,13 +4329,13 @@ func (mx *machine) step(self *coroutine) bool {
 					continue
 				}
 
-//line mmixpipe.w:7592
+//line mmixpipe.w:7595
 			case fadd, fsub, fmul, fdiv, fsqrt, fint, fix:
 				entry := 0 // |fin_bflot|이면 0, |fin_uflot|이면 1, |fin_flot|이면 2
 				mx.setRound(data)
 				switch data.i {
 
-//line mmixpipe.w:7623
+//line mmixpipe.w:7626
 				case fadd:
 					data.x.o, mx.exceptions = mmixarith.FPlus(data.y.o, data.z.o, mx.curRound)
 				case fsub:
@@ -4359,7 +4362,7 @@ func (mx *machine) step(self *coroutine) bool {
 					}
 					entry = 2
 
-//line mmixpipe.w:7597
+//line mmixpipe.w:7600
 				}
 				if entry <= 0 && isSubnormal(data.y.o) {
 					data.denin = mx.deninPenalty
@@ -4385,7 +4388,7 @@ func (mx *machine) step(self *coroutine) bool {
 					data.op&0x2 != 0, data.op&0x4 != 0)
 				data.interrupt |= Tetra(mx.exceptions)
 
-//line mmixpipe.w:7661
+//line mmixpipe.w:7664
 			case feps:
 				j = mmixarith.FEpsComp(data.y.o, data.z.o, data.b.o, data.op != FEQLE)
 				if j == 2 {
@@ -4400,57 +4403,57 @@ func (mx *machine) step(self *coroutine) bool {
 					}
 				case data.op == FEQLE:
 
-//line mmixpipe.w:7702
+//line mmixpipe.w:7705
 					if j == 1 {
 						data.x.o = 1
 					} else if j == 2 {
 						data.interrupt |= iBit
 					}
 
-//line mmixpipe.w:7675
+//line mmixpipe.w:7678
 				case data.op == FCMPE && j != 0:
 					if j == 2 {
 						data.interrupt |= iBit
 					}
 				default:
 
-//line mmixpipe.w:7694
+//line mmixpipe.w:7697
 					j = mmixarith.FComp(data.y.o, data.z.o)
 					if j < 0 {
 						data.x.o = negOne
 					} else {
 
-//line mmixpipe.w:7702
+//line mmixpipe.w:7705
 						if j == 1 {
 							data.x.o = 1
 						} else if j == 2 {
 							data.interrupt |= iBit
 						}
 
-//line mmixpipe.w:7699
+//line mmixpipe.w:7702
 					}
 
-//line mmixpipe.w:7681
+//line mmixpipe.w:7684
 				}
 			case fcmp:
 
-//line mmixpipe.w:7694
+//line mmixpipe.w:7697
 				j = mmixarith.FComp(data.y.o, data.z.o)
 				if j < 0 {
 					data.x.o = negOne
 				} else {
 
-//line mmixpipe.w:7702
+//line mmixpipe.w:7705
 					if j == 1 {
 						data.x.o = 1
 					} else if j == 2 {
 						data.interrupt |= iBit
 					}
 
-//line mmixpipe.w:7699
+//line mmixpipe.w:7702
 				}
 
-//line mmixpipe.w:7684
+//line mmixpipe.w:7687
 			case funeq:
 				want := 0
 				if data.op == FUN {
@@ -4460,7 +4463,7 @@ func (mx *machine) step(self *coroutine) bool {
 					data.x.o = 1
 				}
 
-//line mmixpipe.w:7715
+//line mmixpipe.w:7718
 			case frem:
 				if isTrivial(data.y.o) || isTrivial(data.z.o) {
 					data.x.o, mx.exceptions = mmixarith.FRemStep(data.y.o, data.z.o, 2500)
@@ -4587,7 +4590,7 @@ func (mx *machine) step(self *coroutine) bool {
 				pc = lFinEx
 				continue
 
-//line mmixpipe.w:7090
+//line mmixpipe.w:7093
 			case resume, resum:
 				if data.xx != resumeTrans {
 					pc = lFinEx
@@ -4604,7 +4607,7 @@ func (mx *machine) step(self *coroutine) bool {
 				pc = lResumeTrans
 				continue
 
-//line mmixpipe.w:7131
+//line mmixpipe.w:7134
 			case noop:
 				if data.interrupt&fBit != 0 {
 					pc = lEmulateVirt
@@ -4633,7 +4636,7 @@ func (mx *machine) step(self *coroutine) bool {
 				pc = lSwitch1
 				continue
 
-//line mmixpipe.w:7167
+//line mmixpipe.w:7170
 			case get:
 				if data.zz >= 21 || data.zz == rK || data.zz == rQ {
 					if data != mx.oldHot {
@@ -4645,7 +4648,7 @@ func (mx *machine) step(self *coroutine) bool {
 				pc = lFinEx
 				continue
 
-//line mmixpipe.w:7182
+//line mmixpipe.w:7185
 			case put:
 				if data.xx == 8 || (data.xx >= 15 && data.xx <= 20) {
 					if data != mx.oldHot {
@@ -4675,7 +4678,7 @@ func (mx *machine) step(self *coroutine) bool {
 							mx.pageB[1] = int(rv>>20) & 0xf
 						}
 
-//line mmixpipe.w:7190
+//line mmixpipe.w:7193
 					case rQ:
 						mx.newQ |= data.z.o &^ mx.g[rQ].o
 						data.z.o |= mx.newQ
@@ -4687,7 +4690,7 @@ func (mx *machine) step(self *coroutine) bool {
 						}
 					case rG:
 
-//line mmixpipe.w:7216
+//line mmixpipe.w:7219
 						if data.z.o>>32 != 0 || Tetra(data.z.o) >= 256 ||
 							Tetra(data.z.o) < Tetra(mx.g[rL].o) || Tetra(data.z.o) < 32 {
 							data.interrupt |= bBit
@@ -4710,7 +4713,7 @@ func (mx *machine) step(self *coroutine) bool {
 							}
 						}
 
-//line mmixpipe.w:7201
+//line mmixpipe.w:7204
 					}
 				} else if data.xx == rA && (data.z.o>>32 != 0 || Tetra(data.z.o) >= 0x40000) {
 					data.interrupt |= bBit
@@ -4720,11 +4723,11 @@ func (mx *machine) step(self *coroutine) bool {
 				pc = lFinEx
 				continue
 
-//line mmixpipe.w:7244
+//line mmixpipe.w:7247
 			case goOp:
 				data.x.o = data.goLoc.o
 
-//line mmixpipe.w:7255
+//line mmixpipe.w:7258
 				data.goLoc.o = data.y.o + data.z.o
 				if data.goLoc.o&signBit != 0 && data.loc&signBit == 0 {
 					data.interrupt |= pBit
@@ -4733,14 +4736,14 @@ func (mx *machine) step(self *coroutine) bool {
 				pc = lFinEx
 				continue
 
-//line mmixpipe.w:7247
+//line mmixpipe.w:7250
 			case pop:
 				data.x.o = data.y.o
 				data.y.o = data.b.o // rJ를 |y| 필드로 옮긴다
 				fallthrough
 			case pushgo:
 
-//line mmixpipe.w:7255
+//line mmixpipe.w:7258
 				data.goLoc.o = data.y.o + data.z.o
 				if data.goLoc.o&signBit != 0 && data.loc&signBit == 0 {
 					data.interrupt |= pBit
@@ -4749,7 +4752,7 @@ func (mx *machine) step(self *coroutine) bool {
 				pc = lFinEx
 				continue
 
-//line mmixpipe.w:7850
+//line mmixpipe.w:7853
 			case sync:
 				switch data.zz {
 				case 0, 4:
@@ -4761,7 +4764,7 @@ func (mx *machine) step(self *coroutine) bool {
 					continue
 				case 2, 3:
 
-//line mmixpipe.w:7885
+//line mmixpipe.w:7888
 					for k := data; k != mx.hot; {
 						k = mx.nextCtl(k)
 						if k.owner != nil && (k.i == ld || k.i == ldunc || k.i == pst) {
@@ -4769,7 +4772,7 @@ func (mx *machine) step(self *coroutine) bool {
 						}
 					}
 
-//line mmixpipe.w:7861
+//line mmixpipe.w:7864
 					releaseLock(self, &mx.dispatchLock)
 					fallthrough
 				case 1:
@@ -4781,13 +4784,13 @@ func (mx *machine) step(self *coroutine) bool {
 						return mx.wait(self, 1)
 					}
 
-//line mmixpipe.w:7987
+//line mmixpipe.w:7990
 					if self.lockloc != nil {
 						*self.lockloc = nil
 						self.lockloc = nil
 					}
 
-//line mmixpipe.w:8005
+//line mmixpipe.w:8008
 					if mx.writeHead != mx.writeTail {
 						if mx.speedLock == nil {
 							setLock(self, &mx.speedLock)
@@ -4795,7 +4798,7 @@ func (mx *machine) step(self *coroutine) bool {
 						return mx.wait(self, 1)
 					}
 
-//line mmixpipe.w:7992
+//line mmixpipe.w:7995
 					if mx.cleanCo.next != nil || mx.cleanLock != nil {
 						return mx.wait(self, 1)
 					}
@@ -4808,13 +4811,13 @@ func (mx *machine) step(self *coroutine) bool {
 					data.interim = true
 					return mx.wait(self, 1)
 
-//line mmixpipe.w:7872
+//line mmixpipe.w:7875
 				case 6:
 					if data != mx.oldHot {
 						return mx.wait(self, 1)
 					}
 
-//line mmixpipe.w:7895
+//line mmixpipe.w:7898
 					if mx.DTcache.lock != nil {
 						return mx.wait(self, 1)
 					}
@@ -4827,13 +4830,13 @@ func (mx *machine) step(self *coroutine) bool {
 					data.state = 10
 					return mx.wait(self, mx.DTcache.accessTime)
 
-//line mmixpipe.w:7877
+//line mmixpipe.w:7880
 				case 7:
 					if data != mx.oldHot {
 						return mx.wait(self, 1)
 					}
 
-//line mmixpipe.w:7908
+//line mmixpipe.w:7911
 					if mx.Icache == nil {
 						data.state = 11
 						pc = lSwitch1
@@ -4851,7 +4854,7 @@ func (mx *machine) step(self *coroutine) bool {
 					data.state = 11
 					return mx.wait(self, mx.Icache.accessTime)
 
-//line mmixpipe.w:7882
+//line mmixpipe.w:7885
 				}
 
 //line mmixpipe.w:2702
@@ -4986,10 +4989,10 @@ func (mx *machine) step(self *coroutine) bool {
 				continue
 			}
 
-//line mmixpipe.w:7765
+//line mmixpipe.w:7768
 			if data.i == ldvts {
 
-//line mmixpipe.w:7770
+//line mmixpipe.w:7773
 				if data != mx.oldHot {
 					return mx.wait(self, 1)
 				}
@@ -5006,7 +5009,7 @@ func (mx *machine) step(self *coroutine) bool {
 					data.x.o = data.x.o&^0xffffffff | 2
 					c = mx.DTcache
 
-//line mmixpipe.w:7795
+//line mmixpipe.w:7798
 					if Tetra(data.z.o) != 0 {
 						p = mx.useAndFix(c, p)
 						p.data[0] = p.data[0]&^0xffffffff | Octa(Tetra(p.data[0])&^7+Tetra(data.z.o))
@@ -5015,13 +5018,13 @@ func (mx *machine) step(self *coroutine) bool {
 						p.tag |= signBit // 태그를 무효로 만든다
 					}
 
-//line mmixpipe.w:7786
+//line mmixpipe.w:7789
 				}
 				mx.passAfter(self, mx.DTcache.accessTime)
 				pc = lPassit
 				continue
 
-//line mmixpipe.w:7767
+//line mmixpipe.w:7770
 			}
 
 //line mmixpipe.w:5408
@@ -5383,7 +5386,7 @@ func (mx *machine) step(self *coroutine) bool {
 			pc = lDie
 			continue
 
-//line mmixpipe.w:7107
+//line mmixpipe.w:7110
 		case lResumeTrans:
 			c = data.ptrA.(*cache)
 			if c.lock != nil {
@@ -5403,7 +5406,7 @@ func (mx *machine) step(self *coroutine) bool {
 			pc = lFinEx
 			continue
 
-//line mmixpipe.w:7926
+//line mmixpipe.w:7929
 		case stage1St + 10:
 			if self.lockloc != nil {
 				*self.lockloc = nil
@@ -5446,7 +5449,7 @@ func (mx *machine) step(self *coroutine) bool {
 			data.state = 12
 			return mx.wait(self, mx.Dcache.accessTime)
 
-//line mmixpipe.w:7969
+//line mmixpipe.w:7972
 		case stage1St + 12:
 			if self.lockloc != nil {
 				*self.lockloc = nil
@@ -5464,7 +5467,7 @@ func (mx *machine) step(self *coroutine) bool {
 			data.state = 3
 			return mx.wait(self, mx.Scache.accessTime)
 
-//line mmixpipe.w:8016
+//line mmixpipe.w:8019
 		case stage1St + 13:
 			if mx.cleanCo.next == nil {
 				data.interim = false
@@ -5490,7 +5493,7 @@ func (mx *machine) step(self *coroutine) bool {
 			mx.panic(confusion("switch2"))
 		case stage2St + 1:
 
-//line mmixpipe.w:7735
+//line mmixpipe.w:7738
 			j = 1
 			if data.i == frem {
 				data.x.o, mx.exceptions = mmixarith.FRemStep(data.y.o, data.z.o, mx.fremMax)
@@ -5815,7 +5818,7 @@ func (mx *machine) step(self *coroutine) bool {
 				data.x.o &= 0xffff<<32 | 0xffffffff
 			case UNSAVE >> 1:
 
-//line mmixpipe.w:7343
+//line mmixpipe.w:7346
 				if data.xx == 0 {
 					data.a.o = data.x.o & (0xffffff<<32 | 0xffffffff) // 되살린 rA
 					data.x.o >>= 56                                   // 되살린 rG
@@ -5959,7 +5962,7 @@ func (mx *machine) step(self *coroutine) bool {
 //line mmixpipe.w:6015
 				case SAVE >> 1:
 
-//line mmixpipe.w:7441
+//line mmixpipe.w:7444
 					if data.interim {
 						data.x.o = data.b.o
 					} else {
@@ -6011,7 +6014,7 @@ func (mx *machine) step(self *coroutine) bool {
 			pc = lState5
 			continue
 
-//line mmixpipe.w:7804
+//line mmixpipe.w:7807
 		case stage2St + ldStLaunch:
 			if mx.ITcache.lock != nil {
 				return mx.wait(self, 1)
@@ -6025,7 +6028,7 @@ func (mx *machine) step(self *coroutine) bool {
 				data.x.o |= 1
 				c = mx.ITcache
 
-//line mmixpipe.w:7795
+//line mmixpipe.w:7798
 				if Tetra(data.z.o) != 0 {
 					p = mx.useAndFix(c, p)
 					p.data[0] = p.data[0]&^0xffffffff | Octa(Tetra(p.data[0])&^7+Tetra(data.z.o))
@@ -6034,12 +6037,12 @@ func (mx *machine) step(self *coroutine) bool {
 					p.tag |= signBit // 태그를 무효로 만든다
 				}
 
-//line mmixpipe.w:7817
+//line mmixpipe.w:7820
 			}
 			data.state = 3
 			return mx.wait(self, mx.ITcache.accessTime)
 
-//line mmixpipe.w:8051
+//line mmixpipe.w:8054
 		case lDoSyncid:
 			data.state = 30
 			if data != mx.oldHot {
@@ -6051,7 +6054,7 @@ func (mx *machine) step(self *coroutine) bool {
 				continue
 			}
 
-//line mmixpipe.w:8157
+//line mmixpipe.w:8160
 			if mx.Icache.lock != nil {
 				return mx.wait(self, 1)
 			}
@@ -6066,7 +6069,7 @@ func (mx *machine) step(self *coroutine) bool {
 				cleanBlock(mx.Icache, p)
 			}
 
-//line mmixpipe.w:8062
+//line mmixpipe.w:8065
 			data.state = syncidNext(data)
 			return mx.wait(self, mx.Icache.accessTime)
 		case stage2St + 31:
@@ -6075,7 +6078,7 @@ func (mx *machine) step(self *coroutine) bool {
 				self.lockloc = nil
 			}
 
-//line mmixpipe.w:8005
+//line mmixpipe.w:8008
 			if mx.writeHead != mx.writeTail {
 				if mx.speedLock == nil {
 					setLock(self, &mx.speedLock)
@@ -6083,7 +6086,7 @@ func (mx *machine) step(self *coroutine) bool {
 				return mx.wait(self, 1)
 			}
 
-//line mmixpipe.w:8070
+//line mmixpipe.w:8073
 			if (Tetra(data.b.o)-1)&^Tetra(data.y.o) < Tetra(data.xx) {
 				data.interim = true
 			}
@@ -6092,7 +6095,7 @@ func (mx *machine) step(self *coroutine) bool {
 				continue
 			}
 
-//line mmixpipe.w:8172
+//line mmixpipe.w:8175
 			if mx.Dcache.lock != nil {
 				return mx.wait(self, 1)
 			}
@@ -6107,7 +6110,7 @@ func (mx *machine) step(self *coroutine) bool {
 				cleanBlock(mx.Dcache, p)
 			}
 
-//line mmixpipe.w:8078
+//line mmixpipe.w:8081
 			data.state = 32
 			return mx.wait(self, mx.Dcache.accessTime)
 		case stage2St + 32:
@@ -6120,7 +6123,7 @@ func (mx *machine) step(self *coroutine) bool {
 				continue
 			}
 
-//line mmixpipe.w:8187
+//line mmixpipe.w:8190
 			if mx.Scache.lock != nil {
 				return mx.wait(self, 1)
 			}
@@ -6131,11 +6134,11 @@ func (mx *machine) step(self *coroutine) bool {
 				cleanBlock(mx.Scache, p)
 			}
 
-//line mmixpipe.w:8090
+//line mmixpipe.w:8093
 			data.state = 35
 			return mx.wait(self, mx.Scache.accessTime)
 
-//line mmixpipe.w:8106
+//line mmixpipe.w:8109
 		case lDoSyncd:
 			data.state = 33
 			if data != mx.oldHot {
@@ -6146,7 +6149,7 @@ func (mx *machine) step(self *coroutine) bool {
 				self.lockloc = nil
 			}
 
-//line mmixpipe.w:8005
+//line mmixpipe.w:8008
 			if mx.writeHead != mx.writeTail {
 				if mx.speedLock == nil {
 					setLock(self, &mx.speedLock)
@@ -6154,7 +6157,7 @@ func (mx *machine) step(self *coroutine) bool {
 				return mx.wait(self, 1)
 			}
 
-//line mmixpipe.w:8116
+//line mmixpipe.w:8119
 			if (Tetra(data.b.o)-1)&^Tetra(data.y.o) < Tetra(data.xx) {
 				data.interim = true
 			}
@@ -6167,7 +6170,7 @@ func (mx *machine) step(self *coroutine) bool {
 				continue
 			}
 
-//line mmixpipe.w:8198
+//line mmixpipe.w:8201
 			if mx.cleanCo.next != nil || mx.cleanLock != nil {
 				return mx.wait(self, 1)
 			}
@@ -6178,7 +6181,7 @@ func (mx *machine) step(self *coroutine) bool {
 			mx.cleanCtl.z.o = data.z.o
 			mx.schedule(&mx.cleanCo, 1, 4)
 
-//line mmixpipe.w:8128
+//line mmixpipe.w:8131
 			data.state = 34
 			fallthrough
 		case stage2St + 34:
@@ -6193,7 +6196,7 @@ func (mx *machine) step(self *coroutine) bool {
 			}
 			return mx.wait(self, 1)
 
-//line mmixpipe.w:8143
+//line mmixpipe.w:8146
 		case lNextSync:
 			data.state = 35
 			if self.lockloc != nil {
@@ -6202,7 +6205,7 @@ func (mx *machine) step(self *coroutine) bool {
 			}
 			if data.interim {
 
-//line mmixpipe.w:8211
+//line mmixpipe.w:8214
 				{
 					bl := Tetra(data.b.o)
 					data.interim = false
@@ -6222,13 +6225,13 @@ func (mx *machine) step(self *coroutine) bool {
 					continue
 				}
 
-//line mmixpipe.w:8151
+//line mmixpipe.w:8154
 			}
 			data.goLoc.known = true
 			pc = lFinEx
 			continue
 
-//line mmixpipe.w:8237
+//line mmixpipe.w:8240
 		case lSyncCheck:
 			if yl := Tetra(data.y.o); yl^(yl+Tetra(data.xx)) >= 8192 {
 				data.xx -= byte((8191 &^ yl) + 1)
@@ -7540,12 +7543,12 @@ func isLoadStore(i int) bool {
 	return i >= ld && i <= cswap
 }
 
-//line mmixpipe.w:6839
+//line mmixpipe.w:6842
 func packBytes(a, b, c, d int) Tetra {
 	return Tetra(a)<<24 + Tetra(b)<<16 + Tetra(c)<<8 + Tetra(d)
 }
 
-//line mmixpipe.w:7564
+//line mmixpipe.w:7567
 func isSubnormal(x Octa) bool {
 	return (x>>32)&0x7ff00000 == 0 && x&(0xfffff<<32|0xffffffff) != 0
 }
@@ -7569,7 +7572,7 @@ func (mx *machine) roundMode(y Octa) mmixarith.Round {
 	return mmixarith.Round(Tetra(y))
 }
 
-//line mmixpipe.w:8098
+//line mmixpipe.w:8101
 func syncidNext(data *control) int {
 	if data.loc&signBit != 0 {
 		return 31
@@ -7577,7 +7580,7 @@ func syncidNext(data *control) int {
 	return 33
 }
 
-//line mmixpipe.w:8333
+//line mmixpipe.w:8336
 func (mx *machine) magicRead(addr Octa) Octa {
 	for q := mx.writeTail; q != mx.writeHead; {
 		q = mx.nextWrite(q)
@@ -7598,7 +7601,7 @@ func (mx *machine) magicRead(addr Octa) Octa {
 	return mx.memRead(addr)
 }
 
-//line mmixpipe.w:8356
+//line mmixpipe.w:8359
 func (mx *machine) magicReadCache(c *cache, addr Octa) (Octa, bool) {
 	k := (Tetra(addr) & Tetra(c.bb-1)) >> 3
 	if p := mx.cacheSearch(c, addr); p != nil {
@@ -7610,7 +7613,7 @@ func (mx *machine) magicReadCache(c *cache, addr Octa) (Octa, bool) {
 	return 0, false
 }
 
-//line mmixpipe.w:8371
+//line mmixpipe.w:8374
 func (mx *machine) magicWrite(addr, val Octa) {
 	for q := mx.writeTail; q != mx.writeHead; {
 		q = mx.nextWrite(q)
@@ -7639,12 +7642,12 @@ func (mx *machine) magicWriteCache(c *cache, addr, val Octa) {
 	}
 }
 
-//line mmixpipe.w:8406
+//line mmixpipe.w:8409
 func magicAddr(a Octa) Octa {
 	return Octa(Tetra(a>>32)>>29)<<32 | a&0xffffffff
 }
 
-//line mmixpipe.w:8431
+//line mmixpipe.w:8434
 func (mx *machine) MMGetChars(buf []byte, size int, addr Octa, stop int) int {
 	if (addr>>32&0x9fffffff != 0 || (addr+Octa(size-1))>>32&0x9fffffff != 0) && size != 0 {
 		mx.errprintf("Attempt to get characters from off the page!\n")
@@ -7659,7 +7662,7 @@ func (mx *machine) getChars(buf []byte, size int, a Octa, stop int) int {
 		x := mx.magicRead(a)
 		if a&0x7 != 0 || k > size-8 {
 
-//line mmixpipe.w:8456
+//line mmixpipe.w:8459
 			buf[k] = byte(x >> (8 * (^a & 0x7)))
 			if buf[k] == 0 && stop >= 0 {
 				if stop == 0 {
@@ -7672,10 +7675,10 @@ func (mx *machine) getChars(buf []byte, size int, a Octa, stop int) int {
 			k++
 			a++
 
-//line mmixpipe.w:8445
+//line mmixpipe.w:8448
 		} else {
 
-//line mmixpipe.w:8469
+//line mmixpipe.w:8472
 			{
 				h, l := Tetra(x>>32), Tetra(x)
 				buf[k] = byte(h >> 24)
@@ -7714,13 +7717,13 @@ func (mx *machine) getChars(buf []byte, size int, a Octa, stop int) int {
 				a += 8
 			}
 
-//line mmixpipe.w:8447
+//line mmixpipe.w:8450
 		}
 	}
 	return size
 }
 
-//line mmixpipe.w:8513
+//line mmixpipe.w:8516
 func (mx *machine) MMPutChars(buf []byte, size int, addr Octa) {
 	if (addr>>32&0x9fffffff != 0 || (addr+Octa(size-1))>>32&0x9fffffff != 0) && size != 0 {
 		mx.errprintf("Attempt to put characters off the page!\n")
@@ -7734,7 +7737,7 @@ func (mx *machine) putChars(buf []byte, size int, a Octa) {
 	for k := 0; k < size; {
 		if a&0x7 != 0 || k > size-8 {
 
-//line mmixpipe.w:8533
+//line mmixpipe.w:8536
 			{
 				s := 8 * (^a & 0x7)
 				x := mx.magicRead(a)
@@ -7744,10 +7747,10 @@ func (mx *machine) putChars(buf []byte, size int, a Octa) {
 				a++
 			}
 
-//line mmixpipe.w:8526
+//line mmixpipe.w:8529
 		} else {
 
-//line mmixpipe.w:8543
+//line mmixpipe.w:8546
 			{
 				var x Octa
 				for _, b := range buf[k : k+8] {
@@ -7758,12 +7761,12 @@ func (mx *machine) putChars(buf []byte, size int, a Octa) {
 				a += 8
 			}
 
-//line mmixpipe.w:8528
+//line mmixpipe.w:8531
 		}
 	}
 }
 
-//line mmixpipe.w:8563
+//line mmixpipe.w:8566
 func (mx *machine) StdinChr() byte {
 	for mx.stdinBufStart == mx.stdinBufEnd {
 		mx.printf("StdIn> ")

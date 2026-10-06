@@ -6736,6 +6736,9 @@ if mx.g[rI].o == 0 {
 		mx.printf("\n")
 	}
 }
+if mx.blk != nil {
+	mx.blk.tick() // 보충: \.{mmixmem.w}의 블록 장치가 시간을 보낸다
+}
 mx.tryingToInterrupt = false
 if mx.g[rQ].o&mx.g[rK].o != 0 && mx.cool != mx.hot &&
 	mx.hot.interrupt&(eBit+fBit+hBit) == 0 && mx.doingInterrupt == 0 &&

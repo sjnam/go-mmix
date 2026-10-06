@@ -368,6 +368,11 @@ $$\vbox{\halign{\hfil\tt#\quad&\.{#}\hfil\quad&#\hfil\cr
 \#30&NBLK&읽기: 디스크의 블록 수\cr}}$$
 규약은 장치~0과 같다. 커널은 \.{DONE}이 바뀔 때까지 기다린 뒤에 \.{RESULT}를 읽는다.
 
+다만 장치~0과 달리 이 장치는 시간이 걸린다. 명령은 |blkLatency|사이클 뒤에야 끝나고, 그때 블록을
+옮기고 \.{DONE}을 늘리고 rQ의 비트 |blkInt|를 켠다. 이것은 rQ의 ``높은 우선순위 입출력'' 바이트들의
+가장 오른쪽 비트다. 커널은 그동안 다른 프로세스를 돌리다가 이 인터럽트로 기다리던 프로세스를
+깨운다. 명령이 끝나기 전에 다음 명령을 내리면 그것은 무시한다.
+
 @<상수@>=
 const (
 	blkBase   = hioBase + hioSize  // 장치 1의 물리 주소
@@ -376,6 +381,8 @@ const (
 	blkAddr   = 0x10               // 레지스터 \.{ADDR}의 오프셋
 	blkNblk   = 0x30               // 레지스터 \.{NBLK}의 오프셋
 	blkMagic  = 0x4e4e49582d424c4b // \.{"NNIX-BLK"}
+	blkLatency = 10000             // 명령 하나에 걸리는 사이클
+	blkInt    = 1 << 8             // 명령이 끝나면 켜는 rQ의 비트
 )
 
 @ @<타입 정의@>=
@@ -387,6 +394,8 @@ type blk struct {
 	addr   Octa     // 레지스터 \.{ADDR}
 	result Octa     // 레지스터 \.{RESULT}
 	done   Octa     // 레지스터 \.{DONE}
+	cmd    Octa     // 진행 중인 명령(없으면 0)
+	count  int      // 그 명령이 끝날 때까지 남은 사이클
 }
 
 @ 레지스터 \.{ID}, \.{RESULT}, \.{DONE}의 오프셋은 장치~0과 같다.
@@ -417,6 +426,25 @@ case blkBlock:
 case blkAddr:
 	d.addr = val &^ signBit
 case hioCmd:
+	if d.cmd == 0 {
+		d.cmd, d.count = val, blkLatency
+	}
+}
+
+@ 메서드 |tick|은 \.{mmixpipe.w}가 사이클마다 부른다. 명령이 진행 중이면 남은 사이클을 줄이고, 다
+되면 일을 한다. 레지스터 \.{BLOCK}과 \.{ADDR}은 명령이 끝날 때의 값을 쓴다(커널은 그동안 바꾸지
+않는다). 크누스의 타이머 rI처럼 rQ와 |newQ|에 같은 비트를 켠다.
+
+@<함수들@>=
+func (d *blk) tick() {
+	if d.cmd == 0 {
+		return
+	}
+	if d.count--; d.count > 0 {
+		return
+	}
+	mx, val := d.mx, d.cmd
+	d.cmd = 0
 	d.result = negOne
 	if d.block < d.nblk && d.addr&7 == 0 && d.addr+blkSize <= hioBase && (val == 1 || val == 2) {
 		var b [blkSize]byte
@@ -427,6 +455,8 @@ case hioCmd:
 		}
 	}
 	d.done++
+	mx.g[rQ].o |= blkInt
+	mx.newQ |= blkInt
 }
 
 @ @<블록 |d.block|을...@>=
