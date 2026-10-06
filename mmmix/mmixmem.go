@@ -1,11 +1,11 @@
-//line mmixmem.w:35
+//line mmixmem.w:36
 package main
 
 import "github.com/sjnam/go-mmix/mmixio"
 
 var kind = [4]string{"byte", "wyde", "tetra", "octa"}
 
-//line mmixmem.w:135
+//line mmixmem.w:137
 const (
 	hioBase   = 1 << 48            // 장치 0의 물리 주소
 	hioSize   = 1 << 16            // 장치 하나가 차지하는 바이트 수
@@ -15,10 +15,11 @@ const (
 	hioCmd    = 0x18               // 레지스터 \.{CMD}의 오프셋
 	hioResult = 0x20               // 레지스터 \.{RESULT}의 오프셋
 	hioDone   = 0x28               // 레지스터 \.{DONE}의 오프셋
+	hioRV     = 0x30               // 레지스터 \.{RV}의 오프셋
 	hioMagic  = 0x4e4e49582d48494f // \.{"NNIX-HIO"}
 )
 
-//line mmixmem.w:151
+//line mmixmem.w:155
 type hio struct {
 	mx     *machine
 	io     *mmixio.IO
@@ -26,16 +27,17 @@ type hio struct {
 	arg1   Octa // 레지스터 \.{ARG1}
 	result Octa // 레지스터 \.{RESULT}
 	done   Octa // 레지스터 \.{DONE}
+	rv     Octa // 레지스터 \.{RV}
 }
 
-//line mmixmem.w:51
+//line mmixmem.w:52
 func (mx *machine) specRead(addr Octa, size int) Octa {
 	var val Octa
 	size &= 0x3
 	addr = addr&^0xffffffff | Octa(Tetra(addr)&-(Tetra(1)<<size))
 	if mx.hio != nil && addr-hioBase < hioSize {
 
-//line mmixmem.w:165
+//line mmixmem.w:170
 		var reg Octa
 		switch addr&^7 - hioBase {
 		case hioID:
@@ -44,10 +46,12 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 			reg = mx.hio.result
 		case hioDone:
 			reg = mx.hio.done
+		case hioRV:
+			reg = mx.hio.rv
 		}
 		val = reg >> ((8 - (1 << size) - int(addr&7)) << 3)
 
-//line mmixmem.w:57
+//line mmixmem.w:58
 	} else if mx.verbose&interactiveReadBit != 0 {
 		mx.printf("** Read %s from loc %016x: ", kind[size], addr)
 		mx.stdin.fgets(mx.specBuf[:], 20)
@@ -64,7 +68,7 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 	if mx.verbose&showSpecBit != 0 {
 		mx.printf("   (spec_read ")
 
-//line mmixmem.w:79
+//line mmixmem.w:80
 		switch size {
 		case 0:
 			mx.printf("%02x", Tetra(val))
@@ -76,13 +80,13 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 			mx.printf("%016x", val)
 		}
 
-//line mmixmem.w:73
+//line mmixmem.w:74
 		mx.printf(" from %016x at time %d)\n", addr, int32(Tetra(mx.ticks)))
 	}
 	return val << ((8 - (1 << size) - int(addr&7)) << 3)
 }
 
-//line mmixmem.w:97
+//line mmixmem.w:98
 func (mx *machine) specWrite(addr, val Octa, size int) {
 	if mx.verbose&showSpecBit != 0 {
 		size &= 0x3
@@ -90,7 +94,7 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 		val >>= (8 - (1 << size) - int(addr&7)) << 3
 		mx.printf("   (spec_write ")
 
-//line mmixmem.w:79
+//line mmixmem.w:80
 		switch size {
 		case 0:
 			mx.printf("%02x", Tetra(val))
@@ -102,18 +106,20 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 			mx.printf("%016x", val)
 		}
 
-//line mmixmem.w:104
+//line mmixmem.w:105
 		mx.printf(" to %016x at time %d)\n", addr, int32(Tetra(mx.ticks)))
 	}
 	if mx.hio != nil && addr-hioBase < hioSize && size == 3 && addr&7 == 0 {
 
-//line mmixmem.w:181
+//line mmixmem.w:188
 		h := mx.hio
 		switch addr - hioBase {
 		case hioArg0:
 			h.arg0 = val
 		case hioArg1:
 			h.arg1 = val
+		case hioRV:
+			h.rv = val
 		case hioCmd:
 			handle := byte(val)
 			switch val >> 8 {
@@ -145,27 +151,99 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 			h.done++
 		}
 
-//line mmixmem.w:108
+//line mmixmem.w:109
 	}
 }
 
-//line mmixmem.w:224
+//line mmixmem.w:238
+func (h *hio) piece(v Octa, size int) (pa Octa, n int, ok bool) {
+	n = size
+	if h.rv == 0 || v&signBit != 0 {
+		pa = v &^ signBit
+	} else {
+
+//line mmixmem.w:257
+		rv := h.rv
+		sh := uint(rv >> 40 & 0xff)
+		if sh < 13 || sh > 48 {
+			return 0, 0, false
+		}
+		var b, a [5]Octa
+		for j := 1; j <= 4; j++ {
+			b[j] = rv >> (64 - 4*j) & 0xf
+		}
+		i := v >> 61
+		r := rv >> 13 & (1<<27 - 1)
+		t := (r + b[i]) << 13         // 첫 페이지 테이블의 주소
+		limit := (r + b[i+1]) << 13   // 마지막 페이지 테이블 다음의 주소
+		a[0] = (v &^ (7 << 61)) >> sh // 페이지 번호
+		if a[0] == 0 {
+			limit++
+		}
+		d := 0
+		for d < 4 && a[d] >= 1024 {
+			a[d+1] = a[d] >> 10
+			a[d] &= 0x3ff
+			d++
+		}
+		if t += Octa(d) << 13; t >= limit {
+			return 0, 0, false
+		}
+
+//line mmixmem.w:289
+		for ; d > 0; d-- {
+			x := h.mx.magicRead(t + 8*a[d])
+			if x&signBit == 0 || (x^rv)&0x1ff8 != 0 {
+				return 0, 0, false
+			}
+			t = x &^ signBit &^ 0x1fff
+		}
+		x := h.mx.magicRead(t + 8*a[0])
+		if (x^rv)&0x1ff8 != 0 {
+			return 0, 0, false
+		}
+		mask := Octa(1)<<sh - 1
+		pa = x&(1<<48-1)&^mask | v&mask
+		if left := int(mask + 1 - v&mask); left < n {
+			n = left
+		}
+
+//line mmixmem.w:244
+	}
+	if n != 0 && (pa >= hioBase || pa+Octa(n-1) >= hioBase) {
+		return 0, 0, false
+	}
+	return pa, n, true
+}
+
+//line mmixmem.w:315
 func (h *hio) StdinChr() byte { return h.mx.StdinChr() }
 
 func (h *hio) MMGetChars(buf []byte, size int, addr Octa, stop int) int {
-	if size != 0 && (addr >= hioBase || addr+Octa(size-1) >= hioBase) {
-		h.mx.errprintf("HIO: Attempt to get characters from off the memory!\n")
+	for k := 0; k < size; {
+		pa, n, ok := h.piece(addr+Octa(k), size-k)
+		if !ok {
+			h.mx.errprintf("HIO: Attempt to get characters from off the memory!\n")
 
-		return 0
+			return k
+		}
+		if m := h.mx.getChars(buf[k:], n, pa, stop); m < n {
+			return k + m
+		}
+		k += n
 	}
-	return h.mx.getChars(buf, size, addr, stop)
+	return size
 }
 
 func (h *hio) MMPutChars(buf []byte, size int, addr Octa) {
-	if size != 0 && (addr >= hioBase || addr+Octa(size-1) >= hioBase) {
-		h.mx.errprintf("HIO: Attempt to put characters off the memory!\n")
+	for k := 0; k < size; {
+		pa, n, ok := h.piece(addr+Octa(k), size-k)
+		if !ok {
+			h.mx.errprintf("HIO: Attempt to put characters off the memory!\n")
 
-		return
+			return
+		}
+		h.mx.putChars(buf[k:], n, pa)
+		k += n
 	}
-	h.mx.putChars(buf, size, addr)
 }

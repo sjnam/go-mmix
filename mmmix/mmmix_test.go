@@ -1,4 +1,4 @@
-//line mmmix.w:1067
+//line mmmix.w:1084
 package main
 
 import (
@@ -24,12 +24,12 @@ func digest(s string) string {
 	return hexenc.EncodeToString(h[:8])
 }
 
-//line mmmix.w:1097
+//line mmmix.w:1114
 const (
 	script1 = "@8000000000010000\nv1ff\n2000\np\ns\nq\n"
 	script2 = "@8000000000010000\n100000\ns\nD*\nS*\ng255\nm10000\nq\n"
 
-//line mmmix.w:1100
+//line mmmix.w:1117
 )
 
 func TestKnuthFiles(t *testing.T) {
@@ -52,7 +52,7 @@ func TestKnuthFiles(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1128
+//line mmmix.w:1145
 const (
 	helloMMB = "00000000000001008fff010000000701f4ff000300000701000000002c20776f726c640a" +
 		"0000000000000000000000004000000000000000400000000000002840000000000000180000" +
@@ -66,7 +66,7 @@ const (
 		"Predictions: 0 in agreement, 0 in opposition; 0 good, 0 bad\n" +
 		"Instructions issued per cycle:\n  0   380\n  1   26\n"
 
-//line mmmix.w:1140
+//line mmmix.w:1157
 )
 
 func writeHex(t *testing.T, name, h string) string {
@@ -94,7 +94,7 @@ func TestHello(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1170
+//line mmmix.w:1187
 const primesMMB = "0000000000000100e3fe0003c1fbf700a6fef8fbe7fb000242fb0013e7fe0002c1faf70086f9" +
 	"f8fa1cfdfef9fefc000643fcfffb30fffdf94dfffff6e7fa0002f1fffff9466972737420466976" +
 	"652048756e64726564205072696d65730a00202020000023fff6000000070135fa000220fafaf7" +
@@ -117,7 +117,7 @@ func TestPrimes(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1195
+//line mmmix.w:1212
 func TestErrors(t *testing.T) {
 	dir := t.TempDir()
 	file := func(name, text string) string {
@@ -159,7 +159,7 @@ func TestErrors(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1240
+//line mmmix.w:1257
 func assembleKernel(t *testing.T) string {
 	t.Helper()
 	mmo := filepath.Join(t.TempDir(), "nnix.mmo")
@@ -170,7 +170,7 @@ func assembleKernel(t *testing.T) string {
 	return mmo
 }
 
-//line mmmix.w:1254
+//line mmmix.w:1271
 func TestKernelMatchesMagic(t *testing.T) {
 	k := assembleKernel(t)
 	for _, prog := range []struct{ name, hex string }{
@@ -189,13 +189,14 @@ func TestKernelMatchesMagic(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1277
+//line mmmix.w:1295
 func TestKernelUsesDevice(t *testing.T) {
 	k := assembleKernel(t)
 	p := writeHex(t, "hello.mmb", helloMMB)
-	out, _, code := simulate(t, "v40\n10000\nq\n", "-k"+k, "../examples/plain.mmconfig", p)
+	out, _, code := simulate(t, "v40\n1000000\nq\n", "-k"+k, "../examples/plain.mmconfig", p)
 	for _, want := range []string{
-		"(spec_write 0000000200000018 to 0001000000000008 ",
+		"(spec_write 12340d0700000008 to 0001000000000030 ",
+		"(spec_write 4000000000000018 to 0001000000000008 ",
 		"(spec_write 0000000000000701 to 0001000000000018 ",
 		"hello.mmo", ", world\n", "Halted at time ",
 	} {
@@ -205,7 +206,43 @@ func TestKernelUsesDevice(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1295
+//line mmmix.w:1319
+const (
+	spanMMB = "0000000000000100e0002000eb001ff081010018e0024000a1010200c1ff000000000701e0ff" +
+		"2000ebff500000000400e0ff2000ebff3ffc0000070100000000000000000000000020000000" +
+		"00001ff06120737472696e672074686174207370616e732074776f2070616765730a00000000" +
+		"00000000000020000000000050002000000000003ffc00000000000000090000000000000000" +
+		"4000000000000000400000000000002040000000000000180000000000000000400000000000" +
+		"00187370616e0000000000000000000000006000000000000000000000000000000140000000" +
+		"000000080000000000000002000000000000010000000000000000006000000000000080ff00" +
+		"0000000000000000000000000000"
+	farMMB = "0000000000000100e0002000e9000000ea0000808d0100000000000000000000400000000000" +
+		"0000400000000000002040000000000000180000000000000000400000000000001866617200" +
+		"0000000000000000000000006000000000000000000000000000000140000000000000080000" +
+		"000000000002000000000000010000000000000000006000000000000080ff00000000000000" +
+		"0000000000000000"
+
+//line mmmix.w:1333
+)
+
+func TestKernelPaging(t *testing.T) {
+	k := assembleKernel(t)
+	p := writeHex(t, "span.mmb", spanMMB)
+	c := "../examples/plain.mmconfig"
+	mOut, _, mCode := simulate(t, "abcdefgh\n", "-s", c, p)
+	kOut, kErr, kCode := simulate(t, "abcdefgh\n", "-s", "-k"+k, c, p)
+	want := "a string that spans two pages\nStdIn> abcdefgh"
+	if kOut != want || mOut != want || kCode != mCode || kErr != "" {
+		t.Errorf("span: magic %q %d, kernel %q %d %q", mOut, mCode, kOut, kCode, kErr)
+	}
+	p = writeHex(t, "far.mmb", farMMB)
+	_, kErr, kCode = simulate(t, "", "-s", "-k"+k, c, p)
+	if kErr != "NNIX: page fault I can't serve\n" || kCode != -1 {
+		t.Errorf("far: %q %d", kErr, kCode)
+	}
+}
+
+//line mmmix.w:1355
 func TestKernelErrors(t *testing.T) {
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "bad.mmo")

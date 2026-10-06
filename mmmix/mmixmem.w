@@ -116,7 +116,7 @@ $2^s$의 배수이고 $2^{63}$보다 작기 때문이다. 그러니 $(a,s)$는 6
 @* 호스트 입출력 장치. 보충: 이 장은 옮긴이가 덧붙인 것이다. 메타 시뮬레이터는 \NNIX\ 없이도
 돌 수 있도록 rT 자리에서 \.{RESUME}~\.1을 배정하면 입출력 트랩을 ``마법''으로 해치운다. 저장소의
 \.{nnix/nnix.mms}는 그 자리에 진짜 트랩 처리기를 두는 작은 커널이다. 커널은 트랩을 나누고, 사용자
-메모리에서 인자를 읽고, 가상 주소를 물리 주소로 바꾼 뒤, 여기서 정의하는 장치에 입출력을 시킨다.
+메모리에서 인자를 읽고, 버퍼가 걸친 페이지를 들여놓은 뒤, 여기서 정의하는 장치에 입출력을 시킨다.
 호스트의 파일을 읽고 쓰는 일은 여전히 시뮬레이터 안에서 \.{mmixio}가 하지만, 이제는 장치
 레지스터라는 하드웨어 인터페이스를 거친다.
 
@@ -128,7 +128,8 @@ $$\vbox{\halign{\hfil\tt#\quad&\.{#}\hfil\quad&#\hfil\cr
 \#10&ARG1&쓰기: 둘째 인자\cr
 \#18&CMD&쓰기: $\rm op\times256+handle$. 이 값이 닿는 순간 명령을 실행한다\cr
 \#20&RESULT&읽기: 마지막 명령의 결과\cr
-\#28&DONE&읽기: 지금까지 끝낸 명령의 수\cr}}$$
+\#28&DONE&읽기: 지금까지 끝낸 명령의 수\cr
+\#30&RV&읽고 쓰기: 주소를 변환할 rV 값. 0이면 주소는 물리 주소다\cr}}$$
 연산 코드 op는 \.{TRAP}의 Y와 같다(|Fopen|${}=1$부터 |Ftell|${}=10$까지). 그래서 커널은 Y를
 그대로 넘긴다. |Halt|는 장치로 오지 않으므로 op${}=0$은 트립 경고에 쓴다.
 
@@ -142,11 +143,13 @@ const (
 	hioCmd    = 0x18               // 레지스터 \.{CMD}의 오프셋
 	hioResult = 0x20               // 레지스터 \.{RESULT}의 오프셋
 	hioDone   = 0x28               // 레지스터 \.{DONE}의 오프셋
+	hioRV     = 0x30               // 레지스터 \.{RV}의 오프셋
 	hioMagic  = 0x4e4e49582d48494f // \.{"NNIX-HIO"}
 )
 
 @ 장치를 만들 때 자기 몫의 \.{mmixio} 상태를 하나 둔다. 마법이 쓰는 |mx.io|는 사용자의 가상 주소를
-받아 세그먼트를 고정된 방식으로 사상하지만, 장치는 커널이 변환한 물리 주소를 받기 때문이다.
+받아 세그먼트를 고정된 방식으로 사상하지만, 장치는 \.{RV}가 가리키는 진짜 페이지 테이블로 변환하기
+때문이다.
 
 @<타입 정의@>=
 type hio struct {
@@ -156,6 +159,7 @@ type hio struct {
 	arg1   Octa // 레지스터 \.{ARG1}
 	result Octa // 레지스터 \.{RESULT}
 	done   Octa // 레지스터 \.{DONE}
+	rv     Octa // 레지스터 \.{RV}
 }
 
 @ 파이프라인은 장치 적재를 투기적으로, 그리고 쓰기 버퍼의 앞선 저장보다 먼저 할 수 있다. 그래서
@@ -171,6 +175,8 @@ case hioResult:
 	reg = mx.hio.result
 case hioDone:
 	reg = mx.hio.done
+case hioRV:
+	reg = mx.hio.rv
 }
 val = reg >> ((8 - (1 << size) - int(addr&7)) << 3)
 
@@ -185,6 +191,8 @@ case hioArg0:
 	h.arg0 = val
 case hioArg1:
 	h.arg1 = val
+case hioRV:
+	h.rv = val
 case hioCmd:
 	handle := byte(val)
 	switch val >> 8 {
@@ -216,30 +224,123 @@ case hioCmd:
 	h.done++
 }
 
-@ 장치는 |mmixio.Simulator|가 요구하는 메서드 셋을 물리 주소로 구현한다. 메모리는 \.{mmixpipe.w}의
-|getChars|와 |putChars|로 읽고 쓴다. 그것들은 |magicRead|와 |magicWrite|를 거치므로 쓰기 버퍼와
-캐시까지 살핀다. 곧 이 장치는 캐시 일관성을 지키는 DMA처럼 동작한다. 입출력 공간이나 그 너머를
-가리키는 주소는 받지 않는다.
+@ 레지스터 \.{RV}는 장치의 IOMMU다. 그것이 0이 아니면 장치는 인자로 받은 주소를 그 rV 값이 정하는
+페이지 테이블로 변환한다. 규칙은 \MMIX\ 프로세서와 같다. 음수 주소는 부호 비트를 지운 물리 주소이고,
+음이 아닌 주소는 \.{mmixdoc}의 규칙대로 PTP와 PTE를 거친다. 그래서 커널은 사용자의 가상 주소를
+그대로 넘길 수 있다. 버퍼가 여러 페이지에 걸치고 그 프레임들이 물리 메모리에 흩어져 있어도 된다.
+커널은 넘기기 전에 버퍼의 페이지를 들여놓으므로 장치는 페이지 폴트를 처리하지 않는다. 변환할 수 없는
+주소를 만나면 거기서 멈춘다. \.{RV}가 0이면 주소를 물리 주소로 본다.
+
+함수 |piece|는 주소 |v|에서 시작하는 |size|바이트 가운데 한 페이지에 든 앞부분의 물리 주소 |pa|와
+길이 |n|을 돌려준다. 입출력 공간이나 그 너머를 가리키는 주소는 받지 않는다.
+
+@<함수들@>=
+func (h *hio) piece(v Octa, size int) (pa Octa, n int, ok bool) {
+	n = size
+	if h.rv == 0 || v&signBit != 0 {
+		pa = v &^ signBit
+	} else {
+		@<|v|를 |h.rv|로 변환해서 |pa|에 넣고 |n|을 페이지 안으로 줄인다@>
+	}
+	if n != 0 && (pa >= hioBase || pa+Octa(n-1) >= hioBase) {
+		return 0, 0, false
+	}
+	return pa, n, true
+}
+
+@ 변환은 명세 47절의 소프트웨어 변환 코드를 \GO/로 옮긴 것이다. 페이지 번호의 1024진 ``자릿수''를
+오른쪽에서 왼쪽으로 찾고, 맨 윗자리에 해당하는 테이블에서 PTP들을 거쳐 PTE까지 내려온다. PTP는
+부호가 1이고 $n$~필드가 rV와 맞아야 하며, PTE는 $n$~필드가 맞아야 한다. 테이블은 |magicRead|로
+읽으므로 커널이 막 써서 아직 쓰기 버퍼나 캐시에 있는 항목도 보인다.
+
+@<|v|를 |h.rv|로...@>=
+rv := h.rv
+sh := uint(rv >> 40 & 0xff)
+if sh < 13 || sh > 48 {
+	return 0, 0, false
+}
+var b, a [5]Octa
+for j := 1; j <= 4; j++ {
+	b[j] = rv >> (64 - 4*j) & 0xf
+}
+i := v >> 61
+r := rv >> 13 & (1<<27 - 1)
+t := (r + b[i]) << 13            // 첫 페이지 테이블의 주소
+limit := (r + b[i+1]) << 13      // 마지막 페이지 테이블 다음의 주소
+a[0] = (v &^ (7 << 61)) >> sh    // 페이지 번호
+if a[0] == 0 {
+	limit++
+}
+d := 0
+for d < 4 && a[d] >= 1024 {
+	a[d+1] = a[d] >> 10
+	a[d] &= 0x3ff
+	d++
+}
+if t += Octa(d) << 13; t >= limit {
+	return 0, 0, false
+}
+@<PTP들을 거쳐 PTE까지 내려와 |pa|와 |n|을 정한다@>
+
+@ 테이블 |t|의 항목 |a[d]|가 다음 수준의 PTP다. 가장 아래 수준의 항목 |a[0]|이 PTE이고, 물리
+주소는 $2^s a+(v\bmod2^s)$다.
+
+@<PTP들을 거쳐...@>=
+for ; d > 0; d-- {
+	x := h.mx.magicRead(t + 8*a[d])
+	if x&signBit == 0 || (x^rv)&0x1ff8 != 0 {
+		return 0, 0, false
+	}
+	t = x &^ signBit &^ 0x1fff
+}
+x := h.mx.magicRead(t + 8*a[0])
+if (x^rv)&0x1ff8 != 0 {
+	return 0, 0, false
+}
+mask := Octa(1)<<sh - 1
+pa = x&(1<<48-1)&^mask | v&mask
+if left := int(mask + 1 - v&mask); left < n {
+	n = left
+}
+
+@ 장치는 |mmixio.Simulator|가 요구하는 메서드 셋을 구현한다. 버퍼를 한 페이지씩 변환해서
+\.{mmixpipe.w}의 |getChars|와 |putChars|로 읽고 쓴다. 그것들은 |magicRead|와 |magicWrite|를 거치므로
+쓰기 버퍼와 캐시까지 살핀다. 곧 이 장치는 캐시 일관성을 지키는 DMA처럼 동작한다.
+
+페이지는 짝수 크기이고 짝수 주소에서 시작하므로, |getChars|의 멈춤 조건(널 바이트, 또는 짝수
+주소에서 시작하는 널 와이드)은 페이지 경계에 걸리지 않는다. 그래서 한 페이지에서 덜 읽었으면
+거기서 멈추고, 다 읽었으면 다음 페이지로 넘어가면 된다.
 
 @<함수들@>=
 func (h *hio) StdinChr() byte { return h.mx.StdinChr() }
 @#
 func (h *hio) MMGetChars(buf []byte, size int, addr Octa, stop int) int {
-	if size != 0 && (addr >= hioBase || addr+Octa(size-1) >= hioBase) {
-		h.mx.errprintf("HIO: Attempt to get characters from off the memory!\n")
+	for k := 0; k < size; {
+		pa, n, ok := h.piece(addr+Octa(k), size-k)
+		if !ok {
+			h.mx.errprintf("HIO: Attempt to get characters from off the memory!\n")
 @.HIO: Attempt to get characters...@>
-		return 0
+			return k
+		}
+		if m := h.mx.getChars(buf[k:], n, pa, stop); m < n {
+			return k + m
+		}
+		k += n
 	}
-	return h.mx.getChars(buf, size, addr, stop)
+	return size
 }
 @#
 func (h *hio) MMPutChars(buf []byte, size int, addr Octa) {
-	if size != 0 && (addr >= hioBase || addr+Octa(size-1) >= hioBase) {
-		h.mx.errprintf("HIO: Attempt to put characters off the memory!\n")
+	for k := 0; k < size; {
+		pa, n, ok := h.piece(addr+Octa(k), size-k)
+		if !ok {
+			h.mx.errprintf("HIO: Attempt to put characters off the memory!\n")
 @.HIO: Attempt to put characters...@>
-		return
+			return
+		}
+		h.mx.putChars(buf[k:], n, pa)
+		k += n
 	}
-	h.mx.putChars(buf, size, addr)
 }
 
 @* 찾아보기.

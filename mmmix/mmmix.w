@@ -407,19 +407,35 @@ curLoc = 4<<32 | 9<<13
 mx.memWrite(curLoc, curDat) // 스택 세그먼트의 PTE
 
 @* 커널 싣기. 보충: 이 장은 옮긴이가 덧붙인 것이다. 크누스가 만들지 않은 \NNIX\ 대신에 쓸
-작은 커널을 저장소의 \.{nnix/nnix.mms}에 두었다. 이 커널은 rT 자리에 진짜 트랩 처리기를 두고,
-\.{mmixmem.w}에 덧붙인 호스트 입출력 장치로 입출력을 한다. 그러면 마법 같은 입출력은 일어나지
+작은 커널을 저장소의 \.{nnix/nnix.mms}에 두었다. 이 커널은 rT와 rTT에 진짜 처리기를 두고,
+요구 페이징을 하며, \.{mmixmem.w}에 덧붙인 호스트 입출력 장치로 입출력을 한다. 그러면 마법 같은 입출력은 일어나지
 않는다. 마법은 rT 자리에서 \.{RESUME}~\.1을 배정할 때만 일어나기 때문이다.
 
 커널은 미리 짜 둔 환경을 준비한 {\it 뒤에\/} 싣는다. 그래서 위치 $2^{32}\times5$의 원시적인 트랩
-처리기를 커널이 덮어쓴다. 장치는 커널을 실을 때만 만든다.
+처리기 자리는 커널의 코드가 차지한다. 장치는 커널을 실을 때만 만든다.
+
+이진 파일을 실었으면 커널이 사용자 프로그램보다 먼저 돈다. 커널은 위치 |kernelBoot|에서 시작해서
+트랩 주소와 페이지 테이블을 마련한 뒤, \.{RESUME}~\.1로 사용자 프로그램에 넘어간다. 그래서 사용자
+프로그램이 시작할 곳을 rWW에 넣고, rXX를 음수로 정해 \.{RESUME}이 명령을 끼워 넣지 않게 한다. 미리
+짜 둔 환경이 가져오기 버퍼에 넣어 둔 \.{UNSAVE}는 그대로 커널보다 먼저 실행되어 사용자의 레지스터를
+되살린다. 대화 명령 \.{k}에서처럼 그 위치도 커널 쪽으로 옮긴다.
 
 @<커널이 있으면...@>=
 if kernelFileName != "" {
 	mx.hio = &hio{mx: mx}
 	mx.hio.io = mmixio.New(mx.hio, mx.out, stderr)
 	@<커널 목적 파일을 싣는다@>
+	if len(progFileName) > 4 && progFileName[len(progFileName)-4:] == ".mmb" {
+		mx.g[rWW].o = mx.instPtr.o
+		mx.g[rXX].o = signBit
+		mx.instPtr.o = kernelBoot
+		mx.head.loc = kernelBoot - 4
+		@<새 명령 포인터를 정한다@>
+	}
 }
+
+@ @<상수@>=
+const kernelBoot = 0x8000000500000000 // 커널이 시작하는 곳
 
 @ 목적 파일 형식 \.{mmo}는 {\mc MMIXAL}의 프로그램에 나온다. 여기서는 \.{mmixsim}의 적재기를 줄여
 쓴다. 기호표는 싣지 않고, 후기에 이르면 멈춘다. 커널에는 특수 데이터(\.{lop\_spec})를 쓰지 않으므로
@@ -1270,23 +1286,66 @@ func TestKernelMatchesMagic(t *testing.T) {
 	}
 }
 
-@ 마법이 아니라 커널이 일했는지는 \.{v40}이 알리는 장치 입출력으로 확인한다. 첫 \.{Fputs}에서
-커널은 사용자의 가상 주소 \Hex{4000000000000018}을 물리 주소 \Hex{200000018}로 바꾸어 \.{ARG0}에
-쓰고, 명령 \Hex{701}(\.{Fputs}, \.{StdOut})을 \.{CMD}에 쓴다.
+@ 마법이 아니라 커널이 일했는지는 \.{v40}이 알리는 장치 입출력으로 확인한다. 커널은 부팅할 때
+사용자의 rV를 장치의 \.{RV}에 쓴다. 첫 \.{Fputs}에서는 사용자의 가상 주소 \Hex{4000000000000018}을
+그대로 \.{ARG0}에 쓰고(장치가 같은 페이지 테이블로 변환한다), 명령 \Hex{701}(\.{Fputs},
+\.{StdOut})을 \.{CMD}에 쓴다.
 
 @(mmmix_test.go@>=
 func TestKernelUsesDevice(t *testing.T) {
 	k := assembleKernel(t)
 	p := writeHex(t, "hello.mmb", helloMMB)
-	out, _, code := simulate(t, "v40\n10000\nq\n", "-k"+k, "../examples/plain.mmconfig", p)
+	out, _, code := simulate(t, "v40\n1000000\nq\n", "-k"+k, "../examples/plain.mmconfig", p)
 	for _, want := range []string{
-		"(spec_write 0000000200000018 to 0001000000000008 ",
+		"(spec_write 12340d0700000008 to 0001000000000030 ",
+		"(spec_write 4000000000000018 to 0001000000000008 ",
 		"(spec_write 0000000000000701 to 0001000000000018 ",
 		"hello.mmo", ", world\n", "Halted at time ",
 	} {
 		if !strings.Contains(out, want) || code != 0 {
 			t.Errorf("missing %q (code %d)", want, code)
 		}
+	}
+}
+
+@ 요구 페이징을 시험한다. 프로그램 \.{span}은 데이터 세그먼트의 페이지 경계에 걸친 문자열을
+\.{Fputs}로 찍고, 역시 경계에 걸친 버퍼에 \.{Fgets}로 읽어 다시 찍는다. 문자열의 뒤 페이지를 먼저
+건드리고 풀 세그먼트를 건드린 뒤에야 커널이 앞 페이지를 들이므로, 두 페이지의 프레임은 물리
+메모리에서 떨어져 있고 순서도 거꾸로다. 그래도 장치가 페이지 테이블로 변환하므로 출력은 마법과
+같아야 한다. 프로그램 \.{far}는 데이터 세그먼트의 1024번 페이지를 읽는다. 커널의 테이블은
+세그먼트마다 한 페이지뿐이라 이 폴트는 들일 수 없고, 커널은 표준 오류에 알리고 멈춘다.
+
+@(mmmix_test.go@>=
+const (
+	spanMMB = "0000000000000100e0002000eb001ff081010018e0024000a1010200c1ff000000000701e0ff" +
+		"2000ebff500000000400e0ff2000ebff3ffc0000070100000000000000000000000020000000" +
+		"00001ff06120737472696e672074686174207370616e732074776f2070616765730a00000000" +
+		"00000000000020000000000050002000000000003ffc00000000000000090000000000000000" +
+		"4000000000000000400000000000002040000000000000180000000000000000400000000000" +
+		"00187370616e0000000000000000000000006000000000000000000000000000000140000000" +
+		"000000080000000000000002000000000000010000000000000000006000000000000080ff00" +
+		"0000000000000000000000000000"
+	farMMB = "0000000000000100e0002000e9000000ea0000808d0100000000000000000000400000000000" +
+		"0000400000000000002040000000000000180000000000000000400000000000001866617200" +
+		"0000000000000000000000006000000000000000000000000000000140000000000000080000" +
+		"000000000002000000000000010000000000000000006000000000000080ff00000000000000" +
+		"0000000000000000"
+)
+
+func TestKernelPaging(t *testing.T) {
+	k := assembleKernel(t)
+	p := writeHex(t, "span.mmb", spanMMB)
+	c := "../examples/plain.mmconfig"
+	mOut, _, mCode := simulate(t, "abcdefgh\n", "-s", c, p)
+	kOut, kErr, kCode := simulate(t, "abcdefgh\n", "-s", "-k"+k, c, p)
+	want := "a string that spans two pages\nStdIn> abcdefgh"
+	if kOut != want || mOut != want || kCode != mCode || kErr != "" {
+		t.Errorf("span: magic %q %d, kernel %q %d %q", mOut, mCode, kOut, kCode, kErr)
+	}
+	p = writeHex(t, "far.mmb", farMMB)
+	_, kErr, kCode = simulate(t, "", "-s", "-k"+k, c, p)
+	if kErr != "NNIX: page fault I can't serve\n" || kCode != -1 {
+		t.Errorf("far: %q %d", kErr, kCode)
 	}
 }
 
