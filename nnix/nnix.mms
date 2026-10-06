@@ -19,6 +19,9 @@
 % 5단계: Exec과 Wait. Exec(TRAP 0,12,0)은 디스크의 목적 파일을 지금 프로세스의 새
 %   주소 공간에 싣고 MMIX-SIM과 같은 실행 환경을 차려 실행한다. Wait(TRAP 0,13,0)은
 %   끝난 자식을 거둔다. 이 둘과 Fork로 셸(nnix/sh.mms)이 디스크의 프로그램을 돌린다.
+% 9단계: 레지스터 스택 넘침. 계속 페이지를 rC에 두면, 레지스터 고리가 아직 들이지 않은
+%   스택 페이지로 쏟아질 때 하드웨어가 그것을 계속 페이지에 쓰고 스택 넘침 인터럽트를 낸다.
+%   커널은 그 페이지를 들여 계속 페이지를 옮겨 담는다(mmixdoc.w 45절).
 % 8단계: PTP. 세그먼트마다 테이블 페이지를 셋 두고 중간 테이블은 필요할 때 만든다.
 %   세그먼트마다 8MB이던 한계가 8TB가 된다.
 % 6단계: 프레임 회수와 쓸 때 복사. 프레임마다 참조 계수를 두고, 끝난 프로세스와 Exec이
@@ -62,7 +65,8 @@
 % 사용자 페이지를 읽으면 폴트가 나지 않고 조용히 0이 읽힌다. 그러므로 커널은
 % 사용자 메모리를 언제나 UserPA로 변환해서(필요하면 페이지를 들이면서) 만진다.
 % 다만 처리기의 PUSHJ가 사용자의 지역 레지스터를 스택 세그먼트(rS)로 쏟을 수 있으므로,
-% 스택 세그먼트의 처음 StackPages 페이지는 부팅할 때 미리 들여놓는다.
+% 스택 세그먼트의 처음 StackPages 페이지는 부팅할 때 미리 들여놓고, 스택이 넘칠 때마다
+% rS 위로 두 페이지를 더 들여놓는다(StackOvf).
 %
 % 장치는 레지스터 RV에 사용자의 rV를 받아 같은 페이지 테이블로 주소를 변환한다
 % (IOMMU). 그래서 커널은 사용자의 가상 주소를 그대로 넘기고, 넘기기 전에 버퍼의
@@ -155,10 +159,14 @@ Boot    PUT   rK,0              커널은 인터럽트를 끈 채로 돈다
 Main    IS    Boot
 
 % 트랩 입구. TRAP은 사용자의 $255를 rBB로 옮기고 $255를 rJ로 정한 뒤 여기로 온다.
-% rJ는 그대로 있으므로 $255는 마음대로 써도 된다. Fork와 Wait이면 곧바로 문맥을 저장하고,
+% rJ는 그대로 있으므로 $255는 마음대로 써도 된다. 먼저 PreSave로 커널이 쓸 스택 자리를
+% 마련한다. Fork와 Wait이면 곧바로 문맥을 저장하고,
 % 아니면 PUSHJ $255로 사용자의 지역 레지스터를 모두 숨기고 새 틀에서 일한다.
 % 전역 레지스터는 건드리지 않는다.
-TrapEnt GET   $255,rXX
+TrapEnt GET   $255,rJ
+        PUSHJ $255,PreSave      커널이 쓸 스택 자리부터 마련한다
+        PUT   rJ,$255
+        GET   $255,rXX
         SLU   $255,$255,32
         SRU   $255,$255,40      $255=rXX의 아랫 테트라에서 opcode, X, Y
         CMP   $255,$255,Fork
@@ -174,10 +182,14 @@ TrapEnt GET   $255,rXX
         NEG   $255,0,1          돌아갈 때의 rK: 모두 허용(원시 처리기와 같다)
         RESUME 1                rK<-$255, $255<-rBB
 
-% 동적 트랩 입구. 레지스터를 넘겨받는 모양은 TRAP과 같다. 보호 결함(r, w, x)을
-% 먼저 보고, 그다음 디스크를 본다. 타이머라면 돌 수 있는 프로세스가 둘 이상일 때만 프로세스를 바꾸고,
+% 동적 트랩 입구. 레지스터를 넘겨받는 모양은 TRAP과 같다. 맨 먼저 PreSave가 스택 넘침을
+% 처리하고 커널이 쓸 스택 자리를 마련한다. 계속 페이지가 하나뿐이므로 다른 프로세스로
+% 넘어가기 전에 처리해야 하기 때문이다. 그다음 보호 결함(r, w, x)을, 그다음 디스크를 본다. 타이머라면 돌 수 있는 프로세스가 둘 이상일 때만 프로세스를 바꾸고,
 % 혼자면 타이머를 끈다(rI를 다시 걸지 않는다). 나머지는 Fault가 지운다.
-DynEnt  GET   $255,rQ
+DynEnt  GET   $255,rJ
+        PUSHJ $255,PreSave      스택 넘침도 여기서 처리한다
+        PUT   rJ,$255
+        GET   $255,rQ
         SRU   $255,$255,32
         AND   $255,$255,#e0
         BNZ   $255,1F           보호 결함
@@ -224,6 +236,12 @@ res     IS    $3
         SETH  k,#8000
         ORMH  k,#0008
         STO   k,t,0             첫 새 프레임은 8<<32다
+        PUSHJ res,:AllocFrame   계속 페이지(새 프레임이라 0이다)
+        GETA  t,:ContPage
+        STO   res,t,0
+        ANDNH res,#8000
+        OR    res,res,6         PTE 꼴: 읽고 쓸 수 있다
+        PUT   :rC,res
         GETA  t,:Procs
         LDO   t,t,:RVO          프로세스 0의 rV
         PUT   :rV,t
@@ -374,6 +392,115 @@ Warn    CMP   t,h,1
         PUSHJ res,:Device
         JMP   Done
         PREFIX :
+
+% StackOvf: 레지스터 스택 넘침 인터럽트. 레지스터 고리가 쓰기 허가가 없는(아직 들이지
+% 않은) 스택 페이지로 쏟아지면, 하드웨어는 그것을 rC의 계속 페이지에 같은 오프셋으로 쓰고
+% 끼어들 수 있는 다음 명령에서 rQ의 비트 #80을 켠다. 쏟은 자리는 rS 바로 아래다. 그래서
+% rS-8이 든 페이지의 앞 페이지부터 네 페이지(그 위 두 페이지는 커널이 쏟거나 SAVE할 자리다)
+% 가운데 비어 있는 것마다 프레임을 주고 계속 페이지를 통째로 복사해 넣은 뒤, 계속 페이지를
+% 다시 0으로 비운다. 이 처리기에 들어오는 PUSHJ와 이 처리기 안의 호출도 아직 들이지 않은
+% 페이지로 쏟아져 계속 페이지에 쓰일 수 있으므로, 위의 두 페이지도 0이 아니라 계속 페이지로
+% 채운다. 거기 다른 페이지 몫의 데이터가 섞여도 rS 위의 메모리는 쓰기 전에 읽히지 않으니
+% 해가 없다. 그런 쏟음은 스택 넘침을 한 번 더 일으키지만, 그때는 들일 페이지가 없다.
+% PTE를 쓸 때마다 SYNC 6을 한다. 실패한 변환이 변환 캐시에 남아 있으면 쏟음이 계속
+% 계속 페이지로 가기 때문이다.
+        PREFIX Ovf:
+sp      IS    $0
+v       IS    $1
+t       IS    $2
+e       IS    $3
+fr      IS    $4
+cp      IS    $5
+sl      IS    $6
+rj      IS    $7
+res     IS    $8
+:StackOvf GET rj,:rJ
+        GET   sp,:rS
+        SUBU  v,sp,8
+        SETL  t,#1fff
+        ANDN  v,v,t             rS-8이 든 페이지
+        SETL  t,#2000
+        SUBU  v,v,t             그 앞 페이지부터
+        GETA  t,:ContPage
+        LDO   cp,t,0
+        SET   e,4
+1H      SETH  t,#6000
+        CMPU  t,v,t
+        BN    t,2F              스택 세그먼트의 앞이다
+        GET   res+1,:rV
+        SET   res+2,v
+        SETL  res+3,1
+        PUSHJ res,:PteSlot
+        BZ    res,2F
+        SET   sl,res
+        LDO   t,sl,0
+        BNZ   t,2F              이미 있다
+        PUSHJ res,:AllocFrame
+        SET   fr,res
+        SET   res+1,cp
+        SET   res+2,fr
+        SET   res+3,0
+        PUSHJ res,:CopyPage     쏟은 레지스터를 옮겨 담는다
+        ANDNH fr,#8000
+        GET   t,:rV
+        SETL  res,#1ff8
+        AND   t,t,res
+        OR    fr,fr,t
+        OR    fr,fr,6
+        STO   fr,sl,0
+        SYNC  6
+2H      SETL  t,#2000
+        ADDU  v,v,t
+        SUB   e,e,1
+        BP    e,1B
+        SET   t,0
+        SETL  e,#2000
+4H      STCO  0,cp,t            계속 페이지를 비운다
+        ADDU  t,t,8
+        CMP   res,t,e
+        BN    res,4B
+        GET   t,:rQ
+        ANDNL t,#80
+        PUT   :rQ,t
+        PUT   :rJ,rj
+        POP   0,0
+        PREFIX :
+
+% PreSave(): 커널에 들어올 때마다 부른다. 커널이 사용자의 스택 세그먼트에 쓰는 일(쏟음과
+% SAVE)과 거기서 다시 읽는 일(커널 안의 POP이 쏟았던 레지스터를 채우는 것)은 모두 들여놓은
+% 페이지 안에서 일어나야 한다. 커널은 인터럽트를 끈 채로 돌므로, 비어 있는 페이지에 쓰는
+% SAVE는 조용히 버려질 수 있고 거기서 읽는 POP은 조용히 0을 읽기 때문이다. 그래서 스택 넘침이
+% 걸려 있거나 rS+8KB가 든 페이지가 비어 있으면 StackOvf로 rS 둘레의 페이지를 들인다.
+% 입구의 PUSHJ가 쏟은 것은 계속 페이지로 갔으므로 StackOvf가 함께 옮긴다.
+PreSave GET   $0,rJ
+        GET   $1,rQ
+        AND   $1,$1,#80
+        BNZ   $1,1F
+        GET   $4,rV
+        GET   $5,rS
+        SETL  $1,#2000
+        ADDU  $5,$5,$1
+        SET   $6,0
+        PUSHJ $3,PteSlot
+        BZ    $3,1F
+        LDO   $1,$3,0
+        BNZ   $1,9F             넉넉하다
+1H      PUSHJ $3,StackOvf
+9H      PUT   rJ,$0
+        POP   0,0
+
+% OvfCheck(): 다른 프로세스로 넘어갈 수 있는 곳에서 SAVE한 직후에 부른다. 레지스터 고리가
+% 계속 페이지로 쏟아진 뒤 rQ의 비트 #80이 켜지기 전에(끼어들 수 있는 다음 명령이 확정되기
+% 전에) 다른 인터럽트나 트랩이 먼저 잡혔을 수 있고, SAVE 자체가 쏟아졌을 수도 있다. 그 비트는
+% 커널의 명령이 확정되면 켜지므로 여기서는 보인다. 계속 페이지는 하나뿐이니 지금 프로세스의
+% 것으로 처리한다. SAVE가 쓰는 양은 StackOvf가 rS 위로 들여놓는 범위 안에 든다.
+OvfCheck GET  $0,rQ
+        AND   $0,$0,#80
+        BZ    $0,9F
+        GET   $1,rJ
+        PUSHJ $2,StackOvf
+        PUT   rJ,$1
+9H      POP   0,0
 
 % Fault: 동적 트랩. 사용자가 비어 있는 페이지를 건드려 r, w, x 보호 결함이
 % 나면 그 페이지를 들인다. 적재와 저장은 RESUME 1이 다시 실행하고(ropcode 0),
@@ -1034,6 +1161,7 @@ cp      IS    $3
 u       IS    $4
 res     IS    $5
 :Tick   SAVE  $255,0
+        PUSHJ res,:OvfCheck
         GET   t,:rQ
         ANDN  t,t,#40
         PUT   :rQ,t             구간 인터럽트를 지운다
@@ -1050,6 +1178,7 @@ res     IS    $5
 % 프로세스는 대개 조금 계산하고 다음 블록을 요청하며 다시 잠드므로, 다음 틱까지 기다리게
 % 하면 디스크가 놀게 된다. 깨울 프로세스가 없으면 Next가 지금 프로세스를 돌려준다.
 :DiskTick SAVE $255,0
+        PUSHJ res,:OvfCheck
         GET   t,:rQ
         ANDNL t,:DiskBit
         PUT   :rQ,t
@@ -1066,6 +1195,7 @@ res     IS    $5
 % 복사해 만든다. 그래서 자식의 스택 세그먼트에도 같은 문맥이 같은 주소에 있다.
 % 부모의 rBB는 자식의 pid, 자식의 rBB는 0이다. 빈 자리가 없으면 부모에게 -1을 준다.
 :DoFork SAVE  $255,0
+        PUSHJ res,:OvfCheck
         SET   res+1,$255
         PUSHJ res,:Store        부모의 상태
         GETA  t,:Cur
@@ -1177,6 +1307,7 @@ base    IS    $5
 alive   IS    $6
 res     IS    $7
 :DoWait SAVE  $255,0
+        PUSHJ res,:OvfCheck
         SET   res+1,$255
         PUSHJ res,:Store
         GETA  t,:Cur
@@ -2915,8 +3046,10 @@ FlushText GET $0,rJ
 chan    IS    $0
 e       IS    $1
 t       IS    $2
-res     IS    $3
-:Sleep  GETA  t,:Cur
+rj      IS    $3
+res     IS    $4
+:Sleep  GET   rj,:rJ
+        GETA  t,:Cur
         LDO   e,t,0
         SLU   e,e,:PShift
         GETA  t,:Procs
@@ -2930,7 +3063,10 @@ res     IS    $3
         STO   res,t,0
         GETA  t,Cont
         STO   t,e,:KPC
+        PUSHJ res,:PreSave
+        PUT   :rJ,rj            SAVE가 저장할 rJ는 Sleep을 부른 곳으로 돌아갈 주소다
         SAVE  $255,0
+        PUSHJ res,:OvfCheck
         SET   res+1,$255
         PUSHJ res,:Store
         PUSHJ res,:Next
@@ -3138,6 +3274,7 @@ Ready   AND   $6,base,need
         PREFIX :
 
 ExitNext OCTA  0                Exit이 다음에 돌릴 pid
+ContPage OCTA 0                 계속 페이지의 커널 주소(rC가 가리킨다)
 FsOwner OCTA  -1                파일 시스템 자물쇠를 쥔 pid(없으면 -1)
 Cur     OCTA  0                 지금 도는 프로세스의 pid
 NReady  OCTA  1                 돌 수 있는 프로세스의 수
