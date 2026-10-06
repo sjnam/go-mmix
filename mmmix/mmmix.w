@@ -15,6 +15,7 @@
 
 \input kotexgweb
 \def\title{MMMIX}
+\def\NNIX{\hbox{\mc NNIX}}
 
 @* 들어가며. 이 \.{GWEB} 프로그램은 \MMIX\ 컴퓨터를 여러 가지 설정의 고성능 파이프라인으로
 구현하면 어떻게 될지 흉내 낸다. 다중 처리와 메모리 사상 입출력의 저수준 세부를 빼면 \MMIX\
@@ -57,6 +58,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 	mx.MMIXInit()
 	mx.io = mmixio.New(mx, mx.out, stderr)
 	@<프로그램을 입력한다@>
+	@<커널이 있으면 싣는다@>
 	if silent {
 		return mx.MMIXSilent()
 	}
@@ -87,6 +89,9 @@ mx.out.Flush()
 if mx.io != nil {
 	mx.io.FlushAll()
 }
+if mx.hio != nil {
+	mx.hio.io.FlushAll() // 보충: 커널의 장치가 연 파일들
+}
 if r := recover(); r != nil {
 	e, ok := r.(exitSignal)
 	if !ok {
@@ -108,11 +113,17 @@ if r := recover(); r != nil {
 @ 언젠가는 명령줄에 다른 선택 사항이 더 들어갈지도 모른다. 지금은 경험이 더 쌓일 때까지
 그런 것들은 잊고 모든 것을 단순하게 한다.
 
+보충: 옮긴이는 선택 사항을 하나 덧붙였다. \.{-k<filename>}을 주면 프로그램을 입력한 뒤에
+\NNIX\ 커널의 목적 파일을 싣는다. 이름을 선택 사항에 붙여 쓰는 것은 {\mc MMIX-SIM}의
+\.{-f<filename>}을 본뜬 것이다. 사용법 메시지는 원본 그대로 둔다.
+
 @<명령줄을...@>=
 argc := len(args)
 for n = 1; n < len(args) && len(args[n]) > 0 && args[n][0] == '-'; n++ {
 	if len(args[n]) > 1 && args[n][1] == 's' {
 		silent = true
+	} else if len(args[n]) > 2 && args[n][1] == 'k' {
+		kernelFileName = args[n][2:]
 	} else {
 		argc = 0 // 모르는 선택 사항
 	}
@@ -166,6 +177,7 @@ var (
 	badAddress bool             // 현재 위치를 쓸 수 없는가?
 	bp         Octa = negOne    // 멈춤점
 	tmp        Octa             // 잠시 관심을 두는 옥타바이트
+	kernelFileName string       // 보충: \.{-k}로 준 커널 목적 파일
 )
 
 @ 보충: 원본은 첫 널 문자가 줄의 처음에 있으면 |buffer[-1]|을 읽었다. 여기서는 그런 줄을 너무
@@ -393,6 +405,182 @@ mx.memWrite(curLoc, curDat) // 풀 세그먼트의 PTE
 curDat = 3<<32 | 6
 curLoc = 4<<32 | 9<<13
 mx.memWrite(curLoc, curDat) // 스택 세그먼트의 PTE
+
+@* 커널 싣기. 보충: 이 장은 옮긴이가 덧붙인 것이다. 크누스가 만들지 않은 \NNIX\ 대신에 쓸
+작은 커널을 저장소의 \.{nnix/nnix.mms}에 두었다. 이 커널은 rT 자리에 진짜 트랩 처리기를 두고,
+\.{mmixmem.w}에 덧붙인 호스트 입출력 장치로 입출력을 한다. 그러면 마법 같은 입출력은 일어나지
+않는다. 마법은 rT 자리에서 \.{RESUME}~\.1을 배정할 때만 일어나기 때문이다.
+
+커널은 미리 짜 둔 환경을 준비한 {\it 뒤에\/} 싣는다. 그래서 위치 $2^{32}\times5$의 원시적인 트랩
+처리기를 커널이 덮어쓴다. 장치는 커널을 실을 때만 만든다.
+
+@<커널이 있으면...@>=
+if kernelFileName != "" {
+	mx.hio = &hio{mx: mx}
+	mx.hio.io = mmixio.New(mx.hio, mx.out, stderr)
+	@<커널 목적 파일을 싣는다@>
+}
+
+@ 목적 파일 형식 \.{mmo}는 {\mc MMIXAL}의 프로그램에 나온다. 여기서는 \.{mmixsim}의 적재기를 줄여
+쓴다. 기호표는 싣지 않고, 후기에 이르면 멈춘다. 커널에는 특수 데이터(\.{lop\_spec})를 쓰지 않으므로
+그것은 받지 않는다.
+
+@<상수@>=
+const (
+	mm       = 0x98 // \.{mmo} 형식의 탈출 코드
+	lopQuote = 0x0  // 인용 lopcode
+	lopLoc   = 0x1  // 위치 lopcode
+	lopSkip  = 0x2  // 건너뛰기 lopcode
+	lopFixo  = 0x3  // 옥타바이트 고치기 lopcode
+	lopFixr  = 0x4  // 상대 주소 고치기 lopcode
+	lopFixrx = 0x5  // 확장된 상대 주소 고치기 lopcode
+	lopFile  = 0x6  // 파일 이름 lopcode
+	lopLine  = 0x7  // 파일 위치 lopcode
+	lopPre   = 0x9  // 서문 lopcode
+	lopPost  = 0xa  // 후기 lopcode
+	lopStab  = 0xb  // 기호표 lopcode
+	lopEnd   = 0xc  // 모든 것을 끝내는 lopcode
+)
+
+@ 함수 |kernelTet|는 큰 쪽 먼저로 테트라바이트 하나를 읽는다. 파일이 잘렸으면 끝낸다.
+함수 |kernelAddress|는 \.{lop\_loc}이나 \.{lop\_fixo}가 가리키는 주소를 읽는다. 그 lopcode의
+Z~바이트가 2이면 Y~바이트가 윗 테트라의 맨 윗 바이트가 되고, 그다음 테트라바이트가 거기에 더해진다.
+
+@<함수들@>=
+func (mx *machine) kernelTet(f *cfile, name string) Tetra {
+	var b [4]byte
+	if _, err := io.ReadFull(f.r, b[:]); err != nil {
+		mx.kernelErr(name)
+	}
+	return Tetra(b[0])<<24 | Tetra(b[1])<<16 | Tetra(b[2])<<8 | Tetra(b[3])
+}
+@#
+func (mx *machine) kernelAddress(f *cfile, name string, t Tetra) Octa {
+	var h Tetra
+	switch t & 0xff {
+	case 2:
+		h = (t>>8&0xff)<<24 + mx.kernelTet(f, name)
+	case 1:
+		h = (t >> 8 & 0xff) << 24
+	default:
+		mx.kernelErr(name)
+	}
+	return Octa(h)<<32 | Octa(mx.kernelTet(f, name))
+}
+@#
+func (mx *machine) kernelErr(name string) {
+	mx.errprintf("Panic: Bad kernel object file %s!\n", name)
+@.Bad kernel object file@>
+	panic(exitSignal(-4))
+}
+
+@ 커널의 위치는 음수 가상 주소여야 하고, 부호 비트를 지운 물리 주소는 입출력 공간보다 아래여야
+한다. 보통의 테트라는 그 자리에 덮어쓴다. 미리 짜 둔 환경이 써 둔 원시 처리기를 지우기 위해서다.
+고치기는 \.{mmixsim}의 |mmoLoad|처럼 배타적 논리합으로 싣는다.
+
+@<함수들@>=
+func (mx *machine) kernelLoad(loc Octa, t Tetra, xor bool) {
+	if loc&signBit == 0 || loc-signBit >= hioBase {
+		mx.errprintf("Panic: Kernel location %016x isn't in negative memory!\n", loc)
+@.Kernel location...@>
+		panic(exitSignal(-5))
+	}
+	a := (loc - signBit) &^ 7
+	s := 32 * (^loc >> 2 & 1) // 윗 테트라면 32
+	o := mx.memRead(a)
+	if xor {
+		o ^= Octa(t) << s
+	} else {
+		o = o&^(0xffffffff<<s) | Octa(t)<<s
+	}
+	mx.memWrite(a, o)
+}
+
+@ 보충: \.{mmixsim}처럼 lopcode를 해석하는 루프에 이름표를 붙인다. |continue items|는 다음 항목으로
+가고, |break items|는 후기에서 멈춘다. \.{lop\_quote}는 테트라바이트 하나를 더 읽어 보통의 경우로
+넘어간다.
+
+@<커널 목적 파일을...@>=
+kf := openCfile(kernelFileName)
+if kf == nil {
+	mx.errprintf("Panic: Can't open kernel object file %s!\n", kernelFileName)
+@.Can't open kernel...@>
+	panic(exitSignal(-3))
+}
+t := mx.kernelTet(kf, kernelFileName)
+if t>>16 != mm<<8|lopPre || t>>8&0xff != 1 {
+	mx.kernelErr(kernelFileName)
+}
+for j := t & 0xff; j > 0; j-- {
+	mx.kernelTet(kf, kernelFileName) // 파일을 만든 시각
+}
+curLoc = 0
+items:
+for {
+	t = mx.kernelTet(kf, kernelFileName)
+	if t>>24 == mm {
+		yz := t & 0xffff
+		switch t >> 16 & 0xff {
+		case lopQuote:
+			if yz != 1 {
+				mx.kernelErr(kernelFileName)
+			}
+			t = mx.kernelTet(kf, kernelFileName)
+		@<커널을 실을 때 lopcode의 경우들@>
+		default:
+			mx.kernelErr(kernelFileName)
+		}
+	}
+	mx.kernelLoad(curLoc, t, false)
+	curLoc = (curLoc + 4) &^ 3
+}
+kf.f.Close()
+
+@ @<커널을 실을 때...@>=
+case lopLoc:
+	curLoc = mx.kernelAddress(kf, kernelFileName, t)
+	continue items
+case lopSkip:
+	curLoc += Octa(yz)
+	continue items
+case lopFixo:
+	a := mx.kernelAddress(kf, kernelFileName, t)
+	mx.kernelLoad(a, Tetra(curLoc>>32), true)
+	mx.kernelLoad(a+4, Tetra(curLoc), true)
+	continue items
+case lopFile:
+	for j := t & 0xff; j > 0; j-- {
+		mx.kernelTet(kf, kernelFileName) // 파일 이름
+	}
+	continue items
+case lopLine:
+	continue items
+case lopPost, lopStab, lopEnd:
+	break items
+
+@ 상대 주소 고치기는 \.{mmixsim}과 같다. \.{lop\_fixr}의 |delta|는 \Hex{10000}보다 작다.
+\.{lop\_fixrx}의 |delta|가 \Hex{1000000} 이상이면 뒤쪽을 가리키는 $j$비트 차이다.
+
+@<커널을 실을 때...@>=
+case lopFixr, lopFixrx:
+	delta := yz
+	j := Tetra(0)
+	if t>>16&0xff == lopFixrx {
+		j = yz
+		if j != 16 && j != 24 {
+			mx.kernelErr(kernelFileName)
+		}
+		delta = mx.kernelTet(kf, kernelFileName)
+		if delta&0xfe000000 != 0 {
+			mx.kernelErr(kernelFileName)
+		}
+	}
+	d := Octa(delta)
+	if delta >= 0x1000000 {
+		d = Octa(delta&0xffffff) - 1<<j
+	}
+	mx.kernelLoad(curLoc-d<<2, delta, true)
+	continue items
 
 @* 대화. 이 시뮬레이터는 명령을 달라고 할 때 다음과 같은 짧은 명령들을 알아듣는다.
 @.mmmix>@>
@@ -884,6 +1072,7 @@ import (
 	"crypto/sha256"
 	hexenc "encoding/hex"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1041,6 +1230,93 @@ func TestErrors(t *testing.T) {
 		_, err, code := simulate(t, "", c.args...)
 		if err != c.err || code != c.code {
 			t.Errorf("%q: %q, code %d", c.args, err, code)
+		}
+	}
+}
+
+@ 마지막으로 \NNIX\ 커널을 시험한다. 커널의 목적 파일은 저장소에 두지 않고, 시험할 때마다
+\.{mmixal}로 \.{nnix/nnix.mms}를 어셈블한다. 한글 주석 때문에 줄이 길어 입력 버퍼를 늘린다.
+
+@(mmmix_test.go@>=
+func assembleKernel(t *testing.T) string {
+	t.Helper()
+	mmo := filepath.Join(t.TempDir(), "nnix.mmo")
+	cmd := exec.Command("go", "run", "../mmixal", "-b", "250", "-o", mmo, "../nnix/nnix.mms")
+	if out, err := cmd.CombinedOutput(); err != nil || len(out) != 0 {
+		t.Fatalf("mmixal: %v\n%s", err, out)
+	}
+	return mmo
+}
+
+@ 커널을 거쳐도 표준 출력과 종료 코드는 마법과 같아야 한다. 마법은 시뮬레이터 안에서 순식간에
+일어나지만 커널은 진짜 명령을 실행하므로 걸리는 사이클은 다르다.
+
+@(mmmix_test.go@>=
+func TestKernelMatchesMagic(t *testing.T) {
+	k := assembleKernel(t)
+	for _, prog := range []struct{ name, hex string }{
+		{"hello.mmb", helloMMB}, {"primes.mmb", primesMMB},
+	} {
+		p := writeHex(t, prog.name, prog.hex)
+		for _, cfg := range []string{"plain", "deluxe"} {
+			c := "../examples/" + cfg + ".mmconfig"
+			mOut, _, mCode := simulate(t, "", "-s", c, p)
+			kOut, kErr, kCode := simulate(t, "", "-s", "-k"+k, c, p)
+			if kOut != mOut || kCode != mCode || kErr != "" {
+				t.Errorf("%s %s: magic %q %d, kernel %q %d %q",
+					prog.name, cfg, mOut, mCode, kOut, kCode, kErr)
+			}
+		}
+	}
+}
+
+@ 마법이 아니라 커널이 일했는지는 \.{v40}이 알리는 장치 입출력으로 확인한다. 첫 \.{Fputs}에서
+커널은 사용자의 가상 주소 \Hex{4000000000000018}을 물리 주소 \Hex{200000018}로 바꾸어 \.{ARG0}에
+쓰고, 명령 \Hex{701}(\.{Fputs}, \.{StdOut})을 \.{CMD}에 쓴다.
+
+@(mmmix_test.go@>=
+func TestKernelUsesDevice(t *testing.T) {
+	k := assembleKernel(t)
+	p := writeHex(t, "hello.mmb", helloMMB)
+	out, _, code := simulate(t, "v40\n10000\nq\n", "-k"+k, "../examples/plain.mmconfig", p)
+	for _, want := range []string{
+		"(spec_write 0000000200000018 to 0001000000000008 ",
+		"(spec_write 0000000000000701 to 0001000000000018 ",
+		"hello.mmo", ", world\n", "Halted at time ",
+	} {
+		if !strings.Contains(out, want) || code != 0 {
+			t.Errorf("missing %q (code %d)", want, code)
+		}
+	}
+}
+
+@ 커널 파일을 열 수 없거나 형식이 틀렸을 때다.
+
+@(mmmix_test.go@>=
+func TestKernelErrors(t *testing.T) {
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "bad.mmo")
+	if err := os.WriteFile(bad, []byte("not an object file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pos := filepath.Join(dir, "pos.mmo") // 위치가 양수인 테트라 하나
+	if err := os.WriteFile(pos, []byte{0x98, 9, 1, 0, 0x98, 1, 0, 1, 0, 0, 1, 0,
+		0xe3, 0, 0, 1}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := writeHex(t, "hello.mmb", helloMMB)
+	for _, c := range []struct {
+		kernel, err string
+		code       int
+	}{
+		{filepath.Join(dir, "nope.mmo"),
+			"Panic: Can't open kernel object file " + filepath.Join(dir, "nope.mmo") + "!\n", -3},
+		{bad, "Panic: Bad kernel object file " + bad + "!\n", -4},
+		{pos, "Panic: Kernel location 0000000000000100 isn't in negative memory!\n", -5},
+	} {
+		_, e, code := simulate(t, "", "-s", "-k"+c.kernel, "../examples/plain.mmconfig", p)
+		if e != c.err || code != c.code {
+			t.Errorf("%s: %q %d", c.kernel, e, code)
 		}
 	}
 }

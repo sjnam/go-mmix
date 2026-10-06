@@ -15,6 +15,9 @@
 /abstime/abstime
 /bin/
 
+# make nnix로 만드는 커널 목적 파일
+/nnix/*.mmo
+
 # examples/에서 예제를 돌리면 생기는 파일
 /examples/*.mmo
 /examples/*.lst

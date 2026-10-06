@@ -1,4 +1,4 @@
-//line mmmix.w:880
+//line mmmix.w:1067
 package main
 
 import (
@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	hexenc "encoding/hex"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -23,12 +24,12 @@ func digest(s string) string {
 	return hexenc.EncodeToString(h[:8])
 }
 
-//line mmmix.w:909
+//line mmmix.w:1097
 const (
 	script1 = "@8000000000010000\nv1ff\n2000\np\ns\nq\n"
 	script2 = "@8000000000010000\n100000\ns\nD*\nS*\ng255\nm10000\nq\n"
 
-//line mmmix.w:912
+//line mmmix.w:1100
 )
 
 func TestKnuthFiles(t *testing.T) {
@@ -51,7 +52,7 @@ func TestKnuthFiles(t *testing.T) {
 	}
 }
 
-//line mmmix.w:940
+//line mmmix.w:1128
 const (
 	helloMMB = "00000000000001008fff010000000701f4ff000300000701000000002c20776f726c640a" +
 		"0000000000000000000000004000000000000000400000000000002840000000000000180000" +
@@ -65,7 +66,7 @@ const (
 		"Predictions: 0 in agreement, 0 in opposition; 0 good, 0 bad\n" +
 		"Instructions issued per cycle:\n  0   380\n  1   26\n"
 
-//line mmmix.w:952
+//line mmmix.w:1140
 )
 
 func writeHex(t *testing.T, name, h string) string {
@@ -93,7 +94,7 @@ func TestHello(t *testing.T) {
 	}
 }
 
-//line mmmix.w:982
+//line mmmix.w:1170
 const primesMMB = "0000000000000100e3fe0003c1fbf700a6fef8fbe7fb000242fb0013e7fe0002c1faf70086f9" +
 	"f8fa1cfdfef9fefc000643fcfffb30fffdf94dfffff6e7fa0002f1fffff9466972737420466976" +
 	"652048756e64726564205072696d65730a00202020000023fff6000000070135fa000220fafaf7" +
@@ -116,7 +117,7 @@ func TestPrimes(t *testing.T) {
 	}
 }
 
-//line mmmix.w:1007
+//line mmmix.w:1195
 func TestErrors(t *testing.T) {
 	dir := t.TempDir()
 	file := func(name, text string) string {
@@ -154,6 +155,81 @@ func TestErrors(t *testing.T) {
 		_, err, code := simulate(t, "", c.args...)
 		if err != c.err || code != c.code {
 			t.Errorf("%q: %q, code %d", c.args, err, code)
+		}
+	}
+}
+
+//line mmmix.w:1240
+func assembleKernel(t *testing.T) string {
+	t.Helper()
+	mmo := filepath.Join(t.TempDir(), "nnix.mmo")
+	cmd := exec.Command("go", "run", "../mmixal", "-b", "250", "-o", mmo, "../nnix/nnix.mms")
+	if out, err := cmd.CombinedOutput(); err != nil || len(out) != 0 {
+		t.Fatalf("mmixal: %v\n%s", err, out)
+	}
+	return mmo
+}
+
+//line mmmix.w:1254
+func TestKernelMatchesMagic(t *testing.T) {
+	k := assembleKernel(t)
+	for _, prog := range []struct{ name, hex string }{
+		{"hello.mmb", helloMMB}, {"primes.mmb", primesMMB},
+	} {
+		p := writeHex(t, prog.name, prog.hex)
+		for _, cfg := range []string{"plain", "deluxe"} {
+			c := "../examples/" + cfg + ".mmconfig"
+			mOut, _, mCode := simulate(t, "", "-s", c, p)
+			kOut, kErr, kCode := simulate(t, "", "-s", "-k"+k, c, p)
+			if kOut != mOut || kCode != mCode || kErr != "" {
+				t.Errorf("%s %s: magic %q %d, kernel %q %d %q",
+					prog.name, cfg, mOut, mCode, kOut, kCode, kErr)
+			}
+		}
+	}
+}
+
+//line mmmix.w:1277
+func TestKernelUsesDevice(t *testing.T) {
+	k := assembleKernel(t)
+	p := writeHex(t, "hello.mmb", helloMMB)
+	out, _, code := simulate(t, "v40\n10000\nq\n", "-k"+k, "../examples/plain.mmconfig", p)
+	for _, want := range []string{
+		"(spec_write 0000000200000018 to 0001000000000008 ",
+		"(spec_write 0000000000000701 to 0001000000000018 ",
+		"hello.mmo", ", world\n", "Halted at time ",
+	} {
+		if !strings.Contains(out, want) || code != 0 {
+			t.Errorf("missing %q (code %d)", want, code)
+		}
+	}
+}
+
+//line mmmix.w:1295
+func TestKernelErrors(t *testing.T) {
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "bad.mmo")
+	if err := os.WriteFile(bad, []byte("not an object file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pos := filepath.Join(dir, "pos.mmo") // 위치가 양수인 테트라 하나
+	if err := os.WriteFile(pos, []byte{0x98, 9, 1, 0, 0x98, 1, 0, 1, 0, 0, 1, 0,
+		0xe3, 0, 0, 1}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := writeHex(t, "hello.mmb", helloMMB)
+	for _, c := range []struct {
+		kernel, err string
+		code        int
+	}{
+		{filepath.Join(dir, "nope.mmo"),
+			"Panic: Can't open kernel object file " + filepath.Join(dir, "nope.mmo") + "!\n", -3},
+		{bad, "Panic: Bad kernel object file " + bad + "!\n", -4},
+		{pos, "Panic: Kernel location 0000000000000100 isn't in negative memory!\n", -5},
+	} {
+		_, e, code := simulate(t, "", "-s", "-k"+c.kernel, "../examples/plain.mmconfig", p)
+		if e != c.err || code != c.code {
+			t.Errorf("%s: %q %d", c.kernel, e, code)
 		}
 	}
 }

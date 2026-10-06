@@ -4,6 +4,7 @@
 #   make tangle     # 각 .w -> .go (+ _test.go)
 #   make doc        # 각 .w의 .pdf 조판 (한글이라 luatex)
 #   make intro      # 어셈블러와 시뮬레이터의 앞머리 안내서 (*-intro.pdf)
+#   make nnix       # NNIX 커널 nnix/nnix.mms -> nnix/nnix.mmo (mmmix -k로 싣는다)
 #   make test       # go vet + go test
 #   make clean      # 조판 생성물 삭제 (.w 원본은 남김)
 #
@@ -23,7 +24,7 @@ webs = $(or $(WEBS_$(1)),$(1))
 DOCONLY := mmixdoc
 DOCS := $(foreach p,$(PKGS),$(foreach w,$(call webs,$(p)),$(p)/$(w))) $(addprefix ./,$(DOCONLY))
 
-.PHONY: all tangle doc intro test clean $(PKGS) mmixsim-abstime mmmix-abstime
+.PHONY: all tangle doc intro nnix test clean $(PKGS) mmixsim-abstime mmmix-abstime
 .DEFAULT_GOAL := all
 
 all: tangle test
@@ -77,6 +78,10 @@ intro:
 	   $(MUTOOL) merge -o $$w-intro.pdf $$w.pdf 1-$$((n-1)),N && \
 	   echo "$$p/$$w-intro.pdf: 1--$$((n-1))쪽과 목차") || exit 1; \
 	done
+
+# 커널의 한글 주석 때문에 줄이 길어 mmixal의 입력 버퍼를 늘린다.
+nnix:
+	go run ./mmixal -b 250 -o nnix/nnix.mmo nnix/nnix.mms
 
 clean:
 	rm -f *.tex *.idx *.scn *.toc *.log *.pdf *.dvi
