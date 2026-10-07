@@ -1,4 +1,4 @@
-//line nnixfs/nnixfs.w:367
+//line nnixfs.w:367
 package main
 
 import (
@@ -22,7 +22,7 @@ func TestRoundTrip(t *testing.T) {
 	big := filepath.Join(dir, "big.txt")
 	data := []byte(strings.Repeat("0123456789abcdef", 160)) // 2560바이트, 블록 셋
 
-//line nnixfs/nnixfs.w:394
+//line nnixfs.w:394
 	os.WriteFile(big, data, 0o644)
 	empty := filepath.Join(dir, "empty")
 	os.WriteFile(empty, nil, 0o644)
@@ -37,9 +37,9 @@ func TestRoundTrip(t *testing.T) {
 		t.Errorf("ls: %q", o)
 	}
 
-//line nnixfs/nnixfs.w:390
+//line nnixfs.w:390
 
-//line nnixfs/nnixfs.w:409
+//line nnixfs.w:409
 	out := filepath.Join(dir, "out")
 	run(t, "get", img, "big.txt", out)
 	if got, _ := os.ReadFile(out); !bytes.Equal(got, data) {
@@ -63,10 +63,10 @@ func TestRoundTrip(t *testing.T) {
 		}
 	}
 
-//line nnixfs/nnixfs.w:391
+//line nnixfs.w:391
 }
 
-//line nnixfs/nnixfs.w:435
+//line nnixfs.w:435
 func TestErrors(t *testing.T) {
 	dir := t.TempDir()
 	img := filepath.Join(dir, "disk.img")
