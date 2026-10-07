@@ -251,17 +251,18 @@ mmmix> q
 
 ### 6. NNIX 커널로 돌리기
 
-`make nnix`로 커널을 어셈블한 다음 `-k`로 싣는다. 출력은 같지만, 이번에는 커널이
-먼저 부팅하고, 사용자가 처음 건드리는 페이지마다 프레임을 꺼내 복사해 들이며, 진짜
-트랩 처리기가 입출력을 하므로 사이클이 훨씬 더 걸린다.
+상위 디렉터리에서 `make nnix`로 커널을 어셈블한 다음 `-k`로 싣는다. 커널은
+`nnix/`에 있으므로 `examples/`에서 보면 경로가 `../nnix/nnix.mmo`다. 출력은 같지만,
+이번에는 커널이 먼저 부팅하고, 사용자가 처음 건드리는 페이지마다 프레임을 꺼내 복사해
+들이며, 진짜 트랩 처리기가 입출력을 하므로 사이클이 훨씬 더 걸린다.
 
 ```sh
-$ make nnix
-$ mmmix -knnix/nnix.mmo plain.mmconfig hello.mmb
+$ make -C .. nnix
+$ mmmix -k../nnix/nnix.mmo plain.mmconfig hello.mmb
 mmmix> 1000000
 Running 1000000 at time 0
 hello, world
-Halted at time 138193
+Halted at time 141305
 mmmix> q
 ```
 
@@ -335,7 +336,8 @@ FAT와 디렉터리는 메모리에 올려 두었다가 파일을 닫을 때와 
 $ go build ./nnixfs
 $ ./nnixfs mkfs disk.img                 # 1024블록(1MB)짜리 빈 디스크
 $ ./nnixfs put disk.img examples/hello.mms
-$ mmmix -s -knnix/nnix.mmo -ddisk.img plain.mmconfig copy.mmb   # copy.mmb는 mmixsim -Dcopy.mmb copy hello.mms로
+$ (cd examples && mmixal copy.mms && mmixsim -Dcopy.mmb copy hello.mms)
+$ mmmix -s -knnix/nnix.mmo -ddisk.img examples/plain.mmconfig examples/copy.mmb
 $ ./nnixfs ls disk.img
 ```
 
