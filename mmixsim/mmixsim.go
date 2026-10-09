@@ -1,4 +1,4 @@
-//line mmixsim.w:63
+//line mmixsim/mmixsim.w:62
 package main
 
 import (
@@ -16,38 +16,38 @@ import (
 	"github.com/sjnam/go-mmix/mmixio"
 )
 
-//line mmixsim.w:124
+//line mmixsim/mmixsim.w:123
 type simulator struct {
 
-//line mmixsim.w:136
+//line mmixsim/mmixsim.w:135
 	out    *bufio.Writer // standard output
 	stderr io.Writer     // standard error
 	stdin  *cfile        // standard input
 	io     *mmixio.IO    // input/output primitives
 
-//line mmixsim.w:706
+//line mmixsim/mmixsim.w:705
 	priority Tetra    // pseudorandom time stamp counter
 	memRoot  *memNode // root of the treap
 	lastMem  *memNode // the memory node most recently read or written
 	sclock   Octa     // simulated clock
 
-//line mmixsim.w:836
+//line mmixsim/mmixsim.w:835
 	mmoFile *bufio.Reader // the input file
 	buf     [4]byte       // the most recently read bytes
 	yzbytes int           // the two least significant bytes
 	tet     Tetra         // |buf| bytes packed big-endianwise
 
-//line mmixsim.w:950
+//line mmixsim/mmixsim.w:949
 	curFile int   // the most recently selected file number
 	curLine int   // the current position in |curFile|, if nonzero
 	objTime Tetra // when the object file was created
 
-//line mmixsim.w:1138
+//line mmixsim/mmixsim.w:1137
 	fileInfo [256]fileNode // data about each source file
 	bufSize  int           // size of buffer for source lines
 	buffer   []Char
 
-//line mmixsim.w:1274
+//line mmixsim/mmixsim.w:1273
 	srcFile              *cfile // the currently open source file
 	shownFile            int    // index of the most recently listed file
 	shownLine            int32  // the line most recently listed in |shownFile|
@@ -57,11 +57,11 @@ type simulator struct {
 	profileGap           int32  // the |gap| when printing final frequencies
 	profileShowingSource bool   // |showingSource| within final frequencies
 
-//line mmixsim.w:1364
+//line mmixsim/mmixsim.w:1363
 	impliedLoc     Octa // location following the last shown frequency data
 	profileStarted bool // have we printed at least one frequency count?
 
-//line mmixsim.w:1543
+//line mmixsim/mmixsim.w:1542
 	instPtr            Octa  // location of the next instruction
 	tracingExceptions  int   // exception bits that cause tracing
 	halted             bool  // did the program come to a halt?
@@ -72,25 +72,25 @@ type simulator struct {
 	interactAfterBreak bool  // should we go into interactive mode?
 	traceThreshold     Tetra // each instruction should be traced this many times
 
-//line mmixsim.w:2004
+//line mmixsim/mmixsim.w:2003
 	g         [256]Octa // global registers
 	l         []Octa    // local registers
 	lringSize int       // the number of local registers (a power of 2)
 	lringMask int       // one less than |lringSize|
 	S         int       // congruent to $\rm rS/8$ modulo |lringSize|
 
-//line mmixsim.w:3239
+//line mmixsim/mmixsim.w:3238
 	stdinBuf      [256]byte // standard input to the simulated program
 	stdinBufStart int       // current position in that buffer
 	stdinBufEnd   int       // current end of that buffer
 
-//line mmixsim.w:3395
+//line mmixsim/mmixsim.w:3394
 	showingStats bool // should traced instructions also show the statistics?
 
-//line mmixsim.w:3630
+//line mmixsim/mmixsim.w:3629
 	goodGuesses, badGuesses int32 // branch prediction statistics
 
-//line mmixsim.w:3837
+//line mmixsim/mmixsim.w:3836
 	myself    string        // |args[0]|, the name of this simulator
 	interrupt atomic.Bool   // has the user interrupted the simulation recently?
 	profiling bool          // should we print the profile at the end?
@@ -98,24 +98,24 @@ type simulator struct {
 	dumpFile  *bufio.Writer // file used for binary dumps
 	dumpOS    *os.File      // the file underlying |dumpFile|
 
-//line mmixsim.w:4071
+//line mmixsim/mmixsim.w:4070
 	commandBuf [commandBufSize + 2]byte
 
-//line mmixsim.w:4168
+//line mmixsim/mmixsim.w:4167
 	val Octa // the value to be stored by an interactive command
 
-//line mmixsim.w:126
+//line mmixsim/mmixsim.w:125
 }
 
 type exitSignal int // a signal to end the program with this exit code
 
-//line mmixsim.w:574
+//line mmixsim/mmixsim.w:573
 type (
 	Tetra = mmixarith.Tetra // an unsigned 32-bit integer
 	Octa  = mmixarith.Octa  // two tetrabytes make one octabyte
 )
 
-//line mmixsim.w:667
+//line mmixsim/mmixsim.w:666
 type memTetra struct {
 	tet    Tetra  // the tetrabyte of simulated memory
 	freq   Tetra  // the number of times it was obeyed as an instruction
@@ -131,17 +131,17 @@ type memNode struct {
 	dat         [512]memTetra // the chunk of simulated tetrabytes
 }
 
-//line mmixsim.w:1125
+//line mmixsim/mmixsim.w:1124
 type fileNode struct {
 	name      []byte  // name of source file
 	lineCount int     // number of lines in the file
 	lineMap   []int64 // map of file positions, one per line
 }
 
-//line mmixsim.w:1135
+//line mmixsim/mmixsim.w:1134
 type Char = byte // bytes that will become wydes some day
 
-//line mmixsim.w:1578
+//line mmixsim/mmixsim.w:1577
 type opInfo struct {
 	name         string // symbolic name of an opcode
 	flags        byte   // its instruction format
@@ -151,7 +151,7 @@ type opInfo struct {
 	traceFormat  string // how it appears when traced
 }
 
-//line mmixsim.w:3533
+//line mmixsim/mmixsim.w:3532
 type fmtStyle int
 
 const (
@@ -161,10 +161,10 @@ const (
 	floating
 	handle
 
-//line mmixsim.w:3541
+//line mmixsim/mmixsim.w:3540
 )
 
-//line mmixsim.w:4602
+//line mmixsim/mmixsim.w:4601
 type cfile struct {
 	f   *os.File      // the file being read; |nil| if standard input
 	r   *bufio.Reader // read buffer
@@ -172,13 +172,13 @@ type cfile struct {
 	eof bool          // end-of-file indicator (|feof|)
 }
 
-//line mmixsim.w:620
+//line mmixsim/mmixsim.w:619
 const (
 	signBit = mmixarith.SignBit // the sign bit
 	negOne  = mmixarith.NegOne  // $-1$
 )
 
-//line mmixsim.w:792
+//line mmixsim/mmixsim.w:791
 const (
 	mm       = 0x98 // the escape code of \.{mmo} format
 	lopQuote = 0x0  // the quotation lopcode
@@ -196,7 +196,7 @@ const (
 	lopEnd   = 0xc  // the end-it-all lopcode
 )
 
-//line mmixsim.w:1384
+//line mmixsim/mmixsim.w:1383
 const (
 	TRAP = iota
 	FCMP
@@ -206,7 +206,7 @@ const (
 	FIX
 	FSUB
 	FIXU
-//line mmixsim.w:1386
+//line mmixsim/mmixsim.w:1385
 	FLOT
 	FLOTI
 	FLOTU
@@ -215,7 +215,7 @@ const (
 	SFLOTI
 	SFLOTU
 	SFLOTUI
-//line mmixsim.w:1387
+//line mmixsim/mmixsim.w:1386
 	FMUL
 	FCMPE
 	FUNE
@@ -224,7 +224,7 @@ const (
 	FSQRT
 	FREM
 	FINT
-//line mmixsim.w:1388
+//line mmixsim/mmixsim.w:1387
 	MUL
 	MULI
 	MULU
@@ -233,7 +233,7 @@ const (
 	DIVI
 	DIVU
 	DIVUI
-//line mmixsim.w:1389
+//line mmixsim/mmixsim.w:1388
 	ADD
 	ADDI
 	ADDU
@@ -242,7 +242,7 @@ const (
 	SUBI
 	SUBU
 	SUBUI
-//line mmixsim.w:1390
+//line mmixsim/mmixsim.w:1389
 	IIADDU
 	IIADDUI
 	IVADDU
@@ -251,7 +251,7 @@ const (
 	VIIIADDUI
 	XVIADDU
 	XVIADDUI
-//line mmixsim.w:1391
+//line mmixsim/mmixsim.w:1390
 	CMP
 	CMPI
 	CMPU
@@ -260,7 +260,7 @@ const (
 	NEGI
 	NEGU
 	NEGUI
-//line mmixsim.w:1392
+//line mmixsim/mmixsim.w:1391
 	SL
 	SLI
 	SLU
@@ -269,7 +269,7 @@ const (
 	SRI
 	SRU
 	SRUI
-//line mmixsim.w:1393
+//line mmixsim/mmixsim.w:1392
 	BN
 	BNB
 	BZ
@@ -278,7 +278,7 @@ const (
 	BPB
 	BOD
 	BODB
-//line mmixsim.w:1394
+//line mmixsim/mmixsim.w:1393
 	BNN
 	BNNB
 	BNZ
@@ -287,7 +287,7 @@ const (
 	BNPB
 	BEV
 	BEVB
-//line mmixsim.w:1395
+//line mmixsim/mmixsim.w:1394
 	PBN
 	PBNB
 	PBZ
@@ -296,7 +296,7 @@ const (
 	PBPB
 	PBOD
 	PBODB
-//line mmixsim.w:1396
+//line mmixsim/mmixsim.w:1395
 	PBNN
 	PBNNB
 	PBNZ
@@ -305,7 +305,7 @@ const (
 	PBNPB
 	PBEV
 	PBEVB
-//line mmixsim.w:1397
+//line mmixsim/mmixsim.w:1396
 	CSN
 	CSNI
 	CSZ
@@ -314,7 +314,7 @@ const (
 	CSPI
 	CSOD
 	CSODI
-//line mmixsim.w:1398
+//line mmixsim/mmixsim.w:1397
 	CSNN
 	CSNNI
 	CSNZ
@@ -323,7 +323,7 @@ const (
 	CSNPI
 	CSEV
 	CSEVI
-//line mmixsim.w:1399
+//line mmixsim/mmixsim.w:1398
 	ZSN
 	ZSNI
 	ZSZ
@@ -332,7 +332,7 @@ const (
 	ZSPI
 	ZSOD
 	ZSODI
-//line mmixsim.w:1400
+//line mmixsim/mmixsim.w:1399
 	ZSNN
 	ZSNNI
 	ZSNZ
@@ -341,7 +341,7 @@ const (
 	ZSNPI
 	ZSEV
 	ZSEVI
-//line mmixsim.w:1401
+//line mmixsim/mmixsim.w:1400
 	LDB
 	LDBI
 	LDBU
@@ -350,7 +350,7 @@ const (
 	LDWI
 	LDWU
 	LDWUI
-//line mmixsim.w:1402
+//line mmixsim/mmixsim.w:1401
 	LDT
 	LDTI
 	LDTU
@@ -359,7 +359,7 @@ const (
 	LDOI
 	LDOU
 	LDOUI
-//line mmixsim.w:1403
+//line mmixsim/mmixsim.w:1402
 	LDSF
 	LDSFI
 	LDHT
@@ -368,7 +368,7 @@ const (
 	CSWAPI
 	LDUNC
 	LDUNCI
-//line mmixsim.w:1404
+//line mmixsim/mmixsim.w:1403
 	LDVTS
 	LDVTSI
 	PRELD
@@ -377,7 +377,7 @@ const (
 	PREGOI
 	GO
 	GOI
-//line mmixsim.w:1405
+//line mmixsim/mmixsim.w:1404
 	STB
 	STBI
 	STBU
@@ -386,7 +386,7 @@ const (
 	STWI
 	STWU
 	STWUI
-//line mmixsim.w:1406
+//line mmixsim/mmixsim.w:1405
 	STT
 	STTI
 	STTU
@@ -395,7 +395,7 @@ const (
 	STOI
 	STOU
 	STOUI
-//line mmixsim.w:1407
+//line mmixsim/mmixsim.w:1406
 	STSF
 	STSFI
 	STHT
@@ -404,7 +404,7 @@ const (
 	STCOI
 	STUNC
 	STUNCI
-//line mmixsim.w:1408
+//line mmixsim/mmixsim.w:1407
 	SYNCD
 	SYNCDI
 	PREST
@@ -413,7 +413,7 @@ const (
 	SYNCIDI
 	PUSHGO
 	PUSHGOI
-//line mmixsim.w:1409
+//line mmixsim/mmixsim.w:1408
 	OR
 	ORI
 	ORN
@@ -422,7 +422,7 @@ const (
 	NORI
 	XOR
 	XORI
-//line mmixsim.w:1410
+//line mmixsim/mmixsim.w:1409
 	AND
 	ANDI
 	ANDN
@@ -431,7 +431,7 @@ const (
 	NANDI
 	NXOR
 	NXORI
-//line mmixsim.w:1411
+//line mmixsim/mmixsim.w:1410
 	BDIF
 	BDIFI
 	WDIF
@@ -440,7 +440,7 @@ const (
 	TDIFI
 	ODIF
 	ODIFI
-//line mmixsim.w:1412
+//line mmixsim/mmixsim.w:1411
 	MUX
 	MUXI
 	SADD
@@ -449,7 +449,7 @@ const (
 	MORI
 	MXOR
 	MXORI
-//line mmixsim.w:1413
+//line mmixsim/mmixsim.w:1412
 	SETH
 	SETMH
 	SETML
@@ -458,7 +458,7 @@ const (
 	INCMH
 	INCML
 	INCL
-//line mmixsim.w:1414
+//line mmixsim/mmixsim.w:1413
 	ORH
 	ORMH
 	ORML
@@ -467,7 +467,7 @@ const (
 	ANDNMH
 	ANDNML
 	ANDNL
-//line mmixsim.w:1415
+//line mmixsim/mmixsim.w:1414
 	JMP
 	JMPB
 	PUSHJ
@@ -476,7 +476,7 @@ const (
 	GETAB
 	PUT
 	PUTI
-//line mmixsim.w:1416
+//line mmixsim/mmixsim.w:1415
 	POP
 	RESUME
 	SAVE
@@ -486,10 +486,10 @@ const (
 	GET
 	TRIP
 
-//line mmixsim.w:1417
+//line mmixsim/mmixsim.w:1416
 )
 
-//line mmixsim.w:1422
+//line mmixsim/mmixsim.w:1421
 const (
 	rB = iota
 	rD
@@ -499,7 +499,7 @@ const (
 	rM
 	rR
 	rBB
-//line mmixsim.w:1424
+//line mmixsim/mmixsim.w:1423
 	rC
 	rN
 	rO
@@ -513,7 +513,7 @@ const (
 	rV
 	rG
 	rL
-//line mmixsim.w:1425
+//line mmixsim/mmixsim.w:1424
 	rA
 	rF
 	rP
@@ -526,10 +526,10 @@ const (
 	rYY
 	rZZ
 
-//line mmixsim.w:1426
+//line mmixsim/mmixsim.w:1425
 )
 
-//line mmixsim.w:1437
+//line mmixsim/mmixsim.w:1436
 const (
 	xBit = mmixarith.XBit // floating inexact
 	zBit = mmixarith.ZBit // floating division by zero
@@ -542,17 +542,17 @@ const (
 	hBit = 1 << 16        // trip
 )
 
-//line mmixsim.w:1453
+//line mmixsim/mmixsim.w:1452
 const (
 	traceBit = 1 << 3
 	readBit  = 1 << 2
 	writeBit = 1 << 1
 	execBit  = 1 << 0
 
-//line mmixsim.w:1458
+//line mmixsim/mmixsim.w:1457
 )
 
-//line mmixsim.w:1463
+//line mmixsim/mmixsim.w:1462
 const (
 	Halt = iota
 	Fopen
@@ -560,19 +560,19 @@ const (
 	Fread
 	Fgets
 	Fgetws
-//line mmixsim.w:1465
+//line mmixsim/mmixsim.w:1464
 	Fwrite
 	Fputs
 	Fputws
 	Fseek
 	Ftell
 
-//line mmixsim.w:1466
+//line mmixsim/mmixsim.w:1465
 )
 
 const maxSysCall = Ftell
 
-//line mmixsim.w:1597
+//line mmixsim/mmixsim.w:1596
 const (
 	zIsImmedBit  = 0x1
 	zIsSourceBit = 0x2
@@ -583,35 +583,35 @@ const (
 	relAddrBit   = 0x40
 	pushPopBit   = 0x80
 
-//line mmixsim.w:1606
+//line mmixsim/mmixsim.w:1605
 )
 
-//line mmixsim.w:2026
+//line mmixsim/mmixsim.w:2025
 const (
 	version       = 1 // version of the \MMIX\ architecture that we support
 	subversion    = 0 // secondary byte of version number
 	subsubversion = 1 // further qualification to version number
 )
 
-//line mmixsim.w:3308
+//line mmixsim/mmixsim.w:3307
 const (
 	resumeAgain = 0 // repeat the command in rX as if in location $\rm rW-4$
 	resumeCont  = 1 // same, but substitute rY and rZ for operands
 	resumeSet   = 2 // set register \$X to rZ
 )
 
-//line mmixsim.w:4068
+//line mmixsim/mmixsim.w:4067
 const commandBufSize = 1024 // make it plenty long, for floating point tests
 
-//line mmixsim.w:1429
+//line mmixsim/mmixsim.w:1428
 var specialName = [32]string{"rB", "rD", "rE", "rH", "rJ", "rM", "rR", "rBB",
 	"rC", "rN", "rO", "rS", "rI", "rT", "rTT", "rK", "rQ", "rU", "rV", "rG", "rL",
 	"rA", "rF", "rP", "rW", "rX", "rY", "rZ", "rWW", "rXX", "rYY", "rZZ"}
 
-//line mmixsim.w:1609
+//line mmixsim/mmixsim.w:1608
 var info = [256]opInfo{
 
-//line mmixsim.w:1623
+//line mmixsim/mmixsim.w:1622
 	{"TRAP", 0x0a, 255, 0, 5, "%r"},
 	{"FCMP", 0x2a, 0, 0, 1, "%l = %.y cmp %.z = %x"},
 	{"FUN", 0x2a, 0, 0, 1, "%l = [%.y(||)%.z] = %x"},
@@ -629,7 +629,7 @@ var info = [256]opInfo{
 	{"SFLOTU", 0x26, 0, 0, 4, "%l = %(sflot%) %#z = %.x"},
 	{"SFLOTUI", 0x25, 0, 0, 4, "%l = %(sflot%) %z = %.x"},
 
-//line mmixsim.w:1641
+//line mmixsim/mmixsim.w:1640
 	{"FMUL", 0x2a, 0, 0, 4, "%l = %.y %(*%) %.z = %.x"},
 	{"FCMPE", 0x2a, rE, 0, 4, "%l = %.y cmp %.z (%.b)) = %x"},
 	{"FUNE", 0x2a, rE, 0, 1, "%l = [%.y(||)%.z (%.b)] = %x"},
@@ -647,7 +647,7 @@ var info = [256]opInfo{
 	{"DIVU", 0x2a, rD, 0, 60, "%l = %#b%0y / %#z = %#x, rR=%#a"},
 	{"DIVUI", 0x29, rD, 0, 60, "%l = %#b%0y / %z = %#x, rR=%#a"},
 
-//line mmixsim.w:1659
+//line mmixsim/mmixsim.w:1658
 	{"ADD", 0x2a, 0, 0, 1, "%l = %y + %z = %x"},
 	{"ADDI", 0x29, 0, 0, 1, "%l = %y + %z = %x"},
 	{"ADDU", 0x2a, 0, 0, 1, "%l = %#y + %#z = %#x"},
@@ -665,7 +665,7 @@ var info = [256]opInfo{
 	{"16ADDU", 0x2a, 0, 0, 1, "%l = %#y <<4+ %#z = %#x"},
 	{"16ADDUI", 0x29, 0, 0, 1, "%l = %#y <<4+ %z = %#x"},
 
-//line mmixsim.w:1677
+//line mmixsim/mmixsim.w:1676
 	{"CMP", 0x2a, 0, 0, 1, "%l = %y cmp %z = %x"},
 	{"CMPI", 0x29, 0, 0, 1, "%l = %y cmp %z = %x"},
 	{"CMPU", 0x2a, 0, 0, 1, "%l = %#y cmp %#z = %x"},
@@ -683,9 +683,9 @@ var info = [256]opInfo{
 	{"SRU", 0x2a, 0, 0, 1, "%l = %#y >> %#z = %#x"},
 	{"SRUI", 0x29, 0, 0, 1, "%l = %#y >> %z = %#x"},
 
-//line mmixsim.w:1611
+//line mmixsim/mmixsim.w:1610
 
-//line mmixsim.w:1700
+//line mmixsim/mmixsim.w:1699
 	{"BN", 0x50, 0, 0, 1, "%b<0? %t%g"},
 	{"BNB", 0x50, 0, 0, 1, "%b<0? %t%g"},
 	{"BZ", 0x50, 0, 0, 1, "%b==0? %t%g"},
@@ -703,7 +703,7 @@ var info = [256]opInfo{
 	{"BEV", 0x50, 0, 0, 1, "%b even? %t%g"},
 	{"BEVB", 0x50, 0, 0, 1, "%b even? %t%g"},
 
-//line mmixsim.w:1718
+//line mmixsim/mmixsim.w:1717
 	{"PBN", 0x50, 0, 0, 1, "%b<0? %t%g"},
 	{"PBNB", 0x50, 0, 0, 1, "%b<0? %t%g"},
 	{"PBZ", 0x50, 0, 0, 1, "%b==0? %t%g"},
@@ -721,7 +721,7 @@ var info = [256]opInfo{
 	{"PBEV", 0x50, 0, 0, 1, "%b even? %t%g"},
 	{"PBEVB", 0x50, 0, 0, 1, "%b even? %t%g"},
 
-//line mmixsim.w:1736
+//line mmixsim/mmixsim.w:1735
 	{"CSN", 0x3a, 0, 0, 1, "%l = %y<0? %z: %b = %x"},
 	{"CSNI", 0x39, 0, 0, 1, "%l = %y<0? %z: %b = %x"},
 	{"CSZ", 0x3a, 0, 0, 1, "%l = %y==0? %z: %b = %x"},
@@ -739,7 +739,7 @@ var info = [256]opInfo{
 	{"CSEV", 0x3a, 0, 0, 1, "%l = %y even? %z: %b = %x"},
 	{"CSEVI", 0x39, 0, 0, 1, "%l = %y even? %z: %b = %x"},
 
-//line mmixsim.w:1754
+//line mmixsim/mmixsim.w:1753
 	{"ZSN", 0x2a, 0, 0, 1, "%l = %y<0? %z: 0 = %x"},
 	{"ZSNI", 0x29, 0, 0, 1, "%l = %y<0? %z: 0 = %x"},
 	{"ZSZ", 0x2a, 0, 0, 1, "%l = %y==0? %z: 0 = %x"},
@@ -757,9 +757,9 @@ var info = [256]opInfo{
 	{"ZSEV", 0x2a, 0, 0, 1, "%l = %y even? %z: 0 = %x"},
 	{"ZSEVI", 0x29, 0, 0, 1, "%l = %y even? %z: 0 = %x"},
 
-//line mmixsim.w:1612
+//line mmixsim/mmixsim.w:1611
 
-//line mmixsim.w:1777
+//line mmixsim/mmixsim.w:1776
 	{"LDB", 0x2a, 0, 1, 1, "%l = M1[%#y+%#z] = %x"},
 	{"LDBI", 0x29, 0, 1, 1, "%l = M1[%#y%?+] = %x"},
 	{"LDBU", 0x2a, 0, 1, 1, "%l = M1[%#y+%#z] = %#x"},
@@ -777,7 +777,7 @@ var info = [256]opInfo{
 	{"LDOU", 0x2a, 0, 1, 1, "%l = M8[%#y+%#z] = %#x"},
 	{"LDOUI", 0x29, 0, 1, 1, "%l = M8[%#y%?+] = %#x"},
 
-//line mmixsim.w:1795
+//line mmixsim/mmixsim.w:1794
 	{"LDSF", 0x2a, 0, 1, 1, "%l = (M4[%#y+%#z]) = %.x"},
 	{"LDSFI", 0x29, 0, 1, 1, "%l = (M4[%#y%?+]) = %.x"},
 	{"LDHT", 0x2a, 0, 1, 1, "%l = M4[%#y+%#z]<<32 = %#x"},
@@ -795,7 +795,7 @@ var info = [256]opInfo{
 	{"GO", 0x2a, 0, 0, 3, "%l = %#x, -> %#y+%#z"},
 	{"GOI", 0x29, 0, 0, 3, "%l = %#x, -> %#y%?+"},
 
-//line mmixsim.w:1813
+//line mmixsim/mmixsim.w:1812
 	{"STB", 0x1a, 0, 1, 1, "M1[%#y+%#z] = %b, M8[%#w]=%#a"},
 	{"STBI", 0x19, 0, 1, 1, "M1[%#y%?+] = %b, M8[%#w]=%#a"},
 	{"STBU", 0x1a, 0, 1, 1, "M1[%#y+%#z] = %#b, M8[%#w]=%#a"},
@@ -813,7 +813,7 @@ var info = [256]opInfo{
 	{"STOU", 0x1a, 0, 1, 1, "M8[%#y+%#z] = %#b"},
 	{"STOUI", 0x19, 0, 1, 1, "M8[%#y%?+] = %#b"},
 
-//line mmixsim.w:1831
+//line mmixsim/mmixsim.w:1830
 	{"STSF", 0x1a, 0, 1, 1, "%(M4[%#y+%#z]%) = %.b, M8[%#w]=%#a"},
 	{"STSFI", 0x19, 0, 1, 1, "%(M4[%#y%?+]%) = %.b, M8[%#w]=%#a"},
 	{"STHT", 0x1a, 0, 1, 1, "M4[%#y+%#z] = %#b>>32, M8[%#w]=%#a"},
@@ -831,9 +831,9 @@ var info = [256]opInfo{
 	{"PUSHGO", 0xaa, 0, 0, 3, "%lrO=%#b, rL=%a, rJ=%#x, -> %#y+%#z"},
 	{"PUSHGOI", 0xa9, 0, 0, 3, "%lrO=%#b, rL=%a, rJ=%#x, -> %#y%?+"},
 
-//line mmixsim.w:1613
+//line mmixsim/mmixsim.w:1612
 
-//line mmixsim.w:1854
+//line mmixsim/mmixsim.w:1853
 	{"OR", 0x2a, 0, 0, 1, "%l = %#y | %#z = %#x"},
 	{"ORI", 0x29, 0, 0, 1, "%l = %#y | %z = %#x"},
 	{"ORN", 0x2a, 0, 0, 1, "%l = %#y |~ %#z = %#x"},
@@ -851,7 +851,7 @@ var info = [256]opInfo{
 	{"NXOR", 0x2a, 0, 0, 1, "%l = %#y ~^ %#z = %#x"},
 	{"NXORI", 0x29, 0, 0, 1, "%l = %#y ~^ %z = %#x"},
 
-//line mmixsim.w:1872
+//line mmixsim/mmixsim.w:1871
 	{"BDIF", 0x2a, 0, 0, 1, "%l = %#y bdif %#z = %#x"},
 	{"BDIFI", 0x29, 0, 0, 1, "%l = %#y bdif %z = %#x"},
 	{"WDIF", 0x2a, 0, 0, 1, "%l = %#y wdif %#z = %#x"},
@@ -869,7 +869,7 @@ var info = [256]opInfo{
 	{"MXOR", 0x2a, 0, 0, 1, "%l = %#y mxor %#z = %#x"},
 	{"MXORI", 0x29, 0, 0, 1, "%l = %#y mxor %z = %#x"},
 
-//line mmixsim.w:1890
+//line mmixsim/mmixsim.w:1889
 	{"SETH", 0x20, 0, 0, 1, "%l = %#z"},
 	{"SETMH", 0x20, 0, 0, 1, "%l = %#z"},
 	{"SETML", 0x20, 0, 0, 1, "%l = %#z"},
@@ -887,7 +887,7 @@ var info = [256]opInfo{
 	{"ANDNML", 0x30, 0, 0, 1, "%l = %#y \\ %#z = %#x"},
 	{"ANDNL", 0x30, 0, 0, 1, "%l = %#y \\ %#z = %#x"},
 
-//line mmixsim.w:1908
+//line mmixsim/mmixsim.w:1907
 	{"JMP", 0x40, 0, 0, 1, "-> %#z"},
 	{"JMPB", 0x40, 0, 0, 1, "-> %#z"},
 	{"PUSHJ", 0xe0, 0, 0, 1, "%lrO=%#b, rL=%a, rJ=%#x, -> %#z"},
@@ -905,10 +905,10 @@ var info = [256]opInfo{
 	{"GET", 0x20, 0, 0, 1, "%l = %s = %#x"},
 	{"TRIP", 0x0a, 255, 0, 5, "rW=%#w, rX=%#x, rY=%#y, rZ=%#z, rB=%#b, g[255]=%#a"},
 
-//line mmixsim.w:1614
+//line mmixsim/mmixsim.w:1613
 }
 
-//line mmixsim.w:3062
+//line mmixsim/mmixsim.w:3061
 var argCount = [...]int{1, 3, 1, 3, 3, 3, 3, 2, 2, 2, 1}
 
 var trapFormat = [...]string{
@@ -924,14 +924,14 @@ var trapFormat = [...]string{
 	"$255 = Fseek(%!z,%b) = %x",
 	"$255 = Ftell(%!z) = %x"}
 
-//line mmixsim.w:3562
+//line mmixsim/mmixsim.w:3561
 var streamName = [3]string{"StdIn", "StdOut", "StdErr"}
 
-//line mmixsim.w:3626
+//line mmixsim/mmixsim.w:3625
 var leftParen = [5]byte{0, '[', '^', '_', '('}  // denotes the rounding mode
 var rightParen = [5]byte{0, ']', '^', '_', ')'} // denotes the rounding mode
 
-//line mmixsim.w:3845
+//line mmixsim/mmixsim.w:3844
 var usageHelp = [...]string{
 	" with these options: (<n>=decimal number, <x>=hex number)\n",
 	"-t<n> trace each instruction the first n times\n",
@@ -951,7 +951,7 @@ var usageHelp = [...]string{
 	"-D<filename> dump a file for use by other simulators\n",
 	""}
 
-//line mmixsim.w:3865
+//line mmixsim/mmixsim.w:3864
 var interactiveHelp = [...]string{
 	"The interactive commands are:\n",
 	"<return>  trace one instruction\n",
@@ -981,57 +981,57 @@ var interactiveHelp = [...]string{
 	"-?        show the tracing/listing/profile options  \n",
 	""}
 
-//line mmixsim.w:4083
+//line mmixsim/mmixsim.w:4082
 var specRegCode = [26]byte{rA, rB, rC, rD, rE, rF, rG, rH, rI, rJ, rK, rL, rM,
 	rN, rO, rP, rQ, rR, rS, rT, rU, rV, rW, rX, rY, rZ}
 
-//line mmixsim.w:4085
+//line mmixsim/mmixsim.w:4084
 var specReggCode = [26]byte{0, rBB, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, rTT, 0, 0, rWW, rXX, rYY, rZZ}
 
-//line mmixsim.w:583
+//line mmixsim/mmixsim.w:582
 func (m *simulator) printHex(o Octa) {
 	m.printf("%x", o)
 }
 
-//line mmixsim.w:593
+//line mmixsim/mmixsim.w:592
 func (m *simulator) eprintf(format string, a ...any) {
 	if !m.io.StderrError() {
 		fmt.Fprintf(m.stderr, format, a...)
 	}
 }
 
-//line mmixsim.w:604
+//line mmixsim/mmixsim.w:603
 func (m *simulator) printf(format string, a ...any) {
 	fmt.Fprintf(m.out, format, a...)
 }
 
-//line mmixsim.w:632
+//line mmixsim/mmixsim.w:631
 func (m *simulator) panic(msg string) {
 	m.eprintf("Panic: %s!\n", msg)
 	panic(exitSignal(-2))
 }
 
-//line mmixsim.w:646
+//line mmixsim/mmixsim.w:645
 func (m *simulator) printInt(o Octa) {
 	m.out.WriteString(strconv.FormatInt(int64(o), 10))
 }
 
-//line mmixsim.w:691
+//line mmixsim/mmixsim.w:690
 func (m *simulator) newMem() *memNode {
 	p := &memNode{stamp: m.priority}
 	m.priority += 0x9e3779b9 // $\lfloor2^{32}(\phi-1)\rfloor$
 	return p
 }
 
-//line mmixsim.w:724
+//line mmixsim/mmixsim.w:723
 func (m *simulator) memFind(addr Octa) []memTetra {
 	key := addr &^ 0x7ff
 	offset := addr & 0x7fc
 	p := m.lastMem
 	if p.loc != key {
 
-//line mmixsim.w:741
+//line mmixsim/mmixsim.w:740
 		for p = m.memRoot; p != nil; {
 			if key == p.loc {
 				break
@@ -1054,7 +1054,7 @@ func (m *simulator) memFind(addr Octa) []memTetra {
 			*q = m.newMem()
 			(*q).loc = key
 
-//line mmixsim.w:772
+//line mmixsim/mmixsim.w:771
 			l, r := &(*q).left, &(*q).right
 			for p != nil {
 				if key < p.loc {
@@ -1069,17 +1069,17 @@ func (m *simulator) memFind(addr Octa) []memTetra {
 			}
 			*l, *r = nil, nil
 
-//line mmixsim.w:763
+//line mmixsim/mmixsim.w:762
 			p = *q
 		}
 		m.lastMem = p
 
-//line mmixsim.w:730
+//line mmixsim/mmixsim.w:729
 	}
 	return p.dat[offset>>2:]
 }
 
-//line mmixsim.w:853
+//line mmixsim/mmixsim.w:852
 func (m *simulator) readTet() {
 	if _, err := io.ReadFull(m.mmoFile, m.buf[:]); err != nil {
 		m.mmoErr()
@@ -1094,14 +1094,14 @@ func (m *simulator) mmoErr() {
 	panic(exitSignal(-4))
 }
 
-//line mmixsim.w:938
+//line mmixsim/mmixsim.w:937
 func (m *simulator) mmoLoad(loc Octa, val Tetra) []memTetra {
 	ll := m.memFind(loc)
 	ll[0].tet ^= val
 	return ll
 }
 
-//line mmixsim.w:989
+//line mmixsim/mmixsim.w:988
 func (m *simulator) readAddress() Octa {
 	var h Tetra
 	switch m.buf[3] {
@@ -1118,21 +1118,21 @@ func (m *simulator) readAddress() Octa {
 	return Octa(h)<<32 | Octa(m.tet)
 }
 
-//line mmixsim.w:1212
+//line mmixsim/mmixsim.w:1211
 func (m *simulator) printLine(k int) {
 	fi := &m.fileInfo[m.curFile]
 	if k >= fi.lineCount {
 		return
 	}
 
-//line mmixsim.w:1233
+//line mmixsim/mmixsim.w:1232
 	if _, err := m.srcFile.f.Seek(fi.lineMap[k], io.SeekStart); err != nil {
 		return
 	}
 	m.srcFile.r.Reset(m.srcFile.f)
 	m.srcFile.pos, m.srcFile.eof = fi.lineMap[k], false
 
-//line mmixsim.w:1218
+//line mmixsim/mmixsim.w:1217
 	if !m.srcFile.fgets(m.buffer, m.bufSize) {
 		return
 	}
@@ -1145,11 +1145,11 @@ func (m *simulator) printLine(k int) {
 	m.lineShown = true
 }
 
-//line mmixsim.w:1249
+//line mmixsim/mmixsim.w:1248
 func (m *simulator) showLine() {
 	if m.shownFile != m.curFile {
 
-//line mmixsim.w:1293
+//line mmixsim/mmixsim.w:1292
 		name := m.fileInfo[m.curFile].name
 		if m.srcFile == nil {
 			if f, err := os.Open(string(name)); err == nil {
@@ -1175,7 +1175,7 @@ func (m *simulator) showLine() {
 		m.shownLine = 0
 		if m.fileInfo[m.curFile].lineMap == nil {
 
-//line mmixsim.w:1194
+//line mmixsim/mmixsim.w:1193
 			if st, err := os.Stat(string(m.fileInfo[m.curFile].name)); err == nil {
 				if Tetra(st.ModTime().Unix()) > m.objTime {
 					m.eprintf(
@@ -1185,7 +1185,7 @@ func (m *simulator) showLine() {
 				}
 			}
 
-//line mmixsim.w:1168
+//line mmixsim/mmixsim.w:1167
 			lineMap := []int64{0} // index 0 is unused
 			l := 1
 		lines:
@@ -1204,10 +1204,10 @@ func (m *simulator) showLine() {
 			m.fileInfo[m.curFile].lineCount = l
 			m.fileInfo[m.curFile].lineMap = lineMap
 
-//line mmixsim.w:1318
+//line mmixsim/mmixsim.w:1317
 		}
 
-//line mmixsim.w:1252
+//line mmixsim/mmixsim.w:1251
 	} else if m.shownLine == int32(m.curLine) {
 		return // already shown
 	}
@@ -1229,7 +1229,7 @@ func (m *simulator) showLine() {
 	m.shownLine = cl
 }
 
-//line mmixsim.w:1325
+//line mmixsim/mmixsim.w:1324
 func (m *simulator) printFreqs(p *memNode) {
 	if p.left != nil {
 		m.printFreqs(p.left)
@@ -1237,7 +1237,7 @@ func (m *simulator) printFreqs(p *memNode) {
 	for j := range 512 {
 		if p.dat[j].freq != 0 {
 
-//line mmixsim.w:1347
+//line mmixsim/mmixsim.w:1346
 			curLoc := p.loc + Octa(4*j)
 			shown := false
 			if m.showingSource && p.dat[j].lineNo != 0 {
@@ -1254,7 +1254,7 @@ func (m *simulator) printFreqs(p *memNode) {
 			m.impliedLoc = curLoc + 4
 			m.profileStarted = true
 
-//line mmixsim.w:1332
+//line mmixsim/mmixsim.w:1331
 		}
 	}
 	if p.right != nil {
@@ -1262,7 +1262,7 @@ func (m *simulator) printFreqs(p *memNode) {
 	}
 }
 
-//line mmixsim.w:2093
+//line mmixsim/mmixsim.w:2092
 func (m *simulator) stackStore() {
 	ll := m.memFind(m.g[rS])
 	k := m.S & m.lringMask
@@ -1281,7 +1281,7 @@ func (m *simulator) stackStore() {
 	m.S++
 }
 
-//line mmixsim.w:2114
+//line mmixsim/mmixsim.w:2113
 func (m *simulator) stackLoad() {
 	m.S--
 	m.g[rS] -= 8
@@ -1299,7 +1299,7 @@ func (m *simulator) stackLoad() {
 	}
 }
 
-//line mmixsim.w:2134
+//line mmixsim/mmixsim.w:2133
 func (m *simulator) testStoreBkpt(t memTetra) {
 	if t.bkpt&writeBit != 0 {
 		m.breakpoint, m.tracing = true, true
@@ -1312,12 +1312,12 @@ func (m *simulator) testLoadBkpt(t memTetra) {
 	}
 }
 
-//line mmixsim.w:2150
+//line mmixsim/mmixsim.w:2149
 func octa(ll []memTetra) Octa {
 	return Octa(ll[0].tet)<<32 | Octa(ll[1].tet)
 }
 
-//line mmixsim.w:2289
+//line mmixsim/mmixsim.w:2288
 func shiftAmt(z Octa) int {
 	if z >= 64 {
 		return 64
@@ -1325,7 +1325,7 @@ func shiftAmt(z Octa) int {
 	return int(z)
 }
 
-//line mmixsim.w:2470
+//line mmixsim/mmixsim.w:2469
 func registerTruth(o Octa, op int) bool {
 	var b bool
 	switch (op >> 1) & 0x3 {
@@ -1344,7 +1344,7 @@ func registerTruth(o Octa, op int) bool {
 	return b
 }
 
-//line mmixsim.w:3090
+//line mmixsim/mmixsim.w:3089
 func (m *simulator) memArg(addr Octa) Octa {
 	ll := m.memFind(addr)
 	m.testLoadBkpt(ll[0])
@@ -1356,7 +1356,7 @@ func (m *simulator) memArg(addr Octa) Octa {
 	return o
 }
 
-//line mmixsim.w:3119
+//line mmixsim/mmixsim.w:3118
 func (m *simulator) MMGetChars(buf []byte, size int, addr Octa, stop int) int {
 	a := addr
 	for k := 0; k < size; {
@@ -1365,7 +1365,7 @@ func (m *simulator) MMGetChars(buf []byte, size int, addr Octa, stop int) int {
 		x := ll[0].tet
 		if a&0x3 != 0 || k > size-4 {
 
-//line mmixsim.w:3141
+//line mmixsim/mmixsim.w:3140
 			buf[k] = byte(x >> (8 * (^a & 0x3)))
 			if buf[k] == 0 && stop >= 0 {
 				if stop == 0 {
@@ -1378,10 +1378,10 @@ func (m *simulator) MMGetChars(buf []byte, size int, addr Octa, stop int) int {
 			k++
 			a++
 
-//line mmixsim.w:3127
+//line mmixsim/mmixsim.w:3126
 		} else {
 
-//line mmixsim.w:3154
+//line mmixsim/mmixsim.w:3153
 			buf[k] = byte(x >> 24)
 			if buf[k] == 0 && (stop == 0 || stop > 0 && x < 0x10000) {
 				return k
@@ -1401,13 +1401,13 @@ func (m *simulator) MMGetChars(buf []byte, size int, addr Octa, stop int) int {
 			k += 4
 			a += 4
 
-//line mmixsim.w:3129
+//line mmixsim/mmixsim.w:3128
 		}
 	}
 	return size
 }
 
-//line mmixsim.w:3177
+//line mmixsim/mmixsim.w:3176
 func (m *simulator) MMPutChars(buf []byte, size int, addr Octa) {
 	a := addr
 	for k := 0; k < size; {
@@ -1415,26 +1415,26 @@ func (m *simulator) MMPutChars(buf []byte, size int, addr Octa) {
 		m.testStoreBkpt(ll[0])
 		if a&0x3 != 0 || k > size-4 {
 
-//line mmixsim.w:3191
+//line mmixsim/mmixsim.w:3190
 			s := 8 * (^a & 0x3)
 			ll[0].tet ^= ((ll[0].tet>>s ^ Tetra(buf[k])) & 0xff) << s
 			k++
 			a++
 
-//line mmixsim.w:3184
+//line mmixsim/mmixsim.w:3183
 		} else {
 
-//line mmixsim.w:3197
+//line mmixsim/mmixsim.w:3196
 			ll[0].tet = Tetra(buf[k])<<24 | Tetra(buf[k+1])<<16 | Tetra(buf[k+2])<<8 | Tetra(buf[k+3])
 			k += 4
 			a += 4
 
-//line mmixsim.w:3186
+//line mmixsim/mmixsim.w:3185
 		}
 	}
 }
 
-//line mmixsim.w:3214
+//line mmixsim/mmixsim.w:3213
 func (m *simulator) StdinChr() byte {
 	for m.stdinBufStart == m.stdinBufEnd {
 		if m.interacting {
@@ -1459,7 +1459,7 @@ func (m *simulator) StdinChr() byte {
 	return c
 }
 
-//line mmixsim.w:3568
+//line mmixsim/mmixsim.w:3567
 func (m *simulator) tracePrint(o Octa, style fmtStyle) {
 	switch style {
 	case decimal:
@@ -1480,7 +1480,7 @@ func (m *simulator) tracePrint(o Octa, style fmtStyle) {
 	}
 }
 
-//line mmixsim.w:3636
+//line mmixsim/mmixsim.w:3635
 func (m *simulator) showStats(verbose bool) {
 	u, h, l := Tetra(m.g[rU]), Tetra(m.sclock>>32), Tetra(m.sclock)
 	m.printf("  %d instruction%s, %d mem%s, %d oop%s; %d good guess%s, %d bad\n",
@@ -1505,7 +1505,7 @@ func plural(many bool, s string) string {
 	return ""
 }
 
-//line mmixsim.w:3742
+//line mmixsim/mmixsim.w:3741
 func (m *simulator) scanOption(arg string, usage bool) {
 	var opt byte
 	if arg != "" {
@@ -1513,7 +1513,7 @@ func (m *simulator) scanOption(arg string, usage bool) {
 	}
 	switch opt {
 
-//line mmixsim.w:3773
+//line mmixsim/mmixsim.w:3772
 	case 't':
 		if len(arg) > 10 {
 			m.traceThreshold = 0xffffffff
@@ -1548,9 +1548,9 @@ func (m *simulator) scanOption(arg string, usage bool) {
 	case 'P':
 		m.profiling = true
 
-//line mmixsim.w:3749
+//line mmixsim/mmixsim.w:3748
 
-//line mmixsim.w:3808
+//line mmixsim/mmixsim.w:3807
 	case 'v':
 		m.traceThreshold = 0xffffffff
 		m.tracingExceptions = 0xff
@@ -1572,7 +1572,7 @@ func (m *simulator) scanOption(arg string, usage bool) {
 		m.lringSize = int(sscanf(arg[1:], false))
 	case 'f':
 
-//line mmixsim.w:3895
+//line mmixsim/mmixsim.w:3894
 		if m.fakeStdin != nil {
 			m.fakeStdin.Close()
 		}
@@ -1586,10 +1586,10 @@ func (m *simulator) scanOption(arg string, usage bool) {
 			m.io.FakeStdin(f)
 		}
 
-//line mmixsim.w:3829
+//line mmixsim/mmixsim.w:3828
 	case 'D':
 
-//line mmixsim.w:3909
+//line mmixsim/mmixsim.w:3908
 		if f, err := os.Create(arg[1:]); err != nil {
 			m.eprintf("Sorry, I can't open file %s!\n", arg[1:])
 
@@ -1599,10 +1599,10 @@ func (m *simulator) scanOption(arg string, usage bool) {
 			m.dumpFile = bufio.NewWriter(f)
 		}
 
-//line mmixsim.w:3750
+//line mmixsim/mmixsim.w:3749
 	default:
 
-//line mmixsim.w:3759
+//line mmixsim/mmixsim.w:3758
 		if usage {
 			m.eprintf(
 				"Usage: %s <options> progfile command line-args...\n", m.myself)
@@ -1616,11 +1616,11 @@ func (m *simulator) scanOption(arg string, usage bool) {
 			m.printf("%s", usageHelp[k])
 		}
 
-//line mmixsim.w:3752
+//line mmixsim/mmixsim.w:3751
 	}
 }
 
-//line mmixsim.w:4011
+//line mmixsim/mmixsim.w:4010
 func (m *simulator) whatSay() {
 	k := strlen(m.commandBuf[:])
 	if k < 10 && k > 0 && m.commandBuf[k-1] == '\n' {
@@ -1632,7 +1632,7 @@ func (m *simulator) whatSay() {
 		cstr(m.commandBuf[:]))
 }
 
-//line mmixsim.w:4198
+//line mmixsim/mmixsim.w:4197
 func scanHex(s []byte, p int, offset Octa) (Octa, int) {
 	var o Octa
 	for ; isxdigit(s[p]); p++ {
@@ -1647,7 +1647,7 @@ func scanHex(s []byte, p int, offset Octa) (Octa, int) {
 	return o + offset, p
 }
 
-//line mmixsim.w:4477
+//line mmixsim/mmixsim.w:4476
 func (m *simulator) showBreaks(p *memNode) {
 	if p.left != nil {
 		m.showBreaks(p.left)
@@ -1671,7 +1671,7 @@ func flag(bit byte, c rune) rune {
 	return '-'
 }
 
-//line mmixsim.w:4560
+//line mmixsim/mmixsim.w:4559
 func (m *simulator) dump(p *memNode, x *Octa) {
 	if p.left != nil {
 		m.dump(p.left, x)
@@ -1698,7 +1698,7 @@ func (m *simulator) dump(p *memNode, x *Octa) {
 	}
 }
 
-//line mmixsim.w:4587
+//line mmixsim/mmixsim.w:4586
 func (m *simulator) dumpTet(t Tetra) {
 	m.dumpFile.WriteByte(byte(t >> 24))
 	m.dumpFile.WriteByte(byte(t >> 16))
@@ -1706,7 +1706,7 @@ func (m *simulator) dumpTet(t Tetra) {
 	m.dumpFile.WriteByte(byte(t))
 }
 
-//line mmixsim.w:4610
+//line mmixsim/mmixsim.w:4609
 func newCfile(f *os.File) *cfile {
 	return &cfile{f: f, r: bufio.NewReader(f)}
 }
@@ -1719,7 +1719,7 @@ func openCfile(name string) *cfile {
 	return newCfile(f)
 }
 
-//line mmixsim.w:4627
+//line mmixsim/mmixsim.w:4626
 func (c *cfile) fgets(buf []byte, n int) bool {
 	if c.eof {
 		return false
@@ -1745,7 +1745,7 @@ func (c *cfile) fgets(buf []byte, n int) bool {
 	return true
 }
 
-//line mmixsim.w:4656
+//line mmixsim/mmixsim.w:4655
 func strlen(b []byte) int {
 	if n := bytes.IndexByte(b, 0); n >= 0 {
 		return n
@@ -1765,11 +1765,11 @@ func isspace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'
 }
 
-//line mmixsim.w:4684
+//line mmixsim/mmixsim.w:4683
 func sscanf(s string, base16 bool) int32 {
 	var sign, digits string
 
-//line mmixsim.w:4705
+//line mmixsim/mmixsim.w:4704
 	digit := isdigit
 	if base16 {
 		digit = isxdigit
@@ -1799,7 +1799,7 @@ func sscanf(s string, base16 bool) int32 {
 	}
 	digits = s[i:j]
 
-//line mmixsim.w:4687
+//line mmixsim/mmixsim.w:4686
 	if digits == "" {
 		return 0
 	}
@@ -1814,29 +1814,29 @@ func sscanf(s string, base16 bool) int32 {
 	return int32(n)
 }
 
-//line mmixsim.w:85
+//line mmixsim/mmixsim.w:84
 func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	m := &simulator{
 
-//line mmixsim.w:142
+//line mmixsim/mmixsim.w:141
 		out:    bufio.NewWriter(stdout),
 		stderr: stderr,
 		stdin:  &cfile{r: bufio.NewReader(stdin)},
 
-//line mmixsim.w:712
+//line mmixsim/mmixsim.w:711
 		priority: 314159265,
 
-//line mmixsim.w:955
+//line mmixsim/mmixsim.w:954
 		curFile: -1,
 
-//line mmixsim.w:1284
+//line mmixsim/mmixsim.w:1283
 		shownFile: -1,
 
-//line mmixsim.w:88
+//line mmixsim/mmixsim.w:87
 	}
 	defer func() {
 
-//line mmixsim.w:106
+//line mmixsim/mmixsim.w:105
 		m.out.Flush()
 		m.io.FlushAll()
 		if m.dumpFile != nil {
@@ -1851,21 +1851,21 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 			code = int(e)
 		}
 
-//line mmixsim.w:91
+//line mmixsim/mmixsim.w:90
 	}()
 	m.io = mmixio.New(m, m.out, stderr)
 
-//line mmixsim.w:3669
+//line mmixsim/mmixsim.w:3668
 	var (
 
-//line mmixsim.w:845
+//line mmixsim/mmixsim.w:844
 		postamble bool // have we encountered |lopPost|?
 		delta     int  // difference for relative fixup
 
-//line mmixsim.w:945
+//line mmixsim/mmixsim.w:944
 		curLoc Octa // the current location
 
-//line mmixsim.w:1528
+//line mmixsim/mmixsim.w:1527
 		w, x, y, z, a, b, ma, mb Octa            // operands
 		xPtr                     *Octa           // destination
 		loc                      Octa            // location of the current instruction
@@ -1880,7 +1880,7 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 		good                     bool            // did the last branch instruction guess correctly?
 		lhs, rhs                 string          // left and right sides of the trace output
 
-//line mmixsim.w:1554
+//line mmixsim/mmixsim.w:1553
 		op             int        // operation code of the current instruction
 		xx, yy, zz, yz int        // operand fields of the current instruction
 		f              int        // properties of the current |op|
@@ -1888,17 +1888,17 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 		ll             []memTetra // current place in the simulated memory
 		p              int        // current place in a string
 
-//line mmixsim.w:1999
+//line mmixsim/mmixsim.w:1998
 		G, L, O int // accessible copies of key registers
 
-//line mmixsim.w:3398
+//line mmixsim/mmixsim.w:3397
 		justTraced bool // was the previous instruction traced?
 
-//line mmixsim.w:3727
+//line mmixsim/mmixsim.w:3726
 		curArg int // current place in the argument vector
 		argc   int // the number of arguments of the user program
 
-//line mmixsim.w:4074
+//line mmixsim/mmixsim.w:4073
 		cmd         = m.commandBuf[:]
 		inclFile    *cfile       // file of commands included by `\.i'
 		curDispMode byte   = 'l' // |'l'| or |'g'| or |'$'| or |'M'|
@@ -1907,10 +1907,10 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 		curDispAddr Octa         // the upper tetra is relevant only in mode |'M'|
 		curSeg      Octa         // current segment offset
 
-//line mmixsim.w:3671
+//line mmixsim/mmixsim.w:3670
 	)
 
-//line mmixsim.w:3717
+//line mmixsim/mmixsim.w:3716
 	m.myself = args[0]
 	for curArg = 1; curArg < len(args) && args[curArg] != "" && args[curArg][0] == '-'; curArg++ {
 		m.scanOption(args[curArg][1:], true)
@@ -1920,12 +1920,12 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	}
 	argc = len(args) - curArg // this is the |argc| of the user program
 
-//line mmixsim.w:701
+//line mmixsim/mmixsim.w:700
 	m.memRoot = m.newMem()
 	m.memRoot.loc = 0x4000000000000000
 	m.lastMem = m.memRoot
 
-//line mmixsim.w:819
+//line mmixsim/mmixsim.w:818
 	mf, err := os.Open(args[curArg])
 	if err != nil {
 		altName := args[curArg] + ".mmo"
@@ -1939,12 +1939,12 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	}
 	m.mmoFile = bufio.NewReader(mf)
 
-//line mmixsim.w:961
+//line mmixsim/mmixsim.w:960
 	curLoc = 0
 	m.curFile = -1
 	m.curLine = 0
 
-//line mmixsim.w:873
+//line mmixsim/mmixsim.w:872
 	m.readTet() // read the first tetrabyte of input
 	if m.buf[0] != mm || m.buf[1] != lopPre {
 		m.mmoErr()
@@ -1963,11 +1963,11 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 		}
 	}
 
-//line mmixsim.w:965
+//line mmixsim/mmixsim.w:964
 items:
 	for !postamble {
 
-//line mmixsim.w:897
+//line mmixsim/mmixsim.w:896
 		m.readTet()
 	dispatch:
 		for m.buf[0] == mm {
@@ -1979,7 +1979,7 @@ items:
 				m.readTet()
 				break dispatch
 
-//line mmixsim.w:981
+//line mmixsim/mmixsim.w:980
 			case lopLoc:
 				curLoc = m.readAddress()
 				continue items
@@ -1987,7 +1987,7 @@ items:
 				curLoc += Octa(m.yzbytes)
 				continue items
 
-//line mmixsim.w:1013
+//line mmixsim/mmixsim.w:1012
 			case lopFixo:
 				tmp := m.readAddress()
 				m.mmoLoad(tmp, Tetra(curLoc>>32))
@@ -2014,7 +2014,7 @@ items:
 				m.mmoLoad(curLoc-Octa(d<<2), Tetra(delta))
 				continue items
 
-//line mmixsim.w:1049
+//line mmixsim/mmixsim.w:1048
 			case lopFile:
 				if m.fileInfo[m.buf[2]].name != nil {
 					if m.buf[3] != 0 {
@@ -2045,7 +2045,7 @@ items:
 				m.curLine = m.yzbytes
 				continue items
 
-//line mmixsim.w:1082
+//line mmixsim/mmixsim.w:1081
 			case lopSpec:
 				for {
 					m.readTet()
@@ -2057,7 +2057,7 @@ items:
 					}
 				}
 
-//line mmixsim.w:908
+//line mmixsim/mmixsim.w:907
 			case lopPost:
 				postamble = true
 				if m.buf[2] != 0 || m.buf[3] < 32 {
@@ -2069,7 +2069,7 @@ items:
 			}
 		}
 
-//line mmixsim.w:929
+//line mmixsim/mmixsim.w:928
 		ll = m.mmoLoad(curLoc, m.tet)
 		if m.curLine != 0 {
 			ll[0].fileNo = byte(m.curFile)
@@ -2078,10 +2078,10 @@ items:
 		}
 		curLoc = (curLoc + 4) &^ 3
 
-//line mmixsim.w:968
+//line mmixsim/mmixsim.w:967
 	}
 
-//line mmixsim.w:1104
+//line mmixsim/mmixsim.w:1103
 	ll = m.memFind(0x6000000000000000)
 	ll[5].tet = 2           // this will ultimately set $\rm rL=2$
 	ll[1].tet = Tetra(argc) // and $\$0=|argc|$
@@ -2096,17 +2096,17 @@ items:
 	ll[k+2*12].tet = Tetra(G) << 24
 	m.g[255] = 0x6000000000000000 + Octa(4*k) + 12*8 // we will \.{UNSAVE} from here, to get going
 
-//line mmixsim.w:970
+//line mmixsim/mmixsim.w:969
 	mf.Close()
 	m.curLine = 0
 
-//line mmixsim.w:1150
+//line mmixsim/mmixsim.w:1149
 	if m.bufSize < 72 {
 		m.bufSize = 72
 	}
 	m.buffer = make([]Char, m.bufSize+1)
 
-//line mmixsim.w:2033
+//line mmixsim/mmixsim.w:2032
 	m.g[rK] = negOne
 	m.g[rN] = (version<<24+subversion<<16+subsubversion<<8)<<32 |
 		Octa(Tetra(ABSTIME)) // see comment and warning above
@@ -2124,7 +2124,7 @@ items:
 	m.l = make([]Octa, m.lringSize)
 	curRound = mmixarith.RoundNear
 
-//line mmixsim.w:3923
+//line mmixsim/mmixsim.w:3922
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt) // now we will catch interrupts
 	defer func() {
@@ -2137,7 +2137,7 @@ items:
 		}
 	}()
 
-//line mmixsim.w:4512
+//line mmixsim/mmixsim.w:4511
 	x = 0x4000000000000008
 	loc = x + Octa(8*(argc+1))
 	for k = 0; k < argc; k, curArg = k+1, curArg+1 {
@@ -2152,14 +2152,14 @@ items:
 	ll = m.memFind(x)
 	ll[0].tet, ll[1].tet = Tetra(loc>>32), Tetra(loc)
 
-//line mmixsim.w:4530
+//line mmixsim/mmixsim.w:4529
 	x = 0xf0
 	ll = m.memFind(x)
 	if ll[0].tet != 0 {
 		m.instPtr = x
 	}
 
-//line mmixsim.w:4537
+//line mmixsim/mmixsim.w:4536
 	resuming = true
 	rop = resumeAgain
 	m.g[rX] = Octa(UNSAVE)<<24 + 255
@@ -2171,7 +2171,7 @@ items:
 		return 0
 	}
 
-//line mmixsim.w:3676
+//line mmixsim/mmixsim.w:3675
 run:
 	for {
 		if m.interrupt.Load() && !m.breakpoint {
@@ -2181,11 +2181,11 @@ run:
 			m.breakpoint = false
 			if m.interacting {
 
-//line mmixsim.w:3946
+//line mmixsim/mmixsim.w:3945
 			interact:
 				for {
 
-//line mmixsim.w:4026
+//line mmixsim/mmixsim.w:4025
 					ready := false
 					for !ready {
 						for inclFile != nil && !ready {
@@ -2223,13 +2223,13 @@ run:
 						}
 					}
 
-//line mmixsim.w:3949
+//line mmixsim/mmixsim.w:3948
 					p = 0
 					repeating := int32(0)
 					incomplete := false
 					switch cmd[p] {
 
-//line mmixsim.w:3974
+//line mmixsim/mmixsim.w:3973
 					case '\n', 'n':
 						m.breakpoint, m.tracing = true, true // trace one inst and break
 						break interact
@@ -2248,10 +2248,10 @@ run:
 						m.scanOption(string(cstr(cmd[1:])), false)
 						continue interact
 
-//line mmixsim.w:3954
+//line mmixsim/mmixsim.w:3953
 					case 'l', 'g', '$', 'r', 'M', '+', '!', '.', '#', '"', '=':
 
-//line mmixsim.w:4095
+//line mmixsim/mmixsim.w:4094
 						switch cmd[p] {
 						case 'l', 'g', '$':
 							curDispMode = cmd[p]
@@ -2263,7 +2263,7 @@ run:
 							curDispSet, repeating = false, 1
 						case 'r':
 
-//line mmixsim.w:4135
+//line mmixsim/mmixsim.w:4134
 							p++
 							curDispMode = 'g'
 							if cmd[p] < 'A' || cmd[p] > 'Z' {
@@ -2282,7 +2282,7 @@ run:
 							}
 							curDispSet, repeating = false, 1
 
-//line mmixsim.w:4106
+//line mmixsim/mmixsim.w:4105
 						case 'M':
 							curDispMode = 'M'
 							curDispAddr, p = scanHex(cmd, p+1, curSeg)
@@ -2308,15 +2308,15 @@ run:
 							curDispSet, repeating = false, 1
 						}
 
-//line mmixsim.w:3956
+//line mmixsim/mmixsim.w:3955
 
-//line mmixsim.w:4154
+//line mmixsim/mmixsim.w:4153
 						if cmd[p] == '!' || cmd[p] == '.' || cmd[p] == '#' || cmd[p] == '"' {
 							curDispType = cmd[p]
 							p++
 						} else if cmd[p] == '=' {
 
-//line mmixsim.w:4174
+//line mmixsim/mmixsim.w:4173
 							curDispSet = true
 							m.val = 0
 							p++
@@ -2338,7 +2338,7 @@ run:
 							}
 							if isStr {
 
-//line mmixsim.w:4219
+//line mmixsim/mmixsim.w:4218
 							str:
 								for {
 									curDispType = '"'
@@ -2377,15 +2377,15 @@ run:
 									break
 								}
 
-//line mmixsim.w:4195
+//line mmixsim/mmixsim.w:4194
 							}
 
-//line mmixsim.w:4159
+//line mmixsim/mmixsim.w:4158
 						}
 
-//line mmixsim.w:3957
+//line mmixsim/mmixsim.w:3956
 
-//line mmixsim.w:4423
+//line mmixsim/mmixsim.w:4422
 					case '@':
 						m.instPtr, p = scanHex(cmd, p+1, curSeg)
 						m.halted = false
@@ -2402,7 +2402,7 @@ run:
 						}
 					case 'b':
 
-//line mmixsim.w:4460
+//line mmixsim/mmixsim.w:4459
 						for k, p = 0, p+1; !isxdigit(cmd[p]) && cmd[p] != 0; p++ {
 							switch cmd[p] {
 							case 'r':
@@ -2419,7 +2419,7 @@ run:
 							ll[0].bkpt = ll[0].bkpt&^7 | byte(k)
 						}
 
-//line mmixsim.w:4439
+//line mmixsim/mmixsim.w:4438
 					case 'T':
 						curSeg = 0
 						p++
@@ -2436,7 +2436,7 @@ run:
 						m.showBreaks(m.memRoot)
 						p++
 
-//line mmixsim.w:3958
+//line mmixsim/mmixsim.w:3957
 					case 'h':
 						for k = 0; interactiveHelp[k] != ""; k++ {
 							m.printf("%s", interactiveHelp[k])
@@ -2447,7 +2447,7 @@ run:
 						continue interact
 					}
 
-//line mmixsim.w:3993
+//line mmixsim/mmixsim.w:3992
 					if incomplete || cmd[p] != '\n' {
 						if incomplete || cmd[p] == 0 {
 							m.printf("Syntax error: Incomplete command!\n")
@@ -2457,13 +2457,13 @@ run:
 						}
 					}
 
-//line mmixsim.w:3968
+//line mmixsim/mmixsim.w:3967
 					for repeating != 0 {
 
-//line mmixsim.w:4258
+//line mmixsim/mmixsim.w:4257
 						if curDispSet {
 
-//line mmixsim.w:4274
+//line mmixsim/mmixsim.w:4273
 							switch curDispMode {
 							case 'l':
 								m.l[int(Tetra(curDispAddr))&m.lringMask] = m.val
@@ -2478,7 +2478,7 @@ run:
 								k = int(curDispAddr & 0xff)
 								if k < 32 {
 
-//line mmixsim.w:4305
+//line mmixsim/mmixsim.w:4304
 									if k >= 9 && k != rI {
 										if k <= 19 {
 											break
@@ -2509,7 +2509,7 @@ run:
 										}
 									}
 
-//line mmixsim.w:4288
+//line mmixsim/mmixsim.w:4287
 								}
 								m.g[k] = m.val
 							case 'M':
@@ -2519,10 +2519,10 @@ run:
 								}
 							}
 
-//line mmixsim.w:4260
+//line mmixsim/mmixsim.w:4259
 						}
 
-//line mmixsim.w:4336
+//line mmixsim/mmixsim.w:4335
 						var aux Octa
 						switch curDispMode {
 						case 'l':
@@ -2563,7 +2563,7 @@ run:
 							m.printHex(aux)
 						case '"':
 
-//line mmixsim.w:4383
+//line mmixsim/mmixsim.w:4382
 							state := 0
 							for i = 0; i < 8; i++ {
 								c := byte(aux >> (56 - 8*i))
@@ -2600,10 +2600,10 @@ run:
 								m.printf("\"")
 							}
 
-//line mmixsim.w:4376
+//line mmixsim/mmixsim.w:4375
 						}
 
-//line mmixsim.w:4262
+//line mmixsim/mmixsim.w:4261
 						m.out.WriteByte('\n')
 						repeating--
 						if repeating == 0 {
@@ -2615,11 +2615,11 @@ run:
 							curDispAddr++
 						}
 
-//line mmixsim.w:3970
+//line mmixsim/mmixsim.w:3969
 					}
 				}
 
-//line mmixsim.w:3685
+//line mmixsim/mmixsim.w:3684
 			}
 		}
 		if m.halted {
@@ -2627,12 +2627,12 @@ run:
 		}
 		for {
 
-//line mmixsim.w:1479
+//line mmixsim/mmixsim.w:1478
 			if resuming {
 				loc, inst = m.instPtr-4, Tetra(m.g[rX])
 			} else {
 
-//line mmixsim.w:1562
+//line mmixsim/mmixsim.w:1561
 				loc = m.instPtr
 				ll = m.memFind(loc)
 				inst = ll[0].tet
@@ -2645,7 +2645,7 @@ run:
 				m.tracing = m.breakpoint || ll[0].bkpt&traceBit != 0 || ll[0].freq <= m.traceThreshold
 				m.instPtr += 4
 
-//line mmixsim.w:1483
+//line mmixsim/mmixsim.w:1482
 			}
 			op = int(inst >> 24)
 			xx, yy, zz = int(inst>>16)&0xff, int(inst>>8)&0xff, int(inst)&0xff
@@ -2656,7 +2656,7 @@ run:
 			oldL = L
 			if f&relAddrBit != 0 {
 
-//line mmixsim.w:1928
+//line mmixsim/mmixsim.w:1927
 				if op&0xfe == JMP {
 					yz = int(inst & 0xffffff)
 				}
@@ -2670,13 +2670,13 @@ run:
 				y = m.instPtr
 				z = loc + Octa(yz<<2)
 
-//line mmixsim.w:1493
+//line mmixsim/mmixsim.w:1492
 			}
 
-//line mmixsim.w:1942
+//line mmixsim/mmixsim.w:1941
 			if resuming && rop != resumeAgain {
 
-//line mmixsim.w:3342
+//line mmixsim/mmixsim.w:3341
 				if rop == resumeSet {
 					op = ORI
 					y = m.g[rZ]
@@ -2688,72 +2688,72 @@ run:
 					z = m.g[rZ]
 				}
 
-//line mmixsim.w:1944
+//line mmixsim/mmixsim.w:1943
 			} else {
 				if f&xIsSourceBit != 0 {
 
-//line mmixsim.w:1987
+//line mmixsim/mmixsim.w:1986
 					if xx >= G {
 						b = m.g[xx]
 					} else if xx < L {
 						b = m.l[(O+xx)&m.lringMask]
 					}
 
-//line mmixsim.w:1947
+//line mmixsim/mmixsim.w:1946
 				}
 				if info[op].thirdOperand != 0 {
 
-//line mmixsim.w:2062
+//line mmixsim/mmixsim.w:2061
 					b = m.g[info[op].thirdOperand]
 
-//line mmixsim.w:1950
+//line mmixsim/mmixsim.w:1949
 				}
 				if f&zIsImmedBit != 0 {
 					z = Octa(zz)
 				} else if f&zIsSourceBit != 0 {
 
-//line mmixsim.w:1973
+//line mmixsim/mmixsim.w:1972
 					if zz >= G {
 						z = m.g[zz]
 					} else if zz < L {
 						z = m.l[(O+zz)&m.lringMask]
 					}
 
-//line mmixsim.w:1955
+//line mmixsim/mmixsim.w:1954
 				} else if op&0xf0 == SETH {
 
-//line mmixsim.w:2058
+//line mmixsim/mmixsim.w:2057
 					z = Octa(yz) << (48 - 16*(op&3))
 					y = b
 
-//line mmixsim.w:1957
+//line mmixsim/mmixsim.w:1956
 				}
 				if f&yIsImmedBit != 0 {
 					y = Octa(yy)
 				} else if f&yIsSourceBit != 0 {
 
-//line mmixsim.w:1980
+//line mmixsim/mmixsim.w:1979
 					if yy >= G {
 						y = m.g[yy]
 					} else if yy < L {
 						y = m.l[(O+yy)&m.lringMask]
 					}
 
-//line mmixsim.w:1962
+//line mmixsim/mmixsim.w:1961
 				}
 			}
 
-//line mmixsim.w:1495
+//line mmixsim/mmixsim.w:1494
 			if f&xIsDestBit != 0 {
 
-//line mmixsim.w:2067
+//line mmixsim/mmixsim.w:2066
 				if xx >= G {
 					lhs = fmt.Sprintf("$%d=g[%d]", xx, xx)
 					xPtr = &m.g[xx]
 				} else {
 					for xx >= L {
 
-//line mmixsim.w:2079
+//line mmixsim/mmixsim.w:2078
 						m.l[(O+L)&m.lringMask] = 0
 						L++
 						m.g[rL] = Octa(L)
@@ -2761,13 +2761,13 @@ run:
 							m.stackStore()
 						}
 
-//line mmixsim.w:2073
+//line mmixsim/mmixsim.w:2072
 					}
 					lhs = fmt.Sprintf("$%d=l[%d]", xx, (O+xx)&m.lringMask)
 					xPtr = &m.l[(O+xx)&m.lringMask]
 				}
 
-//line mmixsim.w:1497
+//line mmixsim/mmixsim.w:1496
 			}
 			w = y + z
 			trouble := ""
@@ -2777,7 +2777,7 @@ run:
 			perform:
 				switch op {
 
-//line mmixsim.w:2167
+//line mmixsim/mmixsim.w:2166
 				case ADD, ADDI:
 					x = w // |w=y+z|
 					if (y^z)&signBit == 0 && (y^x)&signBit != 0 {
@@ -2785,7 +2785,7 @@ run:
 					}
 					*xPtr = x
 
-//line mmixsim.w:2181
+//line mmixsim/mmixsim.w:2180
 				case SUB, SUBI, NEG, NEGI:
 					x = y - z
 					if (x^z)&signBit == 0 && (x^y)&signBit != 0 {
@@ -2805,7 +2805,7 @@ run:
 					x = z
 					*xPtr = x
 
-//line mmixsim.w:2203
+//line mmixsim/mmixsim.w:2202
 				case OR, ORI, ORH, ORMH, ORML, ORL:
 					x = y | z
 					*xPtr = x
@@ -2831,7 +2831,7 @@ run:
 					x = ^(y ^ z)
 					*xPtr = x
 
-//line mmixsim.w:2237
+//line mmixsim/mmixsim.w:2236
 				case SL, SLI:
 					sa := shiftAmt(z)
 					x = y << sa
@@ -2853,7 +2853,7 @@ run:
 					x = Octa(bits.OnesCount64(y &^ z))
 					*xPtr = x
 
-//line mmixsim.w:2262
+//line mmixsim/mmixsim.w:2261
 				case MOR, MORI:
 					x = mmixarith.BoolMult(y, z, false)
 					*xPtr = x
@@ -2880,7 +2880,7 @@ run:
 					}
 					*xPtr = x
 
-//line mmixsim.w:2302
+//line mmixsim/mmixsim.w:2301
 				case MUL, MULI:
 					var overflow bool
 					x, overflow = mmixarith.SignedMult(y, z)
@@ -2912,7 +2912,7 @@ run:
 					m.g[rR] = a
 					*xPtr = x
 
-//line mmixsim.w:2345
+//line mmixsim/mmixsim.w:2344
 				case FADD, FSUB, FMUL, FDIV, FREM:
 					var e int
 					switch op {
@@ -2935,7 +2935,7 @@ run:
 					exc |= e
 					*xPtr = x
 
-//line mmixsim.w:2371
+//line mmixsim/mmixsim.w:2370
 				case FSQRT, FINT, FIX, FIXU, FLOT, FLOTI, FLOTU, FLOTUI,
 					SFLOT, SFLOTI, SFLOTU, SFLOTUI:
 					if y > 4 {
@@ -2963,7 +2963,7 @@ run:
 					exc |= e
 					*xPtr = x
 
-//line mmixsim.w:2408
+//line mmixsim/mmixsim.w:2407
 				case CMP, CMPI:
 					if int64(y) < int64(z) {
 						x = negOne
@@ -2979,7 +2979,7 @@ run:
 					}
 					*xPtr = x
 
-//line mmixsim.w:2424
+//line mmixsim/mmixsim.w:2423
 				case FCMP, FCMPE:
 					k = 0
 					if op == FCMPE {
@@ -3021,7 +3021,7 @@ run:
 					}
 					*xPtr = x
 
-//line mmixsim.w:2491
+//line mmixsim/mmixsim.w:2490
 				case CSN, CSNI, CSZ, CSZI, CSP, CSPI, CSOD, CSODI,
 					CSNN, CSNNI, CSNZ, CSNZI, CSNP, CSNPI, CSEV, CSEVI,
 					ZSN, ZSNI, ZSZ, ZSZI, ZSP, ZSPI, ZSOD, ZSODI,
@@ -3033,7 +3033,7 @@ run:
 					}
 					*xPtr = x
 
-//line mmixsim.w:2510
+//line mmixsim/mmixsim.w:2509
 				case BN, BNB, BZ, BZB, BP, BPB, BOD, BODB,
 					BNN, BNNB, BNZ, BNZB, BNP, BNPB, BEV, BEVB,
 					PBN, PBNB, PBZ, PBZB, PBP, PBPB, PBOD, PBODB,
@@ -3056,7 +3056,7 @@ run:
 						m.g[rI] -= 2
 					}
 
-//line mmixsim.w:2539
+//line mmixsim/mmixsim.w:2538
 				case LDB, LDBI, LDBU, LDBUI, LDW, LDWI, LDWU, LDWUI,
 					LDT, LDTI, LDTU, LDTUI, LDHT, LDHTI:
 					switch op &^ 3 {
@@ -3073,14 +3073,14 @@ run:
 					m.testLoadBkpt(ll[0])
 					x = mmixarith.ShiftRight(Octa(ll[0].tet)<<32<<j, i, op&0x2 != 0)
 
-//line mmixsim.w:2569
+//line mmixsim/mmixsim.w:2568
 					if w&signBit != 0 {
 						trouble = "!privileged"
 					} else {
 						*xPtr = x
 					}
 
-//line mmixsim.w:2555
+//line mmixsim/mmixsim.w:2554
 				case LDO, LDOI, LDOU, LDOUI, LDUNC, LDUNCI:
 					w &^= 7
 					ll = m.memFind(w)
@@ -3088,27 +3088,27 @@ run:
 					m.testLoadBkpt(ll[1])
 					x = octa(ll)
 
-//line mmixsim.w:2569
+//line mmixsim/mmixsim.w:2568
 					if w&signBit != 0 {
 						trouble = "!privileged"
 					} else {
 						*xPtr = x
 					}
 
-//line mmixsim.w:2562
+//line mmixsim/mmixsim.w:2561
 				case LDSF, LDSFI:
 					ll = m.memFind(w)
 					m.testLoadBkpt(ll[0])
 					x = mmixarith.LoadSF(ll[0].tet)
 
-//line mmixsim.w:2569
+//line mmixsim/mmixsim.w:2568
 					if w&signBit != 0 {
 						trouble = "!privileged"
 					} else {
 						*xPtr = x
 					}
 
-//line mmixsim.w:2580
+//line mmixsim/mmixsim.w:2579
 				case STB, STBI, STBU, STBUI, STW, STWI, STWU, STWUI,
 					STT, STTI, STTU, STTUI:
 					switch op &^ 3 {
@@ -3128,7 +3128,7 @@ run:
 					}
 					ll[0].tet ^= (ll[0].tet ^ Tetra(b)<<(i-32-j)) & (^Tetra(0) << (i - 32) >> j)
 
-//line mmixsim.w:2621
+//line mmixsim/mmixsim.w:2620
 					m.testStoreBkpt(ll[0])
 					w &^= 7
 					ll = m.memFind(w)
@@ -3137,12 +3137,12 @@ run:
 						trouble = "!privileged"
 					}
 
-//line mmixsim.w:2599
+//line mmixsim/mmixsim.w:2598
 				case STSF, STSFI:
 					ll = m.memFind(w)
 					ll[0].tet, exc = mmixarith.StoreSF(b, curRound)
 
-//line mmixsim.w:2621
+//line mmixsim/mmixsim.w:2620
 					m.testStoreBkpt(ll[0])
 					w &^= 7
 					ll = m.memFind(w)
@@ -3151,12 +3151,12 @@ run:
 						trouble = "!privileged"
 					}
 
-//line mmixsim.w:2603
+//line mmixsim/mmixsim.w:2602
 				case STHT, STHTI:
 					ll = m.memFind(w)
 					ll[0].tet = Tetra(b >> 32)
 
-//line mmixsim.w:2621
+//line mmixsim/mmixsim.w:2620
 					m.testStoreBkpt(ll[0])
 					w &^= 7
 					ll = m.memFind(w)
@@ -3165,7 +3165,7 @@ run:
 						trouble = "!privileged"
 					}
 
-//line mmixsim.w:2607
+//line mmixsim/mmixsim.w:2606
 				case STCO, STCOI, STO, STOI, STOU, STOUI, STUNC, STUNCI:
 					if op&^1 == STCO {
 						b = Octa(xx)
@@ -3179,7 +3179,7 @@ run:
 						trouble = "!privileged"
 					}
 
-//line mmixsim.w:2633
+//line mmixsim/mmixsim.w:2632
 				case CSWAP, CSWAPI:
 					w &^= 7
 					ll = m.memFind(w)
@@ -3198,14 +3198,14 @@ run:
 						rhs = "rP=%#b"
 					}
 
-//line mmixsim.w:2569
+//line mmixsim/mmixsim.w:2568
 					if w&signBit != 0 {
 						trouble = "!privileged"
 					} else {
 						*xPtr = x
 					}
 
-//line mmixsim.w:2655
+//line mmixsim/mmixsim.w:2654
 				case GET:
 					if yy != 0 || zz >= 32 {
 						trouble = "!illegal"
@@ -3230,7 +3230,7 @@ run:
 						}
 						if xx == rA {
 
-//line mmixsim.w:2717
+//line mmixsim/mmixsim.w:2716
 							if z >= 0x40000 {
 								trouble = "!illegal"
 								break perform
@@ -3241,10 +3241,10 @@ run:
 								curRound = mmixarith.RoundNear
 							}
 
-//line mmixsim.w:2679
+//line mmixsim/mmixsim.w:2678
 						} else if xx == rL {
 
-//line mmixsim.w:2689
+//line mmixsim/mmixsim.w:2688
 							x = z
 							if z>>32 != 0 {
 								rhs = "min(rL,%#x) = %z"
@@ -3258,10 +3258,10 @@ run:
 								oldL = L
 							}
 
-//line mmixsim.w:2681
+//line mmixsim/mmixsim.w:2680
 						} else if xx == rG {
 
-//line mmixsim.w:2703
+//line mmixsim/mmixsim.w:2702
 							if z > 255 || z < Octa(L) || z < 32 {
 								trouble = "!illegal"
 								break perform
@@ -3271,13 +3271,13 @@ run:
 							}
 							G = int(z)
 
-//line mmixsim.w:2683
+//line mmixsim/mmixsim.w:2682
 						}
 					}
 					m.g[xx] = z
 					zz = xx
 
-//line mmixsim.w:2735
+//line mmixsim/mmixsim.w:2734
 				case PUSHGO, PUSHGOI, PUSHJ, PUSHJB:
 					if op == PUSHGO || op == PUSHGOI {
 						m.instPtr = w
@@ -3303,7 +3303,7 @@ run:
 					a = Octa(L)
 					m.g[rL] = a
 
-//line mmixsim.w:2764
+//line mmixsim/mmixsim.w:2763
 				case POP:
 					if xx != 0 && xx <= L {
 						y = m.l[(O+xx-1)&m.lringMask]
@@ -3338,7 +3338,7 @@ run:
 					a = Octa(L)
 					m.g[rL] = a
 
-//line mmixsim.w:2806
+//line mmixsim/mmixsim.w:2805
 				case SAVE:
 					if xx < G || yy != 0 || zz != 0 {
 						trouble = "!illegal"
@@ -3359,7 +3359,7 @@ run:
 					}
 					for k = G; ; {
 
-//line mmixsim.w:2845
+//line mmixsim/mmixsim.w:2844
 						ll = m.memFind(m.g[rS])
 						if k == rZ+1 {
 							x = Octa(G)<<56 | Octa(Tetra(m.g[rA]))
@@ -3388,7 +3388,7 @@ run:
 						m.S++
 						m.g[rS] += 8
 
-//line mmixsim.w:2826
+//line mmixsim/mmixsim.w:2825
 						if k == 255 {
 							k = rB
 						} else if k == rR {
@@ -3404,7 +3404,7 @@ run:
 					x = m.g[rO] - 8
 					*xPtr = x
 
-//line mmixsim.w:2874
+//line mmixsim/mmixsim.w:2873
 				case UNSAVE:
 					if xx != 0 || yy != 0 {
 						trouble = "!illegal"
@@ -3414,7 +3414,7 @@ run:
 					m.g[rS] = z + 8
 					for k = rZ + 1; ; {
 
-//line mmixsim.w:2911
+//line mmixsim/mmixsim.w:2910
 						m.g[rS] -= 8
 						ll = m.memFind(m.g[rS])
 						m.testLoadBkpt(ll[0])
@@ -3448,7 +3448,7 @@ run:
 							}
 						}
 
-//line mmixsim.w:2883
+//line mmixsim/mmixsim.w:2882
 						if k == rP {
 							k = rR
 						} else if k == rB {
@@ -3476,11 +3476,11 @@ run:
 					a = m.g[rL]
 					m.g[rG] = Octa(G)
 
-//line mmixsim.w:2949
+//line mmixsim/mmixsim.w:2948
 				case SYNCID, SYNCIDI, PREST, PRESTI, SYNCD, SYNCDI, PREGO, PREGOI, PRELD, PRELDI:
 					x = w + Octa(xx)
 
-//line mmixsim.w:2959
+//line mmixsim/mmixsim.w:2958
 				case GO, GOI:
 					x = m.instPtr
 					m.instPtr = w
@@ -3497,7 +3497,7 @@ run:
 				case LDVTS, LDVTSI:
 					trouble = "!privileged"
 
-//line mmixsim.w:2998
+//line mmixsim/mmixsim.w:2997
 				case TRIP:
 					exc |= hBit
 				case TRAP:
@@ -3512,19 +3512,19 @@ run:
 					z = Octa(zz)
 					a = b + 8
 
-//line mmixsim.w:3084
+//line mmixsim/mmixsim.w:3083
 					if argCount[yy] == 3 {
 						mb = m.memArg(b)
 						ma = m.memArg(a)
 					}
 
-//line mmixsim.w:3012
+//line mmixsim/mmixsim.w:3011
 
-//line mmixsim.w:3017
+//line mmixsim/mmixsim.w:3016
 					switch yy {
 					case Halt:
 
-//line mmixsim.w:3048
+//line mmixsim/mmixsim.w:3047
 						if zz == 0 {
 							m.halted, m.breakpoint = true, true
 						} else if zz == 1 {
@@ -3538,7 +3538,7 @@ run:
 							break perform
 						}
 
-//line mmixsim.w:3020
+//line mmixsim/mmixsim.w:3019
 						m.g[rBB] = m.g[255]
 					case Fopen:
 						m.g[rBB] = m.io.Fopen(byte(zz), mb, ma)
@@ -3562,11 +3562,11 @@ run:
 						m.g[rBB] = m.io.Ftell(byte(zz))
 					}
 
-//line mmixsim.w:3013
+//line mmixsim/mmixsim.w:3012
 					x = m.g[rBB]
 					m.g[255] = x
 
-//line mmixsim.w:3287
+//line mmixsim/mmixsim.w:3286
 				case RESUME:
 					if xx != 0 || yy != 0 || zz != 0 {
 						trouble = "!illegal"
@@ -3577,7 +3577,7 @@ run:
 					b = m.g[rX]
 					if b&signBit == 0 {
 
-//line mmixsim.w:3315
+//line mmixsim/mmixsim.w:3314
 						rop = int(b >> 56) // the ropcode is the leading byte of rX
 						switch rop {
 						case resumeCont:
@@ -3604,25 +3604,25 @@ run:
 						}
 						resuming = true
 
-//line mmixsim.w:3297
+//line mmixsim/mmixsim.w:3296
 					}
 
-//line mmixsim.w:1506
+//line mmixsim/mmixsim.w:1505
 				}
 			}
 			if trouble != "" {
 
-//line mmixsim.w:2979
+//line mmixsim/mmixsim.w:2978
 				lhs = trouble
 				m.breakpoint, m.tracing = true, true
 				if !m.interacting && !m.interactAfterBreak {
 					m.halted = true
 				}
 
-//line mmixsim.w:1510
+//line mmixsim/mmixsim.w:1509
 			}
 
-//line mmixsim.w:3251
+//line mmixsim/mmixsim.w:3250
 			if exc&(uBit+xBit) == uBit && m.g[rA]&uBit == 0 {
 				exc &^= uBit
 			}
@@ -3633,7 +3633,7 @@ run:
 				j = exc & (int(Tetra(m.g[rA])) | hBit) // find all exceptions that have been enabled
 				if j != 0 {
 
-//line mmixsim.w:3266
+//line mmixsim/mmixsim.w:3265
 					tripping = true
 					for k = 0; j&hBit == 0; j, k = j<<1, k+1 {
 					}
@@ -3652,12 +3652,12 @@ run:
 						w, x, a = m.g[rW], m.g[rX], m.g[255]
 					}
 
-//line mmixsim.w:3261
+//line mmixsim/mmixsim.w:3260
 				}
 				m.g[rA] |= Octa(exc >> 8)
 			}
 
-//line mmixsim.w:3360
+//line mmixsim/mmixsim.w:3359
 			if m.sclock != 0 || !resuming {
 				m.sclock += Octa(info[op].mems) << 32 // clock goes up by $2^{32}$ for each $\mu$
 				m.sclock += Octa(info[op].oops)       // clock goes up by 1 for each $\upsilon$
@@ -3672,13 +3672,13 @@ run:
 				m.g[rI] -= Octa(info[op].oops) // interval $\upsilon$ timer counts down
 			}
 
-//line mmixsim.w:3378
+//line mmixsim/mmixsim.w:3377
 			if m.tracing {
 				if m.showingSource && m.curLine != 0 {
 					m.showLine()
 				}
 
-//line mmixsim.w:3401
+//line mmixsim/mmixsim.w:3400
 				if resuming && op != RESUME {
 					switch rop {
 					case resumeAgain:
@@ -3693,26 +3693,26 @@ run:
 					m.printf("%10d. %016x: %08x (%s) ", int32(ll[0].freq), loc, inst, info[op].name)
 				}
 
-//line mmixsim.w:3383
+//line mmixsim/mmixsim.w:3382
 
-//line mmixsim.w:3423
+//line mmixsim/mmixsim.w:3422
 				if lhs != "" && lhs[0] == '!' {
 					m.printf("%s instruction!\n", lhs[1:]) // privileged or illegal
 				} else {
 
-//line mmixsim.w:3448
+//line mmixsim/mmixsim.w:3447
 					if L != oldL && f&pushPopBit == 0 {
 						m.printf("rL=%d, ", L)
 					}
 
-//line mmixsim.w:3427
+//line mmixsim/mmixsim.w:3426
 					fs := info[op].traceFormat
 					if Tetra(z) == 0 && (op == ADDUI || op == ORI) {
 						fs = "%l = %y = %#x" // \.{LDA}, \.{SET}
 					}
 					for p = 0; p < len(fs); p++ {
 
-//line mmixsim.w:3494
+//line mmixsim/mmixsim.w:3493
 						if fs[p] != '%' {
 							m.out.WriteByte(fs[p])
 						} else {
@@ -3722,7 +3722,7 @@ run:
 								p++
 								switch fs[p] {
 
-//line mmixsim.w:3519
+//line mmixsim/mmixsim.w:3518
 								case '#':
 									style = hex
 									continue charSwitch
@@ -3736,7 +3736,7 @@ run:
 									style = handle
 									continue charSwitch
 
-//line mmixsim.w:3544
+//line mmixsim/mmixsim.w:3543
 								case 'a':
 									m.tracePrint(a, style)
 								case 'b':
@@ -3754,7 +3754,7 @@ run:
 								case 'z':
 									m.tracePrint(z, style)
 
-//line mmixsim.w:3593
+//line mmixsim/mmixsim.w:3592
 								case '(':
 									m.out.WriteByte(leftParen[roundMode])
 								case ')':
@@ -3783,7 +3783,7 @@ run:
 								case 'r':
 									fs, p = rhs, -1
 
-//line mmixsim.w:3503
+//line mmixsim/mmixsim.w:3502
 								default:
 									m.printf("BUG!!") // can't happen
 								}
@@ -3791,7 +3791,7 @@ run:
 							}
 						}
 
-//line mmixsim.w:3433
+//line mmixsim/mmixsim.w:3432
 					}
 					if exc != 0 {
 						m.printf(", rA=#%05x", Tetra(m.g[rA]))
@@ -3803,7 +3803,7 @@ run:
 					m.printf("\n")
 				}
 
-//line mmixsim.w:3384
+//line mmixsim/mmixsim.w:3383
 				if m.showingStats || m.breakpoint {
 					m.showStats(m.breakpoint)
 				}
@@ -3814,12 +3814,12 @@ run:
 				m.shownLine = -m.gap - 1 // gap will not be filled
 			}
 
-//line mmixsim.w:1514
+//line mmixsim/mmixsim.w:1513
 			if resuming && op != RESUME {
 				resuming = false
 			}
 
-//line mmixsim.w:3692
+//line mmixsim/mmixsim.w:3691
 			if (m.interrupt.Load() || m.breakpoint) && !resuming {
 				break
 			}
@@ -3830,7 +3830,7 @@ run:
 	}
 	if m.profiling {
 
-//line mmixsim.w:1368
+//line mmixsim/mmixsim.w:1367
 		m.printf("\nProgram profile:\n")
 		m.shownFile, m.curFile = -1, -1
 		m.shownLine, m.curLine = 0, 0
@@ -3839,14 +3839,14 @@ run:
 		m.impliedLoc = negOne
 		m.printFreqs(m.memRoot)
 
-//line mmixsim.w:3702
+//line mmixsim/mmixsim.w:3701
 	}
 	if m.interacting || m.profiling || m.showingStats {
 		m.showStats(true)
 	}
 	return int(int32(Tetra(m.g[255]))) // provide rudimentary feedback for non-interactive runs
 
-//line mmixsim.w:94
+//line mmixsim/mmixsim.w:93
 }
 
 func main() {

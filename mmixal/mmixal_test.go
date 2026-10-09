@@ -1,4 +1,4 @@
-//line mmixal.w:3661
+//line mmixal/mmixal.w:3660
 package main
 
 import (
@@ -23,7 +23,7 @@ func assembleFile(t *testing.T, name, src string, opts ...string) (mmo []byte, l
 	return mmo, string(l), e.String(), code
 }
 
-//line mmixal.w:3689
+//line mmixal/mmixal.w:3688
 func TestKnuthExample(t *testing.T) {
 	mmo, lst, stderr, code := assembleFile(t, "test.mms", testMMS)
 	if code != 0 || stderr != "" {
@@ -41,7 +41,7 @@ func TestKnuthExample(t *testing.T) {
 	}
 }
 
-//line mmixal.w:3707
+//line mmixal/mmixal.w:3706
 const testMMS = `% A peculiar example of MMIXAL
      LOC   Data_Segment      % location #2000000000000000
      OCTA  1F                % a future reference
@@ -63,7 +63,7 @@ Main JMP   1F                % another future reference
      BYTE  "cd",#98          % assemble three more bytes of data
 `
 
-//line mmixal.w:3729
+//line mmixal/mmixal.w:3728
 const testMMO = `98090101 36f4a363 98012001 00000000 00000000 00000000 61620000
 98010002 00000001 2345678c 98060002 74657374 2e6d6d73 98070007 f0000000
 98024000 98070009 8103fe01 42030000 9807000a 00000000 98010002 00000001
@@ -73,7 +73,7 @@ const testMMO = `98090101 36f4a363 98012001 00000000 00000000 00000000 61620000
 980b0000 203a5040 50404020 41204220 43094408 83404020 4d206120 69056e01
 2345678c 81400f61 fe820000 980c000a`
 
-//line mmixal.w:3739
+//line mmixal/mmixal.w:3738
 const testLST = `                   % A peculiar example of MMIXAL
                         LOC   Data_Segment      % location #2000000000000000
 2000000000000000:       OCTA  1F                % a future reference
@@ -109,7 +109,7 @@ Symbol table:
  a = $254 (2)
 `
 
-//line mmixal.w:3780
+//line mmixal/mmixal.w:3779
 func TestErrorMessages(t *testing.T) {
 	_, lst, stderr, code := assembleFile(t, "errs.mms", errsMMS)
 	if code != 8 || stderr != errsErr {
@@ -141,7 +141,7 @@ rA   IS   7
 w    SETL $0,1B
 `
 
-//line mmixal.w:3812
+//line mmixal/mmixal.w:3811
 const errsErr = `"errs.mms", line 1: Z field is undefined!
 "errs.mms", line 2 warning: register number too large, will be reduced mod 256
 "errs.mms", line 3 warning: Y field of ` + "`SUB'" + ` should be a register number
@@ -158,7 +158,7 @@ const errsErr = `"errs.mms", line 1: Z field is undefined!
 (8 errors were found.)
 `
 
-//line mmixal.w:3833
+//line mmixal/mmixal.w:3832
 func TestStaleLastLine(t *testing.T) {
 	mmo, _, stderr, _ := assembleFile(t, "stale.mms", "Main SWYM 1,2,3\nabc")
 	want := "\"stale.mms\", line 2 warning: no opcode; label `abc' will be ignored\n"

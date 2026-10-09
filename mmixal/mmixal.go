@@ -1,4 +1,4 @@
-//line mmixal.w:39
+//line mmixal/mmixal.w:38
 package main
 
 import (
@@ -11,34 +11,34 @@ import (
 	"github.com/sjnam/go-mmix/mmixarith"
 )
 
-//line mmixal.w:786
+//line mmixal/mmixal.w:785
 type (
 	Tetra = mmixarith.Tetra
 	Octa  = mmixarith.Octa
 
-//line mmixal.w:789
+//line mmixal/mmixal.w:788
 )
 
-//line mmixal.w:826
+//line mmixal/mmixal.w:825
 type assembler struct {
 
-//line mmixal.w:831
+//line mmixal/mmixal.w:830
 	buffer      []byte // raw input of the current line
 	bufPtr      int    // current position within |buffer|
 	labField    []byte // copy of the label field of the current instruction
 	opField     []byte // copy of the opcode field of the current instruction
 	operandList []byte // copy of the operand field of the current instruction (null-terminated)
 
-//line mmixal.w:906
+//line mmixal/mmixal.w:905
 	curFile          int  // index of the current file in |filename|
 	lineNo           int  // current position in the file
 	lineListed       bool // have we listed the buffer contents?
 	longWarningGiven bool // have we given the hint about \.{-b}?
 
-//line mmixal.w:915
+//line mmixal/mmixal.w:914
 	filename []string // source file names, including those in line directives
 
-//line mmixal.w:1003
+//line mmixal/mmixal.w:1002
 	curLoc      Octa    // current location of assembled output
 	listingLoc  Octa    // current location on the listing
 	holdBuf     [4]byte // assembled bytes
@@ -47,53 +47,53 @@ type assembler struct {
 	specMode    bool    // are we between \.{BSPEC} and \.{ESPEC}?
 	specModeLoc Tetra   // number of bytes in the current special output
 
-//line mmixal.w:1138
+//line mmixal/mmixal.w:1137
 	errCount int // this many errors were found
 
-//line mmixal.w:1185
+//line mmixal/mmixal.w:1184
 	mmoBuf [4]byte // tetrabyte waiting to be output
 	mmoPtr int     // bytes counted while outputting the symbol table
 
-//line mmixal.w:1284
+//line mmixal/mmixal.w:1283
 	mmoCurLoc      Octa      // current location in the object file
 	mmoLineNo      int       // current line number in the \.{mmo} output so far
 	mmoCurFile     int       // index of the current file in the \.{mmo} output so far
 	filenamePassed [256]bool // has a filename been recorded in the output?
 
-//line mmixal.w:1366
+//line mmixal/mmixal.w:1365
 	trieRoot  *trieNode // root of the trie
 	opRoot    *trieNode // root of subtrie for opcodes
 	curPrefix *trieNode // root of subtrie for unqualified symbols
 
-//line mmixal.w:1465
+//line mmixal/mmixal.w:1464
 	serialNumber int
 
-//line mmixal.w:1928
+//line mmixal/mmixal.w:1927
 	symBuf []byte // the characters of a symbol, gathered along middle branches
 
-//line mmixal.w:2046
+//line mmixal/mmixal.w:2045
 	opStack  []stackOp // stack for pending operators
 	opPtr    int       // number of items on |opStack|
 	valStack []valNode // stack for pending operands
 	valPtr   int       // number of items on |valStack|
 	rtOp     stackOp   // newly scanned operator
 
-//line mmixal.w:2231
+//line mmixal/mmixal.w:2230
 	forwardLocalHost, backwardLocalHost [10]trieNode
 	forwardLocal, backwardLocal         [10]symNode
 
-//line mmixal.w:2668
+//line mmixal/mmixal.w:2667
 	opcode Tetra // numeric code for \MMIX\ operation or \MMIXAL\ pseudo-op
 	opBits Tetra // flags describing an operator's special characteristics
 
-//line mmixal.w:3032
+//line mmixal/mmixal.w:3031
 	z, y, x, yz, xyz Tetra // pieces for assembly
 	futureBits       int   // places where there are future references
 
-//line mmixal.w:3378
+//line mmixal/mmixal.w:3377
 	gregVal [256]Octa // initial values of global registers
 
-//line mmixal.w:3577
+//line mmixal/mmixal.w:3576
 	stderr      io.Writer     // where error messages are written
 	srcFileName string        // name of the \MMIXAL\ input file
 	objFileName string        // name of the binary output file
@@ -104,65 +104,65 @@ type assembler struct {
 	expanding   bool          // are we expanding instructions when base address fail?
 	bufSize     int           // maximum number of characters per line of input
 
-//line mmixal.w:3620
+//line mmixal/mmixal.w:3619
 	greg    int // global register allocator
 	curGreg int // global register just allocated
 	lreg    int // local register allocator
 
-//line mmixal.w:828
+//line mmixal/mmixal.w:827
 }
 
-//line mmixal.w:1095
+//line mmixal/mmixal.w:1094
 type bypassSignal struct{} // a signal to skip the rest of the current instruction
 type fatalSignal struct{}  // a signal to end the assembly
 
-//line mmixal.w:1355
+//line mmixal/mmixal.w:1354
 type trieNode struct {
 	ch               uint16    // the (possibly wyde) character stored here
 	left, mid, right *trieNode // downward in a ternary trie
 	sym              *symNode  // equivalents of symbols
 }
 
-//line mmixal.w:1430
+//line mmixal/mmixal.w:1429
 type symNode struct {
 	serial int      // serial number of symbol; type number for fixups
 	link   *symNode // |defined| status or link to fixup
 	equiv  Octa     // the equivalent value
 }
 
-//line mmixal.w:1514
+//line mmixal/mmixal.w:1513
 type opSpec struct {
 	name string // symbolic opcode
 	code Tetra  // numeric opcode
 	bits Tetra  // treatment of operands
 }
 
-//line mmixal.w:1680
+//line mmixal/mmixal.w:1679
 type predefSpec struct {
 	name string
 	h, l Tetra
 }
 
-//line mmixal.w:1991
+//line mmixal/mmixal.w:1990
 type stackOp int
 
-//line mmixal.w:1992
+//line mmixal/mmixal.w:1991
 type prec int
 
-//line mmixal.w:1993
+//line mmixal/mmixal.w:1992
 type stat int
 
-//line mmixal.w:1994
+//line mmixal/mmixal.w:1993
 type valNode struct {
 	equiv  Octa      // current value
 	link   *trieNode // trie reference for symbol
 	status stat      // |pure|, |regVal|, |undefined|
 }
 
-//line mmixal.w:560
+//line mmixal/mmixal.w:559
 const mm = 0x98 // the escape code of loader commands
 
-//line mmixal.w:742
+//line mmixal/mmixal.w:741
 const (
 	lopQuote = 0x0 // the quotation lopcode
 	lopLoc   = 0x1 // the location lopcode
@@ -179,17 +179,17 @@ const (
 	lopEnd   = 0xc // the end-it-all lopcode
 )
 
-//line mmixal.w:962
+//line mmixal/mmixal.w:961
 const filenameMax = 1024
 
-//line mmixal.w:1444
+//line mmixal/mmixal.w:1443
 const (
 	fixO   = 0 // |serial| code for octabyte fixup
 	fixYZ  = 1 // |serial| code for relative fixup
 	fixXYZ = 2 // |serial| code for \.{JMP} fixup
 )
 
-//line mmixal.w:1487
+//line mmixal/mmixal.w:1486
 const (
 	relAddrBit  = 0x1      // is YZ or XYZ relative?
 	immedBit    = 0x2      // should opcode be immediate if Z or YZ not register?
@@ -213,7 +213,7 @@ const (
 	specBit     = 0x100000 // is this opcode allowed in \.{SPEC} mode?
 )
 
-//line mmixal.w:1521
+//line mmixal/mmixal.w:1520
 const (
 	SET = 0x100 + iota
 	IS
@@ -228,10 +228,10 @@ const (
 	TETRA
 	OCTA
 
-//line mmixal.w:1534
+//line mmixal/mmixal.w:1533
 )
 
-//line mmixal.w:2001
+//line mmixal/mmixal.w:2000
 const (
 	negate stackOp = iota
 	serialize
@@ -253,7 +253,7 @@ const (
 	outerRP
 	innerRP
 
-//line mmixal.w:2021
+//line mmixal/mmixal.w:2020
 )
 
 const (
@@ -262,7 +262,7 @@ const (
 	strong
 	unary
 
-//line mmixal.w:2028
+//line mmixal/mmixal.w:2027
 )
 
 const (
@@ -270,30 +270,30 @@ const (
 	regVal
 	undefined
 
-//line mmixal.w:2034
+//line mmixal/mmixal.w:2033
 )
 
-//line mmixal.w:3246
+//line mmixal/mmixal.w:3245
 const (
 	SETH = 0xe0
 	SETL = 0xe3
 	ORH  = 0xe8
 	ORL  = 0xeb
 
-//line mmixal.w:3251
+//line mmixal/mmixal.w:3250
 )
 
-//line mmixal.w:1437
+//line mmixal/mmixal.w:1436
 var (
 	defined    = new(symNode) // code value for octabyte equivalents
 	register   = new(symNode) // code value for register-number equivalents
 	predefined = new(symNode) // code value for not-yet-used predefined equivalents
 )
 
-//line mmixal.w:1550
+//line mmixal/mmixal.w:1549
 var opInitTable = []opSpec{
 
-//line mmixal.w:1555
+//line mmixal/mmixal.w:1554
 	{"TRAP", 0x00, 0x27554}, {"FCMP", 0x01, 0x240a8}, {"FUN", 0x02, 0x240a8}, {"FEQL", 0x03, 0x240a8},
 
 	{"FADD", 0x04, 0x240a8}, {"FIX", 0x05, 0x26288}, {"FSUB", 0x06, 0x240a8}, {"FIXU", 0x07, 0x26288},
@@ -310,7 +310,7 @@ var opInitTable = []opSpec{
 
 	{"2ADDU", 0x28, 0x240a2}, {"4ADDU", 0x2a, 0x240a2}, {"8ADDU", 0x2c, 0x240a2}, {"16ADDU", 0x2e, 0x240a2},
 
-//line mmixal.w:1573
+//line mmixal/mmixal.w:1572
 	{"CMP", 0x30, 0x240a2}, {"CMPU", 0x32, 0x240a2}, {"NEG", 0x34, 0x26082}, {"NEGU", 0x36, 0x26082},
 
 	{"SL", 0x38, 0x240a2}, {"SLU", 0x3a, 0x240a2}, {"SR", 0x3c, 0x240a2}, {"SRU", 0x3e, 0x240a2},
@@ -327,7 +327,7 @@ var opInitTable = []opSpec{
 
 	{"CSNN", 0x68, 0x240a2}, {"CSNZ", 0x6a, 0x240a2}, {"CSNP", 0x6c, 0x240a2}, {"CSEV", 0x6e, 0x240a2},
 
-//line mmixal.w:1591
+//line mmixal/mmixal.w:1590
 	{"ZSN", 0x70, 0x240a2}, {"ZSZ", 0x72, 0x240a2}, {"ZSP", 0x74, 0x240a2}, {"ZSOD", 0x76, 0x240a2},
 
 	{"ZSNN", 0x78, 0x240a2}, {"ZSNZ", 0x7a, 0x240a2}, {"ZSNP", 0x7c, 0x240a2}, {"ZSEV", 0x7e, 0x240a2},
@@ -344,7 +344,7 @@ var opInitTable = []opSpec{
 
 	{"STT", 0xa8, 0xa60a2}, {"STTU", 0xaa, 0xa60a2}, {"STO", 0xac, 0xa60a2}, {"STOU", 0xae, 0xa60a2},
 
-//line mmixal.w:1609
+//line mmixal/mmixal.w:1608
 	{"STSF", 0xb0, 0xa60a2}, {"STHT", 0xb2, 0xa60a2}, {"STCO", 0xb4, 0xa6022}, {"STUNC", 0xb6, 0xa60a2},
 
 	{"SYNCD", 0xb8, 0xa6022}, {"PREST", 0xba, 0xa6022}, {"SYNCID", 0xbc, 0xa6022}, {"PUSHGO", 0xbe, 0xa6062},
@@ -361,7 +361,7 @@ var opInitTable = []opSpec{
 
 	{"INCH", 0xe4, 0x22080}, {"INCMH", 0xe5, 0x22080}, {"INCML", 0xe6, 0x22080}, {"INCL", 0xe7, 0x22080},
 
-//line mmixal.w:1627
+//line mmixal/mmixal.w:1626
 	{"ORH", 0xe8, 0x22080}, {"ORMH", 0xe9, 0x22080}, {"ORML", 0xea, 0x22080}, {"ORL", 0xeb, 0x22080},
 
 	{"ANDNH", 0xec, 0x22080}, {"ANDNMH", 0xed, 0x22080}, {"ANDNML", 0xee, 0x22080}, {"ANDNL", 0xef, 0x22080},
@@ -382,35 +382,35 @@ var opInitTable = []opSpec{
 
 	{"GREG", GREG, 0x101000}, {"LOCAL", LOCAL, 0x141800},
 
-//line mmixal.w:1552
+//line mmixal/mmixal.w:1551
 }
 
-//line mmixal.w:1674
+//line mmixal/mmixal.w:1673
 var specialName = [32]string{"rB", "rD", "rE", "rH", "rJ", "rM", "rR", "rBB",
 	"rC", "rN", "rO", "rS", "rI", "rT", "rTT", "rK", "rQ", "rU", "rV", "rG", "rL",
 	"rA", "rF", "rP", "rW", "rX", "rY", "rZ", "rWW", "rXX", "rYY", "rZZ"}
 
-//line mmixal.w:1689
+//line mmixal/mmixal.w:1688
 var predefs = []predefSpec{
 	{"ROUND_CURRENT", 0, 0}, {"ROUND_OFF", 0, 1}, {"ROUND_UP", 0, 2},
 	{"ROUND_DOWN", 0, 3}, {"ROUND_NEAR", 0, 4},
 
-//line mmixal.w:1694
+//line mmixal/mmixal.w:1693
 	{"Inf", 0x7ff00000, 0},
 
 	{"Data_Segment", 0x20000000, 0}, {"Pool_Segment", 0x40000000, 0},
 	{"Stack_Segment", 0x60000000, 0},
 
-//line mmixal.w:1700
+//line mmixal/mmixal.w:1699
 	{"D_BIT", 0, 0x80}, {"V_BIT", 0, 0x40}, {"W_BIT", 0, 0x20}, {"I_BIT", 0, 0x10},
 	{"O_BIT", 0, 0x08}, {"U_BIT", 0, 0x04}, {"Z_BIT", 0, 0x02}, {"X_BIT", 0, 0x01},
 
-//line mmixal.w:1704
+//line mmixal/mmixal.w:1703
 	{"D_Handler", 0, 0x10}, {"V_Handler", 0, 0x20}, {"W_Handler", 0, 0x30},
 	{"I_Handler", 0, 0x40}, {"O_Handler", 0, 0x50}, {"U_Handler", 0, 0x60},
 	{"Z_Handler", 0, 0x70}, {"X_Handler", 0, 0x80},
 
-//line mmixal.w:1710
+//line mmixal/mmixal.w:1709
 	{"StdIn", 0, 0}, {"StdOut", 0, 1}, {"StdErr", 0, 2},
 
 	{"TextRead", 0, 0}, {"TextWrite", 0, 1}, {"BinaryRead", 0, 2},
@@ -420,15 +420,15 @@ var predefs = []predefSpec{
 	{"Fgets", 0, 4}, {"Fgetws", 0, 5}, {"Fwrite", 0, 6}, {"Fputs", 0, 7},
 	{"Fputws", 0, 8}, {"Fseek", 0, 9}, {"Ftell", 0, 10},
 
-//line mmixal.w:1720
+//line mmixal/mmixal.w:1719
 }
 
-//line mmixal.w:2057
+//line mmixal/mmixal.w:2056
 var precedence = [...]prec{unary, unary, unary, unary, zero,
 	weak, weak, strong, strong, strong, strong, strong, strong, strong, weak, weak,
 	zero, zero, zero}
 
-//line mmixal.w:875
+//line mmixal/mmixal.w:874
 func cstrlen(b []byte) int {
 	for i, c := range b {
 		if c == 0 {
@@ -440,18 +440,18 @@ func cstrlen(b []byte) int {
 
 func cstr(b []byte) string { return string(b[:cstrlen(b)]) }
 
-//line mmixal.w:976
+//line mmixal/mmixal.w:975
 func isSpace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'
 }
 
-//line mmixal.w:979
+//line mmixal/mmixal.w:978
 func isDigit(c byte) bool { return '0' <= c && c <= '9' }
 
-//line mmixal.w:980
+//line mmixal/mmixal.w:979
 func isXDigit(c byte) bool { return isDigit(c) || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' }
 
-//line mmixal.w:993
+//line mmixal/mmixal.w:992
 func (a *assembler) flushListingLine(s string) {
 	if a.lineListed {
 		fmt.Fprintf(a.listingFile, "\n")
@@ -461,7 +461,7 @@ func (a *assembler) flushListingLine(s string) {
 	}
 }
 
-//line mmixal.w:1019
+//line mmixal/mmixal.w:1018
 func (a *assembler) listingClear() {
 	var j, k int
 	for k = 0; k < 4; k++ {
@@ -473,14 +473,14 @@ func (a *assembler) listingClear() {
 		fmt.Fprintf(a.listingFile, "         ")
 	} else {
 
-//line mmixal.w:1054
+//line mmixal/mmixal.w:1053
 		if (a.curLoc^a.listingLoc)&^0xfff != 0 {
 			fmt.Fprintf(a.listingFile, "%016x:", a.curLoc&^3|Octa(k))
 			a.flushListingLine("  ")
 		}
 		a.listingLoc = a.curLoc&^3 | Octa(k)
 
-//line mmixal.w:1030
+//line mmixal/mmixal.w:1029
 		fmt.Fprintf(a.listingFile, " ...%03x: ", Tetra(a.listingLoc)&0xffc|Tetra(k))
 	}
 	for j = 0; j < 4; j++ {
@@ -497,7 +497,7 @@ func (a *assembler) listingClear() {
 	a.listingBits = 0
 }
 
-//line mmixal.w:1077
+//line mmixal/mmixal.w:1076
 func (a *assembler) err(m string) {
 	a.reportError(m)
 	if m[0] != '*' {
@@ -515,7 +515,7 @@ func (a *assembler) fatal(format string, args ...any) {
 
 func ch(c byte) string { return string([]byte{c}) }
 
-//line mmixal.w:1102
+//line mmixal/mmixal.w:1101
 func (a *assembler) reportError(message string) {
 	name := "(nofile)"
 	if a.curFile < len(a.filename) {
@@ -532,7 +532,7 @@ func (a *assembler) reportError(message string) {
 	}
 	if a.listingFile != nil {
 
-//line mmixal.w:1125
+//line mmixal/mmixal.w:1124
 		if !a.lineListed {
 			a.flushListingLine("****************** ")
 		}
@@ -545,14 +545,14 @@ func (a *assembler) reportError(message string) {
 			fmt.Fprintf(a.listingFile, "********** error: %s!\n", message)
 		}
 
-//line mmixal.w:1118
+//line mmixal/mmixal.w:1117
 	}
 	if message[0] == '!' {
 		panic(fatalSignal{})
 	}
 }
 
-//line mmixal.w:1149
+//line mmixal/mmixal.w:1148
 func (a *assembler) mmoWrite(buf []byte) {
 	if _, err := a.objFile.Write(buf); err != nil {
 		a.fatal("Can't write on %s", a.objFileName)
@@ -560,7 +560,7 @@ func (a *assembler) mmoWrite(buf []byte) {
 	}
 }
 
-//line mmixal.w:1161
+//line mmixal/mmixal.w:1160
 func (a *assembler) mmoClear() {
 	if a.holdBuf[0] == mm {
 		a.mmoWrite([]byte{mm, lopQuote, 0, 1})
@@ -584,7 +584,7 @@ func (a *assembler) mmoOut() {
 	a.mmoWrite(a.mmoBuf[:])
 }
 
-//line mmixal.w:1191
+//line mmixal/mmixal.w:1190
 func (a *assembler) mmoTetra(t Tetra) {
 	a.mmoBuf = [4]byte{byte(t >> 24), byte(t >> 16), byte(t >> 8), byte(t)}
 	a.mmoOut()
@@ -608,7 +608,7 @@ func (a *assembler) mmoLopp(x byte, yz uint16) { // output a loader operation wi
 	a.mmoOut()
 }
 
-//line mmixal.w:1220
+//line mmixal/mmixal.w:1219
 func (a *assembler) mmoLoc() {
 	if a.heldBits != 0 {
 		a.mmoClear()
@@ -630,14 +630,14 @@ func (a *assembler) mmoLoc() {
 	a.mmoCurLoc = a.curLoc
 }
 
-//line mmixal.w:1245
+//line mmixal/mmixal.w:1244
 func (a *assembler) mmoSync() {
 	if a.curFile != a.mmoCurFile {
 		if a.filenamePassed[a.curFile] {
 			a.mmoLop(lopFile, byte(a.curFile), 0)
 		} else {
 
-//line mmixal.w:1267
+//line mmixal/mmixal.w:1266
 			name := a.filename[a.curFile]
 			a.mmoLop(lopFile, byte(a.curFile), byte((len(name)+3)>>2))
 			j := 0
@@ -654,7 +654,7 @@ func (a *assembler) mmoSync() {
 				a.mmoOut()
 			}
 
-//line mmixal.w:1251
+//line mmixal/mmixal.w:1250
 			a.filenamePassed[a.curFile] = true
 		}
 		a.mmoCurFile = a.curFile
@@ -670,7 +670,7 @@ func (a *assembler) mmoSync() {
 	}
 }
 
-//line mmixal.w:1299
+//line mmixal/mmixal.w:1298
 func (a *assembler) assemble(k int, dat Tetra, xBits byte) {
 	var l int
 	if a.specMode {
@@ -688,18 +688,18 @@ func (a *assembler) assemble(k int, dat Tetra, xBits byte) {
 	} else {
 		l = int(Tetra(a.curLoc))
 
-//line mmixal.w:1341
+//line mmixal/mmixal.w:1340
 		if (a.curLoc^a.mmoCurLoc)&^3 != 0 {
 			a.mmoLoc()
 		}
 
-//line mmixal.w:1316
+//line mmixal/mmixal.w:1315
 		if a.heldBits == 0 && a.curLoc>>61 == 0 {
 			a.mmoSync()
 		}
 	}
 
-//line mmixal.w:1329
+//line mmixal/mmixal.w:1328
 	for j := 0; j < k; j++ {
 		jj := (l + j) & 3
 		a.holdBuf[jj] = byte(dat >> (8 * (k - 1 - j)))
@@ -711,7 +711,7 @@ func (a *assembler) assemble(k int, dat Tetra, xBits byte) {
 		a.mmoClear()
 	}
 
-//line mmixal.w:1321
+//line mmixal/mmixal.w:1320
 	if a.specMode {
 		a.specModeLoc += Tetra(k)
 	} else {
@@ -719,7 +719,7 @@ func (a *assembler) assemble(k int, dat Tetra, xBits byte) {
 	}
 }
 
-//line mmixal.w:1381
+//line mmixal/mmixal.w:1380
 func isLetter(c byte) bool {
 	return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || c == '_' || c == ':' || c > 126
 }
@@ -750,7 +750,7 @@ func trieSearch(t *trieNode, s []byte, i int) (*trieNode, int) {
 	return tt, i
 }
 
-//line mmixal.w:1455
+//line mmixal/mmixal.w:1454
 func (a *assembler) newSymNode(serialize bool) *symNode {
 	p := new(symNode)
 	if serialize {
@@ -760,7 +760,7 @@ func (a *assembler) newSymNode(serialize bool) *symNode {
 	return p
 }
 
-//line mmixal.w:1777
+//line mmixal/mmixal.w:1776
 func prune(t *trieNode) *trieNode {
 	useful := false
 	if t.sym != nil {
@@ -791,7 +791,7 @@ func prune(t *trieNode) *trieNode {
 	return nil
 }
 
-//line mmixal.w:1810
+//line mmixal/mmixal.w:1809
 func (a *assembler) outStab(t *trieNode) {
 	m := 0
 	if t.ch > 0xff {
@@ -808,13 +808,13 @@ func (a *assembler) outStab(t *trieNode) {
 	}
 	if t.sym != nil {
 
-//line mmixal.w:1840
+//line mmixal/mmixal.w:1839
 		switch {
 		case t.sym.link == register:
 			m += 0xf
 		case t.sym.link == defined:
 
-//line mmixal.w:1908
+//line mmixal/mmixal.w:1907
 			h := Tetra(t.sym.equiv >> 32)
 			x := h
 			if h&0xffff0000 == 0x20000000 {
@@ -834,10 +834,10 @@ func (a *assembler) outStab(t *trieNode) {
 			}
 			m += j
 
-//line mmixal.w:1845
+//line mmixal/mmixal.w:1844
 		case t.sym.link != nil || t.sym.serial == 1:
 
-//line mmixal.w:1950
+//line mmixal/mmixal.w:1949
 			c := byte(t.ch)
 			if m&0x80 != 0 {
 				c = '?' // Unicode? not yet
@@ -847,10 +847,10 @@ func (a *assembler) outStab(t *trieNode) {
 			a.errCount++
 			m += 2
 
-//line mmixal.w:1847
+//line mmixal/mmixal.w:1846
 		}
 
-//line mmixal.w:1826
+//line mmixal/mmixal.w:1825
 	}
 	a.mmoByte(byte(m))
 	if t.left != nil {
@@ -858,7 +858,7 @@ func (a *assembler) outStab(t *trieNode) {
 	}
 	if m&0x2f != 0 {
 
-//line mmixal.w:1856
+//line mmixal/mmixal.w:1855
 		if m&0x80 != 0 {
 			a.mmoByte(byte(t.ch >> 8))
 		}
@@ -872,7 +872,7 @@ func (a *assembler) outStab(t *trieNode) {
 		if m != 0 && t.sym.link != nil {
 			if a.listingFile != nil {
 
-//line mmixal.w:1935
+//line mmixal/mmixal.w:1934
 				fmt.Fprintf(a.listingFile, " %s = ", a.symBuf[1:])
 				switch pp := t.sym; pp.link {
 				case defined:
@@ -884,10 +884,10 @@ func (a *assembler) outStab(t *trieNode) {
 				}
 				fmt.Fprintf(a.listingFile, " (%d)\n", t.sym.serial)
 
-//line mmixal.w:1869
+//line mmixal/mmixal.w:1868
 			}
 
-//line mmixal.w:1882
+//line mmixal/mmixal.w:1881
 			if m == 15 {
 				m = 1
 			} else if m > 8 {
@@ -909,37 +909,37 @@ func (a *assembler) outStab(t *trieNode) {
 				a.mmoByte(b)
 			}
 
-//line mmixal.w:1871
+//line mmixal/mmixal.w:1870
 		}
 		if t.mid != nil {
 			a.outStab(t.mid)
 		}
 		a.symBuf = a.symBuf[:len(a.symBuf)-1]
 
-//line mmixal.w:1833
+//line mmixal/mmixal.w:1832
 	}
 	if t.right != nil {
 		a.outStab(t.right)
 	}
 }
 
-//line mmixal.w:2041
+//line mmixal/mmixal.w:2040
 func (a *assembler) topOp() stackOp { return a.opStack[a.opPtr-1] }
 
-//line mmixal.w:2042
+//line mmixal/mmixal.w:2041
 func (a *assembler) topVal() *valNode { return &a.valStack[a.valPtr-1] }
 
-//line mmixal.w:2043
+//line mmixal/mmixal.w:2042
 func (a *assembler) nextVal() *valNode { return &a.valStack[a.valPtr-2] }
 
-//line mmixal.w:2489
+//line mmixal/mmixal.w:2488
 func (a *assembler) binaryCheck(verb string) {
 	if a.topVal().status != pure || a.nextVal().status != pure {
 		a.derr("can %s pure values only", verb)
 	}
 }
 
-//line mmixal.w:3525
+//line mmixal/mmixal.w:3524
 func scanInt(s string) (int, bool) {
 	i := 0
 	for i < len(s) && isSpace(s[i]) {
@@ -963,23 +963,23 @@ func scanInt(s string) (int, bool) {
 	return n, true
 }
 
-//line mmixal.w:3418
+//line mmixal/mmixal.w:3417
 func mmixal(args []string, stderr io.Writer, now int64) (code int) {
 	a := &assembler{stderr: stderr, greg: 255, lreg: 32}
 	var j, k int // all-purpose integers
 	var files []*os.File
 
-//line mmixal.w:970
+//line mmixal/mmixal.w:969
 	var p int // the place where we're currently scanning
 
-//line mmixal.w:1661
+//line mmixal/mmixal.w:1660
 	var tt *trieNode
 	var pp, qq *symNode
 
-//line mmixal.w:2062
+//line mmixal/mmixal.w:2061
 	var acc Octa // temporary accumulator
 
-//line mmixal.w:3423
+//line mmixal/mmixal.w:3422
 	defer func() {
 		if r := recover(); r != nil {
 			if r != (fatalSignal{}) {
@@ -988,7 +988,7 @@ func mmixal(args []string, stderr io.Writer, now int64) (code int) {
 			code = -2
 		}
 
-//line mmixal.w:3460
+//line mmixal/mmixal.w:3459
 		if a.objFile != nil {
 			a.objFile.Flush()
 		}
@@ -999,10 +999,10 @@ func mmixal(args []string, stderr io.Writer, now int64) (code int) {
 			f.Close()
 		}
 
-//line mmixal.w:3431
+//line mmixal/mmixal.w:3430
 	}()
 
-//line mmixal.w:3479
+//line mmixal/mmixal.w:3478
 options:
 	for j = 1; j < len(args)-1 && len(args[j]) > 0 && args[j][0] == '-'; j++ {
 		if len(args[j]) > 2 {
@@ -1014,7 +1014,7 @@ options:
 			continue
 		}
 
-//line mmixal.w:3500
+//line mmixal/mmixal.w:3499
 		var opt byte
 		if len(args[j]) == 2 {
 			opt = args[j][1]
@@ -1039,7 +1039,7 @@ options:
 			break options
 		}
 
-//line mmixal.w:3490
+//line mmixal/mmixal.w:3489
 	}
 	if j != len(args)-1 {
 		fmt.Fprintf(stderr, "Usage: %s %s sourcefilename\n",
@@ -1049,21 +1049,21 @@ options:
 	}
 	a.srcFileName = args[j]
 
-//line mmixal.w:3433
+//line mmixal/mmixal.w:3432
 
-//line mmixal.w:817
+//line mmixal/mmixal.w:816
 	if a.bufSize < 72 {
 		a.bufSize = 72
 	}
 	a.buffer = make([]byte, a.bufSize+2)
 
-//line mmixal.w:1475
+//line mmixal/mmixal.w:1474
 	a.trieRoot = &trieNode{ch: ':'}
 	a.curPrefix = a.trieRoot
 	a.opRoot = &trieNode{ch: '^'}
 	a.trieRoot.mid = a.opRoot
 
-//line mmixal.w:1652
+//line mmixal/mmixal.w:1651
 	for _, op := range opInitTable {
 		tt, _ = trieSearch(a.opRoot, []byte(op.name), 0)
 		pp = a.newSymNode(false)
@@ -1072,7 +1072,7 @@ options:
 		pp.equiv = Octa(op.code)<<32 | Octa(op.bits)
 	}
 
-//line mmixal.w:1665
+//line mmixal/mmixal.w:1664
 	for j, name := range specialName {
 		tt, _ = trieSearch(a.trieRoot, []byte(name), 0)
 		pp = a.newSymNode(false)
@@ -1081,7 +1081,7 @@ options:
 		pp.equiv = Octa(j)
 	}
 
-//line mmixal.w:1724
+//line mmixal/mmixal.w:1723
 	for _, d := range predefs {
 		tt, _ = trieSearch(a.trieRoot, []byte(d.name), 0)
 		pp = a.newSymNode(false)
@@ -1090,22 +1090,22 @@ options:
 		pp.equiv = Octa(d.h)<<32 | Octa(d.l)
 	}
 
-//line mmixal.w:1738
+//line mmixal/mmixal.w:1737
 	tt, _ = trieSearch(a.trieRoot, []byte("Main"), 0)
 	tt.sym = a.newSymNode(true)
 
-//line mmixal.w:2068
+//line mmixal/mmixal.w:2067
 	a.opStack = make([]stackOp, a.bufSize+1)
 	a.valStack = make([]valNode, a.bufSize+1)
 
-//line mmixal.w:2238
+//line mmixal/mmixal.w:2237
 	for j = 0; j < 10; j++ {
 		a.forwardLocalHost[j].sym = &a.forwardLocal[j]
 		a.backwardLocalHost[j].sym = &a.backwardLocal[j]
 		a.backwardLocal[j].link = defined
 	}
 
-//line mmixal.w:3549
+//line mmixal/mmixal.w:3548
 	f, err := os.Open(a.srcFileName)
 	if err != nil {
 		a.fatal("Can't open the source file %s", a.srcFileName)
@@ -1133,18 +1133,18 @@ options:
 		a.listingFile = bufio.NewWriter(f)
 	}
 
-//line mmixal.w:3589
+//line mmixal/mmixal.w:3588
 	a.filename = []string{a.srcFileName}
 
-//line mmixal.w:3593
+//line mmixal/mmixal.w:3592
 	a.mmoLop(lopPre, 1, 1)
 	a.mmoTetra(Tetra(now))
 	a.mmoCurFile = -1
 
-//line mmixal.w:3434
+//line mmixal/mmixal.w:3433
 	for {
 
-//line mmixal.w:842
+//line mmixal/mmixal.w:841
 		n := 0
 		for n < a.bufSize {
 			c, err := a.srcFile.ReadByte()
@@ -1168,7 +1168,7 @@ options:
 			a.buffer[j-1] = 0 // remove the newline
 		} else if c, err := a.srcFile.ReadByte(); err == nil {
 
-//line mmixal.w:891
+//line mmixal/mmixal.w:890
 			for c != '\n' {
 				if c, err = a.srcFile.ReadByte(); err != nil {
 					break
@@ -1183,11 +1183,11 @@ options:
 				a.err("*trailing characters dropped")
 			}
 
-//line mmixal.w:865
+//line mmixal/mmixal.w:864
 		}
 		if a.buffer[0] == '#' {
 
-//line mmixal.w:924
+//line mmixal/mmixal.w:923
 			for p = 1; isSpace(a.buffer[p]); p++ {
 			}
 			for j = 0; isDigit(a.buffer[p]); p++ {
@@ -1206,7 +1206,7 @@ options:
 				}
 				if a.buffer[p] == '"' && a.buffer[p-1] != '"' { // yes, it's a line directive
 
-//line mmixal.w:946
+//line mmixal/mmixal.w:945
 					for k = 0; k < len(a.filename) && a.filename[k] != string(name); k++ {
 					}
 					if k == len(a.filename) {
@@ -1218,18 +1218,18 @@ options:
 					a.curFile = k
 					a.lineNo = j - 1
 
-//line mmixal.w:942
+//line mmixal/mmixal.w:941
 				}
 			}
 
-//line mmixal.w:868
+//line mmixal/mmixal.w:867
 		}
 		a.bufPtr = 0
 
-//line mmixal.w:3436
+//line mmixal/mmixal.w:3435
 		for {
 
-//line mmixal.w:2567
+//line mmixal/mmixal.w:2566
 			func() {
 				defer func() {
 					if r := recover(); r != nil && r != (bypassSignal{}) {
@@ -1239,7 +1239,7 @@ options:
 				p = a.bufPtr
 				a.bufPtr = len(a.buffer) - 1 // empty string
 
-//line mmixal.w:2611
+//line mmixal/mmixal.w:2610
 				if a.buffer[p] == 0 {
 					return
 				}
@@ -1265,9 +1265,9 @@ options:
 				for p++; isSpace(a.buffer[p]); p++ {
 				}
 
-//line mmixal.w:2576
+//line mmixal/mmixal.w:2575
 
-//line mmixal.w:2640
+//line mmixal/mmixal.w:2639
 				a.opField = a.opField[:0]
 				for isLetter(a.buffer[p]) || isDigit(a.buffer[p]) {
 					a.opField = append(a.opField, a.buffer[p])
@@ -1295,9 +1295,9 @@ options:
 					p++
 				}
 
-//line mmixal.w:2577
+//line mmixal/mmixal.w:2576
 
-//line mmixal.w:2676
+//line mmixal/mmixal.w:2675
 				a.operandList = a.operandList[:0]
 				for a.buffer[p] != 0 {
 					if a.buffer[p] == ';' {
@@ -1318,7 +1318,7 @@ options:
 						}
 					} else if a.buffer[p] == '"' {
 
-//line mmixal.w:2706
+//line mmixal/mmixal.w:2705
 						a.operandList = append(a.operandList, a.buffer[p])
 						for p++; a.buffer[p] != 0 && a.buffer[p] != '"'; p++ {
 							a.operandList = append(a.operandList, a.buffer[p])
@@ -1327,7 +1327,7 @@ options:
 							a.err("incomplete string constant")
 						}
 
-//line mmixal.w:2696
+//line mmixal/mmixal.w:2695
 					}
 					a.operandList = append(a.operandList, a.buffer[p])
 					p++
@@ -1336,7 +1336,7 @@ options:
 					}
 				}
 
-//line mmixal.w:2715
+//line mmixal/mmixal.w:2714
 				for isSpace(a.buffer[p]) {
 					p++
 				}
@@ -1350,7 +1350,7 @@ options:
 				}
 				a.operandList = append(a.operandList, 0)
 
-//line mmixal.w:2578
+//line mmixal/mmixal.w:2577
 				a.bufPtr = p
 				if a.specMode && a.opBits&specBit == 0 {
 					a.derr("cannot use `%s' in special mode", a.opField)
@@ -1363,35 +1363,35 @@ options:
 
 				if a.opBits&alignBits != 0 {
 
-//line mmixal.w:2732
+//line mmixal/mmixal.w:2731
 					j = int((a.opBits & alignBits) >> 16)
 					a.curLoc = (a.curLoc + Octa(1<<j-1)) &^ Octa(1<<j-1)
 
-//line mmixal.w:2590
+//line mmixal/mmixal.w:2589
 				}
 
-//line mmixal.w:2087
+//line mmixal/mmixal.w:2086
 				p = 0
 				a.valPtr = 0                       // |valStack| is empty
 				a.opStack[0], a.opPtr = outerLP, 1 // |opStack| contains an ``outer left parenthesis''
 			scan:
 				for {
 
-//line mmixal.w:2114
+//line mmixal/mmixal.w:2113
 				open:
 					for {
 						c := a.operandList[p]
 						switch {
 						case isLetter(c):
 
-//line mmixal.w:2188
+//line mmixal/mmixal.w:2187
 							if c == ':' {
 								tt, p = trieSearch(a.trieRoot, a.operandList, p+1)
 							} else {
 								tt, p = trieSearch(a.curPrefix, a.operandList, p)
 							}
 
-//line mmixal.w:2199
+//line mmixal/mmixal.w:2198
 							a.valPtr++
 							pp = tt.sym
 							if pp == nil {
@@ -1411,16 +1411,16 @@ options:
 								a.topVal().status = undefined
 							}
 
-//line mmixal.w:2120
+//line mmixal/mmixal.w:2119
 						case isDigit(c):
 							switch a.operandList[p+1] {
 							case 'F':
 
-//line mmixal.w:2219
+//line mmixal/mmixal.w:2218
 								tt = &a.forwardLocalHost[c-'0']
 								p += 2
 
-//line mmixal.w:2199
+//line mmixal/mmixal.w:2198
 								a.valPtr++
 								pp = tt.sym
 								if pp == nil {
@@ -1440,14 +1440,14 @@ options:
 									a.topVal().status = undefined
 								}
 
-//line mmixal.w:2124
+//line mmixal/mmixal.w:2123
 							case 'B':
 
-//line mmixal.w:2224
+//line mmixal/mmixal.w:2223
 								tt = &a.backwardLocalHost[c-'0']
 								p += 2
 
-//line mmixal.w:2199
+//line mmixal/mmixal.w:2198
 								a.valPtr++
 								pp = tt.sym
 								if pp == nil {
@@ -1467,30 +1467,30 @@ options:
 									a.topVal().status = undefined
 								}
 
-//line mmixal.w:2126
+//line mmixal/mmixal.w:2125
 							default:
 
-//line mmixal.w:2281
+//line mmixal/mmixal.w:2280
 								acc = Octa(c - '0')
 								for p++; isDigit(a.operandList[p]); p++ {
 									acc = acc + acc<<2
 									acc = acc<<1 + Octa(a.operandList[p]-'0')
 								}
 
-//line mmixal.w:2291
+//line mmixal/mmixal.w:2290
 								a.valPtr++
 								a.topVal().link = nil
 								a.topVal().equiv = acc
 								a.topVal().status = pure
 
-//line mmixal.w:2128
+//line mmixal/mmixal.w:2127
 							}
 						default:
 							p++
 							switch c {
 							case '#':
 
-//line mmixal.w:2297
+//line mmixal/mmixal.w:2296
 								if !isXDigit(a.operandList[p]) {
 									a.err("illegal hexadecimal constant")
 
@@ -1508,29 +1508,29 @@ options:
 									}
 								}
 
-//line mmixal.w:2291
+//line mmixal/mmixal.w:2290
 								a.valPtr++
 								a.topVal().link = nil
 								a.topVal().equiv = acc
 								a.topVal().status = pure
 
-//line mmixal.w:2134
+//line mmixal/mmixal.w:2133
 							case '\'':
 
-//line mmixal.w:2247
+//line mmixal/mmixal.w:2246
 								acc = Octa(a.operandList[p])
 								p += 2
 
-//line mmixal.w:2291
+//line mmixal/mmixal.w:2290
 								a.valPtr++
 								a.topVal().link = nil
 								a.topVal().equiv = acc
 								a.topVal().status = pure
 
-//line mmixal.w:2136
+//line mmixal/mmixal.w:2135
 							case '"':
 
-//line mmixal.w:2262
+//line mmixal/mmixal.w:2261
 								acc = Octa(a.operandList[p])
 								if a.operandList[p] == '"' {
 									p++
@@ -1545,27 +1545,27 @@ options:
 									a.operandList[p] = ','
 								}
 
-//line mmixal.w:2291
+//line mmixal/mmixal.w:2290
 								a.valPtr++
 								a.topVal().link = nil
 								a.topVal().equiv = acc
 								a.topVal().status = pure
 
-//line mmixal.w:2138
+//line mmixal/mmixal.w:2137
 							case '@':
 
-//line mmixal.w:2316
+//line mmixal/mmixal.w:2315
 								acc = a.curLoc
 
-//line mmixal.w:2291
+//line mmixal/mmixal.w:2290
 								a.valPtr++
 								a.topVal().link = nil
 								a.topVal().equiv = acc
 								a.topVal().status = pure
 
-//line mmixal.w:2140
+//line mmixal/mmixal.w:2139
 
-//line mmixal.w:2149
+//line mmixal/mmixal.w:2148
 							case '-':
 								a.opStack[a.opPtr] = negate
 								a.opPtr++
@@ -1589,10 +1589,10 @@ options:
 								a.opPtr++
 								continue open
 
-//line mmixal.w:2141
+//line mmixal/mmixal.w:2140
 							default:
 
-//line mmixal.w:2173
+//line mmixal/mmixal.w:2172
 								if p == 1 { // treat operand list as empty
 									a.operandList[0], a.operandList[1], p = '0', 0, 0
 									continue open
@@ -1602,17 +1602,17 @@ options:
 								}
 								a.derr("syntax error after character `%s'", ch(a.operandList[p-2]))
 
-//line mmixal.w:2143
+//line mmixal/mmixal.w:2142
 							}
 						}
 						break
 					}
 
-//line mmixal.w:2093
+//line mmixal/mmixal.w:2092
 				close:
 					for {
 
-//line mmixal.w:2324
+//line mmixal/mmixal.w:2323
 						c := a.operandList[p]
 						p++
 						switch c {
@@ -1656,11 +1656,11 @@ options:
 							a.derr("syntax error at `%s'", ch(a.operandList[p-1]))
 						}
 
-//line mmixal.w:2096
+//line mmixal/mmixal.w:2095
 					reduce:
 						for precedence[a.topOp()] >= precedence[a.rtOp] {
 
-//line mmixal.w:2374
+//line mmixal/mmixal.w:2373
 							a.opPtr--
 							switch op := a.opStack[a.opPtr]; {
 							case op == innerLP:
@@ -1672,7 +1672,7 @@ options:
 							case op == outerLP:
 								if a.rtOp == outerRP {
 
-//line mmixal.w:2399
+//line mmixal/mmixal.w:2398
 									if a.topVal().status == regVal && a.topVal().equiv > 0xff {
 										a.err("*register number too large, will be reduced mod 256")
 
@@ -1684,7 +1684,7 @@ options:
 									a.rtOp = outerLP // comma
 									break reduce
 
-//line mmixal.w:2385
+//line mmixal/mmixal.w:2384
 								}
 								a.opPtr++
 								a.err("*missing left parenthesis")
@@ -1692,7 +1692,7 @@ options:
 								continue close
 							case op < innerLP:
 
-//line mmixal.w:2451
+//line mmixal/mmixal.w:2450
 								top := a.topVal()
 								switch op {
 								case negate:
@@ -1722,11 +1722,11 @@ options:
 									top.status = pure
 								}
 
-//line mmixal.w:2392
+//line mmixal/mmixal.w:2391
 								a.topVal().link = nil
 							default:
 
-//line mmixal.w:2430
+//line mmixal/mmixal.w:2429
 								top, next := a.topVal(), a.nextVal()
 								switch op {
 								case plus:
@@ -1742,7 +1742,7 @@ options:
 									}
 									next.equiv += top.equiv
 
-//line mmixal.w:2496
+//line mmixal/mmixal.w:2495
 								case minus:
 									if top.status == undefined {
 										a.err("cannot subtract an undefined quantity")
@@ -1773,7 +1773,7 @@ options:
 										next.equiv = q
 									}
 
-//line mmixal.w:2527
+//line mmixal/mmixal.w:2526
 								case frac:
 									a.binaryCheck("compute a ratio of")
 
@@ -1802,12 +1802,12 @@ options:
 									a.binaryCheck("compute bitwise xor of")
 									next.equiv ^= top.equiv
 
-//line mmixal.w:2445
+//line mmixal/mmixal.w:2444
 								}
 
-//line mmixal.w:2395
+//line mmixal/mmixal.w:2394
 
-//line mmixal.w:2421
+//line mmixal/mmixal.w:2420
 								if a.topVal().status == a.nextVal().status {
 									a.nextVal().status = pure
 								} else {
@@ -1816,10 +1816,10 @@ options:
 								a.valPtr--
 								a.topVal().link = nil
 
-//line mmixal.w:2396
+//line mmixal/mmixal.w:2395
 							}
 
-//line mmixal.w:2099
+//line mmixal/mmixal.w:2098
 						}
 						break
 					}
@@ -1827,10 +1827,10 @@ options:
 					a.opPtr++
 				}
 
-//line mmixal.w:2592
+//line mmixal/mmixal.w:2591
 				if a.opcode == GREG {
 
-//line mmixal.w:2739
+//line mmixal/mmixal.w:2738
 					v := a.valStack[0].equiv
 					for j = a.greg; v != 0 && j < 255; j++ {
 						if a.gregVal[j] == v {
@@ -1849,11 +1849,11 @@ options:
 						a.curGreg = a.greg
 					}
 
-//line mmixal.w:2594
+//line mmixal/mmixal.w:2593
 				}
 				if len(a.labField) > 0 {
 
-//line mmixal.w:2772
+//line mmixal/mmixal.w:2771
 					newLink := defined
 					acc = a.curLoc
 					if a.opcode == IS {
@@ -1869,7 +1869,7 @@ options:
 						a.curLoc, newLink = Octa(a.curGreg), register
 					}
 
-//line mmixal.w:2843
+//line mmixal/mmixal.w:2842
 					if isDigit(a.labField[0]) {
 						pp = &a.forwardLocal[a.labField[0]-'0']
 					} else {
@@ -1885,7 +1885,7 @@ options:
 						}
 					}
 
-//line mmixal.w:2799
+//line mmixal/mmixal.w:2798
 					switch {
 					case pp.link == defined || pp.link == register:
 						if pp.equiv != a.curLoc || pp.link != newLink {
@@ -1908,13 +1908,13 @@ options:
 						}
 						for pp.link != nil {
 
-//line mmixal.w:2862
+//line mmixal/mmixal.w:2861
 							qq = pp.link
 							pp.link = qq.link
 							a.mmoLoc()
 							if qq.serial == fixO {
 
-//line mmixal.w:2872
+//line mmixal/mmixal.w:2871
 								if (qq.equiv>>32)&0xffffff != 0 {
 									a.mmoLop(lopFixo, 0, 2)
 									a.mmoTetra(Tetra(qq.equiv >> 32))
@@ -1923,10 +1923,10 @@ options:
 								}
 								a.mmoTetra(Tetra(qq.equiv))
 
-//line mmixal.w:2867
+//line mmixal/mmixal.w:2866
 							} else {
 
-//line mmixal.w:2886
+//line mmixal/mmixal.w:2885
 								o := a.curLoc - qq.equiv
 								if o&3 != 0 {
 									a.derr("*relative address in location #%016x not divisible by 4", qq.equiv)
@@ -1953,20 +1953,20 @@ options:
 									a.derr("relative address in location #%016x is too far away", qq.equiv)
 								}
 
-//line mmixal.w:2869
+//line mmixal/mmixal.w:2868
 							}
 
-//line mmixal.w:2821
+//line mmixal/mmixal.w:2820
 						}
 					}
 
-//line mmixal.w:2788
+//line mmixal/mmixal.w:2787
 					if isDigit(a.labField[0]) {
 						pp = &a.backwardLocal[a.labField[0]-'0']
 					}
 					pp.equiv, pp.link = a.curLoc, newLink
 
-//line mmixal.w:2829
+//line mmixal/mmixal.w:2828
 					if !isDigit(a.labField[0]) {
 						for j = 0; j < a.valPtr; j++ {
 							if a.valStack[j].status == undefined && a.valStack[j].link.sym == pp {
@@ -1980,10 +1980,10 @@ options:
 						}
 					}
 
-//line mmixal.w:2793
+//line mmixal/mmixal.w:2792
 					if a.listingFile != nil && (a.opcode == IS || a.opcode == LOC) {
 
-//line mmixal.w:2913
+//line mmixal/mmixal.w:2912
 						if newLink == defined {
 							fmt.Fprintf(a.listingFile, "(%016x)", a.curLoc)
 							a.flushListingLine(" ")
@@ -1992,22 +1992,22 @@ options:
 							a.flushListingLine("             ")
 						}
 
-//line mmixal.w:2795
+//line mmixal/mmixal.w:2794
 					}
 					a.curLoc = acc
 
-//line mmixal.w:2597
+//line mmixal/mmixal.w:2596
 				}
 
-//line mmixal.w:2931
+//line mmixal/mmixal.w:2930
 				a.futureBits = 0
 				if a.opBits&manyArgBit != 0 {
 
-//line mmixal.w:2981
+//line mmixal/mmixal.w:2980
 					for j = 0; j < a.valPtr; j++ {
 						v := &a.valStack[j]
 
-//line mmixal.w:3008
+//line mmixal/mmixal.w:3007
 						if v.status == regVal {
 							a.err("*register number used as a constant")
 
@@ -2024,7 +2024,7 @@ options:
 							qq.equiv = a.curLoc
 						}
 
-//line mmixal.w:2984
+//line mmixal/mmixal.w:2983
 						k = 1 << (a.opcode - BYTE)
 						if (v.equiv>>32 != 0 && a.opcode < OCTA) ||
 							(Tetra(v.equiv) > 0xffff && a.opcode < TETRA) ||
@@ -2048,7 +2048,7 @@ options:
 						}
 					}
 
-//line mmixal.w:2934
+//line mmixal/mmixal.w:2933
 					return
 				}
 				switch a.valPtr {
@@ -2058,12 +2058,12 @@ options:
 
 					}
 
-//line mmixal.w:3257
+//line mmixal/mmixal.w:3256
 					v := &a.valStack[0]
 					switch {
 					case v.status == undefined && a.opBits&relAddrBit != 0:
 
-//line mmixal.w:3300
+//line mmixal/mmixal.w:3299
 						pp = v.link.sym
 						qq = a.newSymNode(false)
 						qq.link = pp.link
@@ -2073,13 +2073,13 @@ options:
 						a.xyz = 0
 						a.futureBits = 0xe0
 
-//line mmixal.w:3261
+//line mmixal/mmixal.w:3260
 					case v.status == pure && a.opBits&relAddrBit != 0:
 						if a.opBits&xyzrBit != 0 {
 							a.derr("*operand of `%s' should be a register number", a.opField)
 						}
 
-//line mmixal.w:3310
+//line mmixal/mmixal.w:3309
 						if v.equiv&3 != 0 {
 							a.err("*relative address is not divisible by 4")
 
@@ -2100,10 +2100,10 @@ options:
 						}
 						a.xyz = Tetra(acc)
 
-//line mmixal.w:3266
+//line mmixal/mmixal.w:3265
 					default:
 
-//line mmixal.w:3282
+//line mmixal/mmixal.w:3281
 						switch v.status {
 						case undefined:
 							if a.opcode != PREFIX {
@@ -2121,10 +2121,10 @@ options:
 							}
 						}
 
-//line mmixal.w:3268
+//line mmixal/mmixal.w:3267
 						if a.opcode > 0xff {
 
-//line mmixal.w:3339
+//line mmixal/mmixal.w:3338
 							switch a.opcode {
 							case LOC:
 								a.curLoc = v.equiv
@@ -2137,7 +2137,7 @@ options:
 							case GREG:
 								if a.listingFile != nil {
 
-//line mmixal.w:3381
+//line mmixal/mmixal.w:3380
 									if v.equiv != 0 {
 										fmt.Fprintf(a.listingFile, "($%03d=#%08x", a.curGreg, Tetra(v.equiv>>32))
 										a.flushListingLine("    ")
@@ -2148,7 +2148,7 @@ options:
 										a.flushListingLine("             ")
 									}
 
-//line mmixal.w:3351
+//line mmixal/mmixal.w:3350
 								}
 							case LOCAL:
 								if Tetra(v.equiv) > Tetra(a.lreg) {
@@ -2175,7 +2175,7 @@ options:
 							}
 							return
 
-//line mmixal.w:3270
+//line mmixal/mmixal.w:3269
 						}
 						if v.equiv > 0xffffff {
 							a.err("*XYZ field doesn't fit in three bytes")
@@ -2184,10 +2184,10 @@ options:
 						a.xyz = Tetra(v.equiv) & 0xffffff
 					}
 
-//line mmixal.w:2943
+//line mmixal/mmixal.w:2942
 				case 2:
 
-//line mmixal.w:2964
+//line mmixal/mmixal.w:2963
 					if a.opBits&twoArgBit == 0 {
 						if a.opBits&oneArgBit != 0 {
 							a.derr("opcode `%s' must not have two operands", a.opField)
@@ -2196,16 +2196,16 @@ options:
 						}
 					}
 
-//line mmixal.w:2945
+//line mmixal/mmixal.w:2944
 					if a.opBits&(threeArgBit|memBit) == threeArgBit {
 
-//line mmixal.w:2973
+//line mmixal/mmixal.w:2972
 						a.valStack[2], a.valPtr = a.valStack[1], 3
 						a.valStack[1] = valNode{equiv: 0, link: nil, status: pure}
 
-//line mmixal.w:2947
+//line mmixal/mmixal.w:2946
 
-//line mmixal.w:3039
+//line mmixal/mmixal.w:3038
 						if a.valStack[2].status == undefined {
 							a.err("Z field is undefined")
 
@@ -2226,7 +2226,7 @@ options:
 						}
 						a.z = Tetra(a.valStack[2].equiv) & 0xff
 
-//line mmixal.w:3060
+//line mmixal/mmixal.w:3059
 						if a.valStack[1].status == undefined {
 							a.err("Y field is undefined")
 
@@ -2246,7 +2246,7 @@ options:
 						a.y = Tetra(a.valStack[1].equiv) & 0xff
 						a.yz = a.y<<8 + a.z
 
-//line mmixal.w:3080
+//line mmixal/mmixal.w:3079
 						if a.valStack[0].status == undefined {
 							a.err("X field is undefined")
 
@@ -2266,15 +2266,15 @@ options:
 						a.x = Tetra(a.valStack[0].equiv) & 0xff
 						a.xyz = a.x<<16 + a.yz
 
-//line mmixal.w:2948
+//line mmixal/mmixal.w:2947
 					} else {
 
-//line mmixal.w:3109
+//line mmixal/mmixal.w:3108
 						v := &a.valStack[1]
 						switch {
 						case v.status == undefined && a.opBits&relAddrBit != 0:
 
-//line mmixal.w:3158
+//line mmixal/mmixal.w:3157
 							pp = v.link.sym
 							qq = a.newSymNode(false)
 							qq.link = pp.link
@@ -2284,13 +2284,13 @@ options:
 							a.yz = 0
 							a.futureBits = 0xc0
 
-//line mmixal.w:3113
+//line mmixal/mmixal.w:3112
 						case v.status == undefined:
 							a.err("YZ field is undefined")
 
 						case v.status == pure && a.opBits&memBit != 0:
 
-//line mmixal.w:3195
+//line mmixal/mmixal.w:3194
 							o := v.equiv
 							k = 0
 							for j = a.greg; j < 255; j++ {
@@ -2310,7 +2310,7 @@ options:
 
 							default:
 
-//line mmixal.w:3223
+//line mmixal/mmixal.w:3222
 								for j = SETH; j <= ORL; j++ {
 									switch j & 3 {
 									case 0:
@@ -2333,14 +2333,14 @@ options:
 									a.yz, a.opcode = 255<<8, a.opcode+1 // Y = \$255, Z = 0
 								}
 
-//line mmixal.w:3214
+//line mmixal/mmixal.w:3213
 							}
 
-//line mmixal.w:3118
+//line mmixal/mmixal.w:3117
 						default:
 							if v.status == regVal {
 
-//line mmixal.w:3136
+//line mmixal/mmixal.w:3135
 								if a.opBits&(immedBit|yzrBit|yzarBit) == 0 {
 									a.derr("*YZ field of `%s' should not be a register number", a.opField)
 
@@ -2353,10 +2353,10 @@ options:
 									a.opcode++ // silently append \.{,0}
 								}
 
-//line mmixal.w:3121
+//line mmixal/mmixal.w:3120
 							} else {
 
-//line mmixal.w:3149
+//line mmixal/mmixal.w:3148
 								if a.opcode == SET {
 									a.opcode = 0xe3 // change to \.{SETL}
 								} else if a.opBits&immedBit != 0 {
@@ -2365,11 +2365,11 @@ options:
 									a.derr("*YZ field of `%s' should be a register number", a.opField)
 								}
 
-//line mmixal.w:3123
+//line mmixal/mmixal.w:3122
 							}
 							if v.status == pure && a.opBits&relAddrBit != 0 {
 
-//line mmixal.w:3171
+//line mmixal/mmixal.w:3170
 								if v.equiv&3 != 0 {
 									a.err("*relative address is not divisible by 4")
 
@@ -2390,7 +2390,7 @@ options:
 								}
 								a.yz = Tetra(acc)
 
-//line mmixal.w:3126
+//line mmixal/mmixal.w:3125
 							} else {
 								if v.equiv > 0xffff {
 									a.err("*YZ field doesn't fit in two bytes")
@@ -2400,9 +2400,9 @@ options:
 							}
 						}
 
-//line mmixal.w:2950
+//line mmixal/mmixal.w:2949
 
-//line mmixal.w:3080
+//line mmixal/mmixal.w:3079
 						if a.valStack[0].status == undefined {
 							a.err("X field is undefined")
 
@@ -2422,14 +2422,14 @@ options:
 						a.x = Tetra(a.valStack[0].equiv) & 0xff
 						a.xyz = a.x<<16 + a.yz
 
-//line mmixal.w:2951
+//line mmixal/mmixal.w:2950
 					}
 				case 3:
 					if a.opBits&threeArgBit == 0 {
 						a.derr("opcode `%s' must not have three operands", a.opField)
 					}
 
-//line mmixal.w:3039
+//line mmixal/mmixal.w:3038
 					if a.valStack[2].status == undefined {
 						a.err("Z field is undefined")
 
@@ -2450,7 +2450,7 @@ options:
 					}
 					a.z = Tetra(a.valStack[2].equiv) & 0xff
 
-//line mmixal.w:3060
+//line mmixal/mmixal.w:3059
 					if a.valStack[1].status == undefined {
 						a.err("Y field is undefined")
 
@@ -2470,7 +2470,7 @@ options:
 					a.y = Tetra(a.valStack[1].equiv) & 0xff
 					a.yz = a.y<<8 + a.z
 
-//line mmixal.w:3080
+//line mmixal/mmixal.w:3079
 					if a.valStack[0].status == undefined {
 						a.err("X field is undefined")
 
@@ -2490,17 +2490,17 @@ options:
 					a.x = Tetra(a.valStack[0].equiv) & 0xff
 					a.xyz = a.x<<16 + a.yz
 
-//line mmixal.w:2957
+//line mmixal/mmixal.w:2956
 				default:
 					a.derr("too many operands for opcode `%s'", a.opField)
 
 				}
 				a.assemble(4, a.opcode<<24+a.xyz, byte(a.futureBits))
 
-//line mmixal.w:2599
+//line mmixal/mmixal.w:2598
 			}()
 
-//line mmixal.w:3438
+//line mmixal/mmixal.w:3437
 			if a.buffer[a.bufPtr] == 0 {
 				break
 			}
@@ -2514,13 +2514,13 @@ options:
 		}
 	}
 
-//line mmixal.w:3601
+//line mmixal/mmixal.w:3600
 	if a.lreg >= a.greg {
 		a.fatal("Danger: Must reduce the number of GREGs by %d", a.lreg-a.greg+1)
 
 	}
 
-//line mmixal.w:3628
+//line mmixal/mmixal.w:3627
 	a.mmoLop(lopPost, 0, byte(a.greg))
 	tt, _ = trieSearch(a.trieRoot, []byte("Main"), 0)
 	a.gregVal[255] = tt.sym.equiv
@@ -2529,7 +2529,7 @@ options:
 		a.mmoTetra(Tetra(a.gregVal[j]))
 	}
 
-//line mmixal.w:1963
+//line mmixal/mmixal.w:1962
 	a.opRoot.mid = nil // annihilate all the opcodes
 	prune(a.trieRoot)
 	a.symBuf = a.symBuf[:0]
@@ -2543,7 +2543,7 @@ options:
 	}
 	a.mmoLopp(lopEnd, uint16(a.mmoPtr>>2))
 
-//line mmixal.w:3637
+//line mmixal/mmixal.w:3636
 	for j = 0; j < 10; j++ {
 		if a.forwardLocal[j].link != nil {
 			a.errCount++
@@ -2552,7 +2552,7 @@ options:
 		}
 	}
 
-//line mmixal.w:3608
+//line mmixal/mmixal.w:3607
 	if a.errCount > 0 {
 		if a.errCount > 1 {
 			fmt.Fprintf(stderr, "(%d errors were found.)\n", a.errCount)
@@ -2564,11 +2564,11 @@ options:
 		a.fatal("Can't write on %s", a.objFileName)
 	}
 
-//line mmixal.w:3451
+//line mmixal/mmixal.w:3450
 	return a.errCount
 }
 
-//line mmixal.w:3455
+//line mmixal/mmixal.w:3454
 func main() {
 	os.Exit(mmixal(os.Args, os.Stderr, time.Now().Unix()))
 }

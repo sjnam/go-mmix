@@ -1,4 +1,4 @@
-//line mmixio.w:799
+//line mmixio/mmixio.w:798
 package mmixio
 
 import (
@@ -19,7 +19,7 @@ func (f *fakeSim) StdinChr() byte {
 	return c
 }
 
-//line mmixio.w:820
+//line mmixio/mmixio.w:819
 func (f *fakeSim) MMGetChars(buf []byte, size int, addr Octa, stop int) int {
 	for m := 0; m < size; m++ {
 		a := addr + Octa(m)
@@ -40,7 +40,7 @@ func (f *fakeSim) MMPutChars(buf []byte, size int, addr Octa) {
 	}
 }
 
-//line mmixio.w:843
+//line mmixio/mmixio.w:842
 func setup(t *testing.T) (*IO, *fakeSim, *bytes.Buffer, *bytes.Buffer, string) {
 	t.Helper()
 	f := &fakeSim{mem: map[Octa]byte{}}
@@ -58,7 +58,7 @@ func (f *fakeSim) str(addr Octa, n int) string {
 	return string(b)
 }
 
-//line mmixio.w:865
+//line mmixio/mmixio.w:864
 func TestReadWrite(t *testing.T) {
 	x, f, _, _, _ := setup(t)
 	f.MMPutChars([]byte("Hello\nworld\n"), 12, 0x200)
@@ -84,7 +84,7 @@ func TestReadWrite(t *testing.T) {
 	check("Fclose", x.Fclose(3), NegOne)
 }
 
-//line mmixio.w:894
+//line mmixio/mmixio.w:893
 func TestModes(t *testing.T) {
 	x, _, _, _, _ := setup(t)
 	if x.Fopen(4, 0x100, 1) != 0 {
@@ -108,10 +108,10 @@ func TestModes(t *testing.T) {
 	}
 }
 
-//line mmixio.w:918
+//line mmixio/mmixio.w:917
 const NegOne = ^Octa(0)
 
-//line mmixio.w:924
+//line mmixio/mmixio.w:923
 func TestStdStreams(t *testing.T) {
 	x, f, out, _, _ := setup(t)
 	f.stdin = []byte("abc\ndef")
@@ -131,7 +131,7 @@ func TestStdStreams(t *testing.T) {
 	}
 }
 
-//line mmixio.w:947
+//line mmixio/mmixio.w:946
 func TestTripWarning(t *testing.T) {
 	x, _, _, errs, name := setup(t)
 	x.PrintTripWarning(2, 0x100)

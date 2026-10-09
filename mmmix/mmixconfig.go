@@ -1,9 +1,9 @@
-//line mmixconfig.w:43
+//line mmmix/mmixconfig.w:42
 package main
 
 import "io"
 
-//line mmixconfig.w:305
+//line mmmix/mmixconfig.w:304
 type configReader struct {
 	mx              *machine            // the machine being configured
 	configFile      *cfile              // input comes from here
@@ -12,15 +12,15 @@ type configReader struct {
 	buffer          [configBufSize]byte // input lines go here
 	bufPointer      int                 // this is our current position
 
-//line mmixconfig.w:434
+//line mmmix/mmixconfig.w:433
 	fetchBufSize, writeBufSize, reorderBufSize, memBusBytes, hardwarePT int
 	disableSecurity                                                     int
 	maxCycs                                                             int
 
-//line mmixconfig.w:313
+//line mmmix/mmixconfig.w:312
 }
 
-//line mmixconfig.w:381
+//line mmmix/mmixconfig.w:380
 type pvSpec struct {
 	name           string // symbolic name
 	v              *int   // internal name
@@ -29,7 +29,7 @@ type pvSpec struct {
 	powerOfTwo     bool   // must it be a power of two?
 }
 
-//line mmixconfig.w:392
+//line mmmix/mmixconfig.w:391
 type cParam int
 
 const (
@@ -45,7 +45,7 @@ const (
 	cotm
 	prts
 
-//line mmixconfig.w:406
+//line mmmix/mmixconfig.w:405
 )
 
 type cpvSpec struct {
@@ -56,20 +56,20 @@ type cpvSpec struct {
 	powerOfTwo     bool   // must it be a power of two?
 }
 
-//line mmixconfig.w:419
+//line mmmix/mmixconfig.w:418
 type opSpec struct {
 	name   string // symbolic name
 	v      int    // internal code
 	defval int    // default value
 }
 
-//line mmixconfig.w:302
+//line mmmix/mmixconfig.w:301
 const configBufSize = 100 // we don't need long lines
 
-//line mmixconfig.w:471
+//line mmmix/mmixconfig.w:470
 const intMax = 1<<31 - 1
 
-//line mmixconfig.w:474
+//line mmmix/mmixconfig.w:473
 var cpv = []cpvSpec{
 	{"associativity", assoc, 1, 1, intMax, true},
 	{"blocksize", blksz, 8, 8, 8192, true},
@@ -93,7 +93,7 @@ var opTable = []opSpec{
 	{"fint", fint, 4}, {"fix", fix, 2}, {"flot", flot, 2},
 	{"feps", feps, 4}}
 
-//line mmixconfig.w:836
+//line mmmix/mmixconfig.w:835
 var intOp = [256]int{
 	trap, fcmp, funeq, funeq, fadd, fix, fadd, fix,
 	flot, flot, flot, flot, flot, flot, flot, flot,
@@ -128,14 +128,14 @@ var intOp = [256]int{
 	noop, noop, pushj, pushj, set, set, put, put,
 	pop, resume, save, unsave, sync, noop, get, trip}
 
-//line mmixconfig.w:289
+//line mmmix/mmixconfig.w:288
 func (cf *configReader) configPanic(format string, a ...any) {
 	cf.mx.errprintf(format, a...)
 	cf.mx.errprintf("!\n")
 	panic(exitSignal(-1))
 }
 
-//line mmixconfig.w:324
+//line mmmix/mmixconfig.w:323
 func (cf *configReader) getToken() { // set |token| to the next token of the configuration file
 	if cf.tokenPrescanned {
 		cf.tokenPrescanned = false
@@ -170,7 +170,7 @@ func (cf *configReader) getToken() { // set |token| to the next token of the con
 	cf.bufPointer = p
 }
 
-//line mmixconfig.w:365
+//line mmmix/mmixconfig.w:364
 func (cf *configReader) getInt() int {
 	cf.getToken()
 	var v int32
@@ -184,7 +184,7 @@ func (cf *configReader) getInt() int {
 	return int(v)
 }
 
-//line mmixconfig.w:505
+//line mmmix/mmixconfig.w:504
 func newCache(name string) *cache {
 	c := new(cache)
 	c.aa = 1         // default associativity, should equal |cpv[0].defval|
@@ -207,7 +207,7 @@ func newCache(name string) *cache {
 	return c
 }
 
-//line mmixconfig.w:647
+//line mmmix/mmixconfig.w:646
 func (cf *configReader) ppol(rr *replacePolicy) { // subroutine to scan for a replacement policy
 	cf.getToken()
 	switch cf.token {
@@ -224,7 +224,7 @@ func (cf *configReader) ppol(rr *replacePolicy) { // subroutine to scan for a re
 	}
 }
 
-//line mmixconfig.w:664
+//line mmmix/mmixconfig.w:663
 func (cf *configReader) pcs(c *cache) { // subroutine to process a cache spec
 	var j, n int
 	cf.getToken()
@@ -250,7 +250,7 @@ func (cf *configReader) pcs(c *cache) { // subroutine to process a cache spec
 		cf.configPanic("Configuration error: %s must be power of 2", cpv[j].name)
 	}
 
-//line mmixconfig.w:692
+//line mmmix/mmixconfig.w:691
 	switch cpv[j].v {
 	case assoc:
 		c.aa = n
@@ -281,10 +281,10 @@ func (cf *configReader) pcs(c *cache) { // subroutine to process a cache spec
 		c.ports = n
 	}
 
-//line mmixconfig.w:689
+//line mmmix/mmixconfig.w:688
 }
 
-//line mmixconfig.w:886
+//line mmmix/mmixconfig.w:885
 func lg(n int) int { // compute binary logarithm
 	l := 0
 	for j := n; j != 0; j >>= 1 {
@@ -293,7 +293,7 @@ func lg(n int) int { // compute binary logarithm
 	return l - 1
 }
 
-//line mmixconfig.w:897
+//line mmmix/mmixconfig.w:896
 func (cf *configReader) allocCache(c *cache, name string) {
 	if c.bb < c.gg {
 		cf.configPanic("Configuration error: blocksize of %s is less than granularity", name)
@@ -316,7 +316,7 @@ func (cf *configReader) allocCache(c *cache, name string) {
 			name, c.gg)
 	}
 
-//line mmixconfig.w:938
+//line mmmix/mmixconfig.w:937
 	c.set = make([]cacheset, c.cc)
 	for j := 0; j < c.cc; j++ {
 		c.set[j] = make(cacheset, c.aa)
@@ -326,23 +326,23 @@ func (cf *configReader) allocCache(c *cache, name string) {
 		}
 	}
 
-//line mmixconfig.w:919
+//line mmmix/mmixconfig.w:918
 	if c.vv != 0 {
 
-//line mmixconfig.w:948
+//line mmmix/mmixconfig.w:947
 		c.victim = make(cacheset, c.vv)
 		for k := 0; k < c.vv; k++ {
 			c.victim[k] = newBlock(c, k)
 			c.victim[k].tag = sign32 << 32 // invalid tag
 		}
 
-//line mmixconfig.w:921
+//line mmmix/mmixconfig.w:920
 	}
 	c.inbuf = newBlock(c, 0)
 	c.outbuf = newBlock(c, 0)
 	if name[0] != 'S' {
 
-//line mmixconfig.w:955
+//line mmmix/mmixconfig.w:954
 		c.reader = make([]coroutine, c.ports)
 		for j := 0; j < c.ports; j++ {
 			c.reader[j].stage = vanish
@@ -358,16 +358,16 @@ func (cf *configReader) allocCache(c *cache, name string) {
 			}
 		}
 
-//line mmixconfig.w:926
+//line mmmix/mmixconfig.w:925
 	}
 }
 
-//line mmixconfig.w:933
+//line mmmix/mmixconfig.w:932
 func newBlock(c *cache, pos int) cacheblock {
 	return cacheblock{dirty: make([]bool, c.bb>>c.g), data: make([]Octa, c.bb>>3), pos: pos}
 }
 
-//line mmixconfig.w:1083
+//line mmmix/mmixconfig.w:1082
 func (mx *machine) MMIXConfig(filename string) {
 	var i, j, n int
 	var intStages [maxRealCommand + 1]int // stages as function of |internalOp|
@@ -379,7 +379,7 @@ func (mx *machine) MMIXConfig(filename string) {
 
 	}
 
-//line mmixconfig.w:439
+//line mmmix/mmixconfig.w:438
 	mx.securityDisabled = false
 	pv := []pvSpec{
 		{"fetchbuffer", &cf.fetchBufSize, 4, 1, intMax, false},
@@ -409,9 +409,9 @@ func (mx *machine) MMIXConfig(filename string) {
 		{"memchunksmax", &mx.memChunksMax, 1000, 1, intMax, false},
 		{"hashprime", &mx.hashPrime, 2003, 2, intMax, false}}
 
-//line mmixconfig.w:1094
+//line mmmix/mmixconfig.w:1093
 
-//line mmixconfig.w:528
+//line mmmix/mmixconfig.w:527
 	mx.ITcache = newCache("ITcache")
 	mx.DTcache = newCache("DTcache")
 	mx.Icache, mx.Dcache, mx.Scache = nil, nil, nil
@@ -423,9 +423,9 @@ func (mx *machine) MMIXConfig(filename string) {
 		mx.pipeSeq[opTable[j].v][1] = 0 // one stage
 	}
 
-//line mmixconfig.w:1095
+//line mmmix/mmixconfig.w:1094
 
-//line mmixconfig.w:545
+//line mmmix/mmixconfig.w:544
 	mx.funitCount = 0
 	for cf.token != "end" {
 		cf.getToken()
@@ -441,9 +441,9 @@ func (mx *machine) MMIXConfig(filename string) {
 	mx.funit[mx.funitCount].ops[0] = 0x80000000 // \.{TRAP}
 	mx.funit[mx.funitCount].ops[7] = 0x1        // \.{TRIP}
 
-//line mmixconfig.w:1096
+//line mmmix/mmixconfig.w:1095
 
-//line mmixconfig.w:569
+//line mmmix/mmixconfig.w:568
 	cf.configFile.f.Seek(0, io.SeekStart)
 	cf.configFile.r.Reset(cf.configFile.f)
 	cf.configFile.pos, cf.configFile.eof = 0, false
@@ -455,7 +455,7 @@ func (mx *machine) MMIXConfig(filename string) {
 			break
 		}
 
-//line mmixconfig.w:591
+//line mmmix/mmixconfig.w:590
 		for j = 0; j < len(pv); j++ {
 			if cf.token == pv[j].name {
 				n = cf.getInt()
@@ -477,9 +477,9 @@ func (mx *machine) MMIXConfig(filename string) {
 			continue
 		}
 
-//line mmixconfig.w:580
+//line mmmix/mmixconfig.w:579
 
-//line mmixconfig.w:613
+//line mmmix/mmixconfig.w:612
 		switch cf.token {
 		case "ITcache":
 			cf.pcs(mx.ITcache)
@@ -513,9 +513,9 @@ func (mx *machine) MMIXConfig(filename string) {
 			continue
 		}
 
-//line mmixconfig.w:581
+//line mmmix/mmixconfig.w:580
 
-//line mmixconfig.w:726
+//line mmmix/mmixconfig.w:725
 		for j = 0; j < len(opTable); j++ {
 			if cf.token == opTable[j].name {
 				for i = 0; ; i++ {
@@ -544,10 +544,10 @@ func (mx *machine) MMIXConfig(filename string) {
 			continue
 		}
 
-//line mmixconfig.w:582
+//line mmmix/mmixconfig.w:581
 		if cf.token == "unit" {
 
-//line mmixconfig.w:755
+//line mmmix/mmixconfig.w:754
 			cf.getToken()
 			if len(cf.token) > 15 {
 				cf.configPanic("Configuration error: `%s' is more than 15 characters long", cf.token)
@@ -581,16 +581,16 @@ func (mx *machine) MMIXConfig(filename string) {
 			mx.funitCount++
 			continue
 
-//line mmixconfig.w:584
+//line mmmix/mmixconfig.w:583
 		}
 		cf.configPanic("Configuration syntax error: Specification can't start with `%s'",
 			cf.token)
 
 	}
 
-//line mmixconfig.w:1097
+//line mmmix/mmixconfig.w:1096
 
-//line mmixconfig.w:817
+//line mmmix/mmixconfig.w:816
 	for j = div; j <= maxPipeOp; j++ {
 		intStages[j] = strlen(mx.pipeSeq[j][:])
 	}
@@ -606,10 +606,10 @@ func (mx *machine) MMIXConfig(filename string) {
 		stages[j] = intStages[intOp[j]]
 	}
 
-//line mmixconfig.w:799
+//line mmmix/mmixconfig.w:798
 	for j = 0; j <= mx.funitCount; j++ {
 
-//line mmixconfig.w:871
+//line mmmix/mmixconfig.w:870
 		for i, n = 0, 0; i < 256; i++ {
 			if (mx.funit[j].ops[i>>5]<<(i&0x1f))&0x80000000 != 0 && stages[i] > n {
 				n = stages[i]
@@ -620,7 +620,7 @@ func (mx *machine) MMIXConfig(filename string) {
 
 		}
 
-//line mmixconfig.w:801
+//line mmmix/mmixconfig.w:800
 		u := &mx.funit[j]
 		u.k = n
 		u.co = make([]coroutine, n)
@@ -633,9 +633,9 @@ func (mx *machine) MMIXConfig(filename string) {
 		}
 	}
 
-//line mmixconfig.w:1098
+//line mmmix/mmixconfig.w:1097
 
-//line mmixconfig.w:971
+//line mmmix/mmixconfig.w:970
 	cf.allocCache(mx.ITcache, "ITcache")
 	mx.ITcache.filler.name, mx.ITcache.filler.stage = "ITfiller", fillFromVirt
 	cf.allocCache(mx.DTcache, "DTcache")
@@ -651,7 +651,7 @@ func (mx *machine) MMIXConfig(filename string) {
 	}
 	if mx.Scache != nil {
 
-//line mmixconfig.w:989
+//line mmmix/mmixconfig.w:988
 		cf.allocCache(mx.Scache, "Scache")
 		if mx.Scache.bb < mx.Icache.bb {
 			cf.configPanic("Configuration error: Scache blocks smaller than Icache blocks")
@@ -669,12 +669,12 @@ func (mx *machine) MMIXConfig(filename string) {
 		mx.Scache.filler.name, mx.Scache.filler.stage = "Sfiller", fillFromMem
 		mx.Scache.flusher.name, mx.Scache.flusher.stage = "Sflusher", flushToMem
 
-//line mmixconfig.w:986
+//line mmmix/mmixconfig.w:985
 	}
 
-//line mmixconfig.w:1099
+//line mmmix/mmixconfig.w:1098
 
-//line mmixconfig.w:1010
+//line mmmix/mmixconfig.w:1009
 	mx.busWords = cf.memBusBytes >> 3
 	j = max(mx.memReadTime, mx.memWriteTime)
 	n = 1
@@ -696,9 +696,9 @@ func (mx *machine) MMIXConfig(filename string) {
 		mx.ring[k].stage = maxStage
 	}
 
-//line mmixconfig.w:1100
+//line mmmix/mmixconfig.w:1099
 
-//line mmixconfig.w:1035
+//line mmmix/mmixconfig.w:1034
 	if mx.hashPrime <= mx.memChunksMax {
 		cf.configPanic("Configuration error: hashprime must exceed memchunksmax")
 
@@ -724,7 +724,7 @@ func (mx *machine) MMIXConfig(filename string) {
 	}
 	mx.wbufBot, mx.wbufTop = &mx.wbuf[0], &mx.wbuf[cf.writeBufSize]
 
-//line mmixconfig.w:1071
+//line mmmix/mmixconfig.w:1070
 	if mx.bpN == 0 {
 		mx.bpTable = nil
 	} else { // a branch prediction table is desired
@@ -734,7 +734,7 @@ func (mx *machine) MMIXConfig(filename string) {
 		mx.bpTable = make([]int8, 1<<(mx.bpA+mx.bpB+mx.bpC))
 	}
 
-//line mmixconfig.w:1060
+//line mmmix/mmixconfig.w:1059
 	mx.l = make([]specnode, mx.lringSize)
 	j = mx.busWords
 	if mx.Icache != nil && mx.Icache.bb>>3 > j {
@@ -745,5 +745,5 @@ func (mx *machine) MMIXConfig(filename string) {
 	mx.noHardwarePT = cf.hardwarePT == 0
 	mx.securityDisabled = cf.disableSecurity != 0
 
-//line mmixconfig.w:1101
+//line mmmix/mmixconfig.w:1100
 }

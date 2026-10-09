@@ -2,7 +2,6 @@
 % 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
 @i ../boilerplate.w
 
-
 \input kotexgweb
 \def\title{MMIXCONFIG}
 \def\PV{\\{PV}} % 타자기체가 아니라 이탤릭으로

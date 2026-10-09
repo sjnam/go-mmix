@@ -2,7 +2,6 @@
 % 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
 @i ../boilerplate.w
 
-
 \input kotexgweb
 \def\title{MMIXARITH}
 \def\ff{\\{ff\kern-.05em}}

@@ -1,4 +1,4 @@
-//line mmixmem.w:31
+//line mmmix/mmixmem.w:30
 package main
 
 import (
@@ -9,7 +9,7 @@ import (
 
 var kind = [4]string{"byte", "wyde", "tetra", "octa"}
 
-//line mmixmem.w:141
+//line mmmix/mmixmem.w:140
 const (
 	hioBase   = 1 << 48            // physical address of device 0
 	hioSize   = 1 << 16            // number of bytes occupied by one device
@@ -23,7 +23,7 @@ const (
 	hioMagic  = 0x4e4e49582d48494f // \.{"NNIX-HIO"}
 )
 
-//line mmixmem.w:370
+//line mmmix/mmixmem.w:369
 const (
 	blkBase    = hioBase + hioSize  // physical address of device 1
 	blkSize    = 1024               // number of bytes in a block
@@ -35,7 +35,7 @@ const (
 	blkInt     = 1 << 8             // bit of rQ set when a command finishes
 )
 
-//line mmixmem.w:159
+//line mmmix/mmixmem.w:158
 type hio struct {
 	mx     *machine
 	io     *mmixio.IO
@@ -46,7 +46,7 @@ type hio struct {
 	rv     Octa // register \.{RV}
 }
 
-//line mmixmem.w:382
+//line mmmix/mmixmem.w:381
 type blk struct {
 	mx     *machine
 	f      *os.File // the disk image
@@ -59,14 +59,14 @@ type blk struct {
 	count  int      // cycles left until that command finishes
 }
 
-//line mmixmem.w:51
+//line mmmix/mmixmem.w:50
 func (mx *machine) specRead(addr Octa, size int) Octa {
 	var val Octa
 	size &= 0x3
 	addr = addr&^0xffffffff | Octa(Tetra(addr)&-(Tetra(1)<<size))
 	if mx.hioDev != nil && addr-hioBase < hioSize {
 
-//line mmixmem.w:174
+//line mmmix/mmixmem.w:173
 		var reg Octa
 		switch addr&^7 - hioBase {
 		case hioID:
@@ -80,10 +80,10 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 		}
 		val = reg >> ((8 - (1 << size) - int(addr&7)) << 3)
 
-//line mmixmem.w:57
+//line mmmix/mmixmem.w:56
 	} else if mx.blkDev != nil && addr-blkBase < hioSize {
 
-//line mmixmem.w:397
+//line mmmix/mmixmem.w:396
 		var reg Octa
 		switch addr&^7 - blkBase {
 		case hioID:
@@ -97,7 +97,7 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 		}
 		val = reg >> ((8 - (1 << size) - int(addr&7)) << 3)
 
-//line mmixmem.w:59
+//line mmmix/mmixmem.w:58
 	} else if mx.verbose&interactiveReadBit != 0 {
 		mx.printf("** Read %s from loc %016x: ", kind[size], addr)
 		mx.stdin.fgets(mx.specBuf[:], 20)
@@ -114,7 +114,7 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 	if mx.verbose&showSpecBit != 0 {
 		mx.printf("   (spec_read ")
 
-//line mmixmem.w:81
+//line mmmix/mmixmem.w:80
 		switch size {
 		case 0:
 			mx.printf("%02x", Tetra(val))
@@ -126,13 +126,13 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 			mx.printf("%016x", val)
 		}
 
-//line mmixmem.w:75
+//line mmmix/mmixmem.w:74
 		mx.printf(" from %016x at time %d)\n", addr, int32(Tetra(mx.ticks)))
 	}
 	return val << ((8 - (1 << size) - int(addr&7)) << 3)
 }
 
-//line mmixmem.w:99
+//line mmmix/mmixmem.w:98
 func (mx *machine) specWrite(addr, val Octa, size int) {
 	if mx.verbose&showSpecBit != 0 {
 		size &= 0x3
@@ -140,7 +140,7 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 		val >>= (8 - (1 << size) - int(addr&7)) << 3
 		mx.printf("   (spec_write ")
 
-//line mmixmem.w:81
+//line mmmix/mmixmem.w:80
 		switch size {
 		case 0:
 			mx.printf("%02x", Tetra(val))
@@ -152,12 +152,12 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 			mx.printf("%016x", val)
 		}
 
-//line mmixmem.w:106
+//line mmmix/mmixmem.w:105
 		mx.printf(" to %016x at time %d)\n", addr, int32(Tetra(mx.ticks)))
 	}
 	if mx.hioDev != nil && addr-hioBase < hioSize && size == 3 && addr&7 == 0 {
 
-//line mmixmem.w:192
+//line mmmix/mmixmem.w:191
 		h := mx.hioDev
 		switch addr - hioBase {
 		case hioArg0:
@@ -197,11 +197,11 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 			h.done++
 		}
 
-//line mmixmem.w:110
+//line mmmix/mmixmem.w:109
 	}
 	if mx.blkDev != nil && addr-blkBase < hioSize && size == 3 && addr&7 == 0 {
 
-//line mmixmem.w:415
+//line mmmix/mmixmem.w:414
 		d := mx.blkDev
 		switch addr - blkBase {
 		case blkBlock:
@@ -214,18 +214,18 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 			}
 		}
 
-//line mmixmem.w:113
+//line mmmix/mmixmem.w:112
 	}
 }
 
-//line mmixmem.w:242
+//line mmmix/mmixmem.w:241
 func (h *hio) piece(v Octa, size int) (pa Octa, n int, ok bool) {
 	n = size
 	if h.rv == 0 || v&signBit != 0 {
 		pa = v &^ signBit
 	} else {
 
-//line mmixmem.w:261
+//line mmmix/mmixmem.w:260
 		rv := h.rv
 		sh := uint(rv >> 40 & 0xff)
 		if sh < 13 || sh > 48 {
@@ -253,7 +253,7 @@ func (h *hio) piece(v Octa, size int) (pa Octa, n int, ok bool) {
 			return 0, 0, false
 		}
 
-//line mmixmem.w:293
+//line mmmix/mmixmem.w:292
 		for ; d > 0; d-- {
 			x := h.mx.magicRead(t + 8*a[d])
 			if x&signBit == 0 || (x^rv)&0x1ff8 != 0 {
@@ -271,7 +271,7 @@ func (h *hio) piece(v Octa, size int) (pa Octa, n int, ok bool) {
 			n = left
 		}
 
-//line mmixmem.w:248
+//line mmmix/mmixmem.w:247
 	}
 	if n != 0 && (pa >= hioBase || pa+Octa(n-1) >= hioBase) {
 		return 0, 0, false
@@ -279,7 +279,7 @@ func (h *hio) piece(v Octa, size int) (pa Octa, n int, ok bool) {
 	return pa, n, true
 }
 
-//line mmixmem.w:319
+//line mmmix/mmixmem.w:318
 func (h *hio) StdinChr() byte { return h.mx.StdinChr() }
 
 func (h *hio) MMGetChars(buf []byte, size int, addr Octa, stop int) int {
@@ -311,7 +311,7 @@ func (h *hio) MMPutChars(buf []byte, size int, addr Octa) {
 	}
 }
 
-//line mmixmem.w:432
+//line mmmix/mmixmem.w:431
 func (d *blk) tick() {
 	if d.cmd == 0 {
 		return
@@ -326,7 +326,7 @@ func (d *blk) tick() {
 		var b [blkSize]byte
 		if val == 1 {
 
-//line mmixmem.w:456
+//line mmmix/mmixmem.w:455
 			if _, err := d.f.ReadAt(b[:], int64(d.block)*blkSize); err == nil {
 				for k := 0; k < blkSize; k += 8 {
 					var o Octa
@@ -338,10 +338,10 @@ func (d *blk) tick() {
 				d.result = 0
 			}
 
-//line mmixmem.w:446
+//line mmmix/mmixmem.w:445
 		} else {
 
-//line mmixmem.w:468
+//line mmmix/mmixmem.w:467
 			for k := 0; k < blkSize; k += 8 {
 				o := mx.magicRead(d.addr + Octa(k))
 				for j := 7; j >= 0; j-- {
@@ -353,7 +353,7 @@ func (d *blk) tick() {
 				d.result = 0
 			}
 
-//line mmixmem.w:448
+//line mmmix/mmixmem.w:447
 		}
 	}
 	d.done++
