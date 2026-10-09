@@ -2,14 +2,6 @@
 % 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
 @i ../boilerplate.w
 
-@s io.Writer int
-@s bufio.Reader int
-@s bufio.Writer int
-@s bytes.Buffer int
-@s os.File int
-@s mmixarith.Octa int
-@s mmixarith.Tetra int
-@s testing.T int
 
 \input kotexgweb
 \def\title{MMIXAL}

@@ -1,4 +1,4 @@
-//line mmixio.w:35
+//line mmixio.w:27
 package mmixio
 
 import (
@@ -10,30 +10,30 @@ import (
 	"github.com/sjnam/go-mmix/mmixarith"
 )
 
-//line mmixio.w:58
+//line mmixio.w:50
 type (
 	Tetra = mmixarith.Tetra
 	Octa  = mmixarith.Octa
 
-//line mmixio.w:61
+//line mmixio.w:53
 )
 
 const filenameMax = 1024
 
-//line mmixio.w:78
+//line mmixio.w:70
 type Simulator interface {
 	StdinChr() byte
 	MMGetChars(buf []byte, size int, addr Octa, stop int) int
 	MMPutChars(buf []byte, size int, addr Octa)
 }
 
-//line mmixio.w:87
+//line mmixio.w:79
 type simFileInfo struct {
 	fp   *stream // file pointer
 	mode int     // [read OK] + 2[write OK] + 4[binary] + 8[readwrite]
 }
 
-//line mmixio.w:96
+//line mmixio.w:88
 type IO struct {
 	sfile   [256]simFileInfo
 	sim     Simulator
@@ -41,7 +41,7 @@ type IO struct {
 	stderr  *stream   // the original standard error, i.e., \CEE/'s |stderr|
 }
 
-//line mmixio.w:622
+//line mmixio.w:614
 type stream struct {
 	f          *os.File      // if a real file
 	r          *bufio.Reader // buffer for reading from |f|
@@ -54,7 +54,7 @@ type stream struct {
 	unbuffered bool          // is it unbuffered (like |stderr|)?
 }
 
-//line mmixio.w:161
+//line mmixio.w:153
 var modeFlags = [5]int{
 	os.O_RDONLY,                            // \.{"r"}
 	os.O_WRONLY | os.O_CREATE | os.O_TRUNC, // \.{"w"}
@@ -63,10 +63,10 @@ var modeFlags = [5]int{
 	os.O_RDWR | os.O_CREATE | os.O_TRUNC,   // \.{"w+b"}
 }
 
-//line mmixio.w:168
+//line mmixio.w:160
 var modeCode = [5]int{0x1, 0x2, 0x5, 0x6, 0xf}
 
-//line mmixio.w:599
+//line mmixio.w:591
 var tripWarning = [...]string{
 	"TRIP",
 	"integer divide check",
@@ -78,7 +78,7 @@ var tripWarning = [...]string{
 	"floating point division by zero",
 	"floating point inexact"}
 
-//line mmixio.w:109
+//line mmixio.w:101
 func New(sim Simulator, stdout, stderr io.Writer) *IO {
 	x := &IO{sim: sim}
 	x.sfile[0] = simFileInfo{&stream{isStdin: true}, 1}
@@ -88,7 +88,7 @@ func New(sim Simulator, stdout, stderr io.Writer) *IO {
 	return x
 }
 
-//line mmixio.w:128
+//line mmixio.w:120
 func (x *IO) Fopen(handle byte, name, mode Octa) Octa {
 	var nameBuf [filenameMax]byte
 	if mode > 4 {
@@ -116,13 +116,13 @@ func (x *IO) abort(handle byte) Octa {
 	return mmixarith.NegOne // failure
 }
 
-//line mmixio.w:174
+//line mmixio.w:166
 func (x *IO) FakeStdin(f *os.File) {
 	x.sfile[0].fp = &stream{f: f, r: bufio.NewReader(f)} // |f| should be open for reading
 	x.streams = append(x.streams, x.sfile[0].fp)
 }
 
-//line mmixio.w:180
+//line mmixio.w:172
 func (x *IO) Fclose(handle byte) Octa {
 	if x.sfile[handle].mode == 0 {
 		return mmixarith.NegOne
@@ -134,7 +134,7 @@ func (x *IO) Fclose(handle byte) Octa {
 	return 0 // success
 }
 
-//line mmixio.w:204
+//line mmixio.w:196
 func (x *IO) Fread(handle byte, buffer, size Octa) Octa {
 	o := mmixarith.NegOne
 	if x.sfile[handle].mode&0x1 == 0 {
@@ -147,7 +147,7 @@ func (x *IO) Fread(handle byte, buffer, size Octa) Octa {
 		return o - size
 	}
 
-//line mmixio.w:224
+//line mmixio.w:216
 	fp := x.sfile[handle].fp
 	buf := make([]byte, min(size, 1<<16))
 	n := 0
@@ -175,11 +175,11 @@ func (x *IO) Fread(handle byte, buffer, size Octa) Octa {
 		}
 	}
 
-//line mmixio.w:216
+//line mmixio.w:208
 	return Octa(n) - size
 }
 
-//line mmixio.w:256
+//line mmixio.w:248
 func (x *IO) Fgets(handle byte, buffer, size Octa) Octa {
 	var buf [256]byte
 	var n, s int
@@ -197,7 +197,7 @@ func (x *IO) Fgets(handle byte, buffer, size Octa) Octa {
 	size--
 	for {
 
-//line mmixio.w:289
+//line mmixio.w:281
 		s = 255
 		if size < Octa(s) {
 			s = int(size)
@@ -228,7 +228,7 @@ func (x *IO) Fgets(handle byte, buffer, size Octa) Octa {
 		}
 		buf[n] = 0
 
-//line mmixio.w:273
+//line mmixio.w:265
 		x.sim.MMPutChars(buf[:], n+1, buffer)
 		o += Octa(n)
 		size -= Octa(n)
@@ -239,7 +239,7 @@ func (x *IO) Fgets(handle byte, buffer, size Octa) Octa {
 	}
 }
 
-//line mmixio.w:331
+//line mmixio.w:323
 func (x *IO) Fgetws(handle byte, buffer, size Octa) Octa {
 	var buf [256]byte
 	var n, s int
@@ -258,7 +258,7 @@ func (x *IO) Fgetws(handle byte, buffer, size Octa) Octa {
 	size--
 	for {
 
-//line mmixio.w:363
+//line mmixio.w:355
 		s = 127
 		if size < Octa(s) {
 			s = int(size)
@@ -292,7 +292,7 @@ func (x *IO) Fgetws(handle byte, buffer, size Octa) Octa {
 		}
 		buf[p], buf[p+1] = 0, 0
 
-//line mmixio.w:349
+//line mmixio.w:341
 		x.sim.MMPutChars(buf[:], 2*n+2, buffer)
 		o += Octa(n)
 		size -= Octa(n)
@@ -303,7 +303,7 @@ func (x *IO) Fgetws(handle byte, buffer, size Octa) Octa {
 	}
 }
 
-//line mmixio.w:403
+//line mmixio.w:395
 func (x *IO) Fwrite(handle byte, buffer, size Octa) Octa {
 	var buf [256]byte
 	var n int
@@ -331,7 +331,7 @@ func (x *IO) Fwrite(handle byte, buffer, size Octa) Octa {
 	}
 }
 
-//line mmixio.w:433
+//line mmixio.w:425
 func (x *IO) Fputs(handle byte, str Octa) Octa {
 	var buf [256]byte
 	var o Octa
@@ -355,7 +355,7 @@ func (x *IO) Fputs(handle byte, str Octa) Octa {
 	}
 }
 
-//line mmixio.w:469
+//line mmixio.w:461
 func (x *IO) Fputws(handle byte, str Octa) Octa {
 	var buf [256]byte
 	var o Octa
@@ -383,7 +383,7 @@ func (x *IO) Fputws(handle byte, str Octa) Octa {
 	}
 }
 
-//line mmixio.w:502
+//line mmixio.w:494
 func (x *IO) Fseek(handle byte, offset Octa) Octa {
 	if x.sfile[handle].mode&0x4 == 0 {
 		return mmixarith.NegOne
@@ -409,7 +409,7 @@ func (x *IO) Fseek(handle byte, offset Octa) Octa {
 	return 0
 }
 
-//line mmixio.w:532
+//line mmixio.w:524
 func (x *IO) Ftell(handle byte) Octa {
 	if x.sfile[handle].mode&0x4 == 0 {
 		return mmixarith.NegOne
@@ -421,7 +421,7 @@ func (x *IO) Ftell(handle byte) Octa {
 	return Octa(Tetra(pos))
 }
 
-//line mmixio.w:552
+//line mmixio.w:544
 func (x *IO) PrintTripWarning(n int, loc Octa) {
 	if x.sfile[2].mode&0x2 != 0 {
 		x.sfile[2].fp.fprintf("Warning: %s at location %016x\n", tripWarning[n], loc)
@@ -435,12 +435,12 @@ func (s *stream) fprintf(format string, a ...any) {
 	s.write(fmt.Appendf(nil, format, a...))
 }
 
-//line mmixio.w:571
+//line mmixio.w:563
 func (x *IO) StderrError() bool {
 	return x.stderr.bad
 }
 
-//line mmixio.w:587
+//line mmixio.w:579
 func (x *IO) FlushAll() {
 	for h := range 3 {
 		if x.sfile[h].fp.f == nil { // an original standard stream
@@ -452,7 +452,7 @@ func (x *IO) FlushAll() {
 	}
 }
 
-//line mmixio.w:638
+//line mmixio.w:630
 func (s *stream) read(p []byte) int {
 	if s.eof || s.r == nil {
 		return 0
@@ -471,7 +471,7 @@ func (s *stream) read(p []byte) int {
 
 func (s *stream) clearerr() { s.eof, s.bad = false, false }
 
-//line mmixio.w:662
+//line mmixio.w:654
 func (s *stream) fgets(buf []byte, n int) bool {
 	if n <= 0 || s.r == nil {
 		return false
@@ -504,7 +504,7 @@ func (s *stream) fgets(buf []byte, n int) bool {
 	return true
 }
 
-//line mmixio.w:703
+//line mmixio.w:695
 func (s *stream) startReading() {
 	if s.writing {
 		s.flush()
@@ -512,7 +512,7 @@ func (s *stream) startReading() {
 	}
 }
 
-//line mmixio.w:721
+//line mmixio.w:713
 func (s *stream) write(p []byte) int {
 	if s.f != nil {
 		if !s.writing {
@@ -547,7 +547,7 @@ func (s *stream) flush() bool {
 	return true
 }
 
-//line mmixio.w:761
+//line mmixio.w:753
 func (s *stream) seek(off int64, whence int) bool {
 	if s.f == nil || !s.flush() {
 		return false

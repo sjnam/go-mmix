@@ -1,4 +1,4 @@
-//line mmixarith.w:49
+//line mmixarith.w:45
 package mmixarith
 
 import (
@@ -7,27 +7,27 @@ import (
 	"strings"
 )
 
-//line mmixarith.w:76
+//line mmixarith.w:72
 type Tetra = uint32 // tetrabyte: 32 bits
 type Octa = uint64  // two tetrabytes make one octabyte
 
-//line mmixarith.w:403
+//line mmixarith.w:399
 type Round int // rounding mode
 
-//line mmixarith.w:623
+//line mmixarith.w:619
 type ftype int // kind of floating point value
 
-//line mmixarith.w:1342
+//line mmixarith.w:1338
 type bignum struct {
 	a   int               // index of the most significant digit
 	b   int               // index of the least significant digit; must be $\ge a$
 	dat [bignumPrec]Tetra // the digits; undefined except between |a| and |b|
 }
 
-//line mmixarith.w:1653
+//line mmixarith.w:1649
 type ConstKind int // kind of constant found by |ScanConst|
 
-//line mmixarith.w:84
+//line mmixarith.w:80
 const (
 	SignBit     Octa = 1 << 63            // the sign bit
 	NegOne      Octa = ^Octa(0)           // $-1$, i.e., all 64 bits are 1
@@ -35,7 +35,7 @@ const (
 	StandardNaN Octa = 0x7ff8000000000000 // floating point NaN(.5)
 )
 
-//line mmixarith.w:406
+//line mmixarith.w:402
 const (
 	RoundOff  Round = 1 // round toward zero
 	RoundUp   Round = 2 // round toward $+\infty$
@@ -43,7 +43,7 @@ const (
 	RoundNear Round = 4 // round to nearest, ties to even
 )
 
-//line mmixarith.w:446
+//line mmixarith.w:442
 const (
 	XBit = 1 << 8  // floating inexact
 	ZBit = 1 << 9  // floating division by zero
@@ -56,7 +56,7 @@ const (
 	EBit = 1 << 18 // external (dynamic) trap bit
 )
 
-//line mmixarith.w:626
+//line mmixarith.w:622
 const (
 	zro ftype = iota // 0
 	num              // a nonzero finite number
@@ -66,29 +66,29 @@ const (
 
 const zeroExponent = -1000 // zero is assumed to have this exponent
 
-//line mmixarith.w:1349
+//line mmixarith.w:1345
 const bignumPrec = 157 // would be 77 if we cared only about |FloatString|
 
-//line mmixarith.w:1460
+//line mmixarith.w:1456
 const (
 	magicOffset = 2112 // the constant $c$ that makes it work
 	origin      = 37   // the radix point follows |dat[37]|
 )
 
-//line mmixarith.w:1656
+//line mmixarith.w:1652
 const (
 	NoConst      ConstKind = -1 // no constant was found
 	DecimalConst ConstKind = 0  // decimal constant
 	FloatConst   ConstKind = 1  // floating constant
 )
 
-//line mmixarith.w:1802
+//line mmixarith.w:1798
 const (
 	buf0   = 8   // index in |buf| where significant digits begin
 	bufMax = 777 // index in |buf| where significant digits end
 )
 
-//line mmixarith.w:116
+//line mmixarith.w:112
 func ShiftRight(y Octa, s int, u bool) Octa {
 	if u {
 		return y >> s
@@ -96,7 +96,7 @@ func ShiftRight(y Octa, s int, u bool) Octa {
 	return Octa(int64(y) >> s)
 }
 
-//line mmixarith.w:154
+//line mmixarith.w:150
 func SignedMult(y, z Octa) (x Octa, overflow bool) {
 	hi, lo := bits.Mul64(y, z)
 	if y&SignBit != 0 {
@@ -108,7 +108,7 @@ func SignedMult(y, z Octa) (x Octa, overflow bool) {
 	return lo, hi != Octa(int64(lo)>>63)
 }
 
-//line mmixarith.w:192
+//line mmixarith.w:188
 func Div(x, y, z Octa) (q, r Octa) {
 	if x >= z {
 		return x, y // trivial answer
@@ -116,7 +116,7 @@ func Div(x, y, z Octa) (q, r Octa) {
 	return bits.Div64(x, y, z)
 }
 
-//line mmixarith.w:221
+//line mmixarith.w:217
 func SignedDiv(y, z Octa) (q, r Octa, overflow bool) {
 	var yy, zz Octa
 	var sy, sz int
@@ -146,16 +146,16 @@ func SignedDiv(y, z Octa) (q, r Octa, overflow bool) {
 		}
 	}
 
-//line mmixarith.w:256
+//line mmixarith.w:252
 	if r != 0 {
 		return ^q, r, false // $-q-1$
 	}
 	return -q, r, false
 
-//line mmixarith.w:250
+//line mmixarith.w:246
 }
 
-//line mmixarith.w:314
+//line mmixarith.w:310
 func ByteDiff(y, z Octa) Octa {
 	d := (y & 0x00ff00ff00ff00ff) + 0x0100010001000100 - (z & 0x00ff00ff00ff00ff)
 	m := d & 0x0100010001000100
@@ -165,7 +165,7 @@ func ByteDiff(y, z Octa) Octa {
 	return x + ((d & (m - (m >> 8))) << 8)
 }
 
-//line mmixarith.w:347
+//line mmixarith.w:343
 func WydeDiff(y, z Octa) Octa {
 	d := (y & 0x0000ffff0000ffff) + 0x0001000000010000 - (z & 0x0000ffff0000ffff)
 	m := d & 0x0001000000010000
@@ -175,7 +175,7 @@ func WydeDiff(y, z Octa) Octa {
 	return x + ((d & (m - (m >> 16))) << 16)
 }
 
-//line mmixarith.w:372
+//line mmixarith.w:368
 func BoolMult(y, z Octa, xor bool) Octa {
 	var x Octa
 	for k, o := 0, y; o != 0; k, o = k+1, o>>8 {
@@ -192,7 +192,7 @@ func BoolMult(y, z Octa, xor bool) Octa {
 	return x
 }
 
-//line mmixarith.w:466
+//line mmixarith.w:462
 func fpack(f Octa, e int, s bool, r Round) (o Octa, exc int) {
 	if e > 0x7fd {
 		e, o = 0x7ff, 0
@@ -212,7 +212,7 @@ func fpack(f Octa, e int, s bool, r Round) (o Octa, exc int) {
 		}
 	}
 
-//line mmixarith.w:504
+//line mmixarith.w:500
 	if o&3 != 0 {
 		exc |= XBit
 	}
@@ -244,10 +244,10 @@ func fpack(f Octa, e int, s bool, r Round) (o Octa, exc int) {
 	}
 	return
 
-//line mmixarith.w:485
+//line mmixarith.w:481
 }
 
-//line mmixarith.w:547
+//line mmixarith.w:543
 func sfpack(f Octa, e int, s bool, r Round) (o Tetra, exc int) {
 	if e > 0x47d {
 		e, o = 0x47f, 0
@@ -270,7 +270,7 @@ func sfpack(f Octa, e int, s bool, r Round) (o Tetra, exc int) {
 		}
 	}
 
-//line mmixarith.w:582
+//line mmixarith.w:578
 	if o&3 != 0 {
 		exc |= XBit
 	}
@@ -302,10 +302,10 @@ func sfpack(f Octa, e int, s bool, r Round) (o Tetra, exc int) {
 	}
 	return
 
-//line mmixarith.w:569
+//line mmixarith.w:565
 }
 
-//line mmixarith.w:642
+//line mmixarith.w:638
 func funpack(x Octa) (t ftype, f Octa, e int, s bool) {
 	s = x&SignBit != 0
 	f = (x << 2) & (1<<54 - 1)
@@ -336,7 +336,7 @@ func funpack(x Octa) (t ftype, f Octa, e int, s bool) {
 	return num, f, ee, s
 }
 
-//line mmixarith.w:676
+//line mmixarith.w:672
 func sfunpack(x Tetra) (t ftype, f Octa, e int, s bool) {
 	s = x&(1<<31) != 0
 	f = (Octa(x) << 31) & (1<<54 - 1)
@@ -367,7 +367,7 @@ func sfunpack(x Tetra) (t ftype, f Octa, e int, s bool) {
 	return num, f, ee + 0x380, s
 }
 
-//line mmixarith.w:716
+//line mmixarith.w:712
 func LoadSF(z Tetra) Octa {
 	t, f, e, s := sfunpack(z)
 	var x Octa
@@ -388,7 +388,7 @@ func LoadSF(z Tetra) Octa {
 	return x
 }
 
-//line mmixarith.w:743
+//line mmixarith.w:739
 func StoreSF(x Octa, r Round) (z Tetra, exc int) {
 	t, f, e, s := funpack(x)
 	switch t {
@@ -411,14 +411,14 @@ func StoreSF(x Octa, r Round) (z Tetra, exc int) {
 	return
 }
 
-//line mmixarith.w:777
+//line mmixarith.w:773
 func FMult(y, z Octa, r Round) (x Octa, exc int) {
 	yt, yf, ye, ys := funpack(y)
 	zt, zf, ze, zs := funpack(z)
 	xs := ys != zs
 	switch 4*yt + zt {
 
-//line mmixarith.w:808
+//line mmixarith.w:804
 	case 4*nan + nan:
 		if y&(1<<51) == 0 {
 			exc |= IBit // |y| is signaling
@@ -437,7 +437,7 @@ func FMult(y, z Octa, r Round) (x Octa, exc int) {
 		}
 		return y, exc
 
-//line mmixarith.w:783
+//line mmixarith.w:779
 	case 4*zro + zro, 4*zro + num, 4*num + zro:
 		x = 0
 	case 4*num + inf, 4*inf + num, 4*inf + inf:
@@ -447,7 +447,7 @@ func FMult(y, z Octa, r Round) (x Octa, exc int) {
 		exc |= IBit
 	case 4*num + num:
 
-//line mmixarith.w:837
+//line mmixarith.w:833
 		xe := ye + ze - 0x3fd // the raw exponent
 		aux, lo := bits.Mul64(yf, zf<<9)
 		var xf Octa
@@ -462,7 +462,7 @@ func FMult(y, z Octa, r Round) (x Octa, exc int) {
 		}
 		return fpack(xf, xe, xs, r)
 
-//line mmixarith.w:792
+//line mmixarith.w:788
 	}
 	if xs {
 		x |= SignBit
@@ -470,14 +470,14 @@ func FMult(y, z Octa, r Round) (x Octa, exc int) {
 	return
 }
 
-//line mmixarith.w:855
+//line mmixarith.w:851
 func FDivide(y, z Octa, r Round) (x Octa, exc int) {
 	yt, yf, ye, ys := funpack(y)
 	zt, zf, ze, zs := funpack(z)
 	xs := ys != zs
 	switch 4*yt + zt {
 
-//line mmixarith.w:808
+//line mmixarith.w:804
 	case 4*nan + nan:
 		if y&(1<<51) == 0 {
 			exc |= IBit // |y| is signaling
@@ -496,7 +496,7 @@ func FDivide(y, z Octa, r Round) (x Octa, exc int) {
 		}
 		return y, exc
 
-//line mmixarith.w:861
+//line mmixarith.w:857
 	case 4*zro + inf, 4*zro + num, 4*num + inf:
 		x = 0
 	case 4*num + zro:
@@ -509,7 +509,7 @@ func FDivide(y, z Octa, r Round) (x Octa, exc int) {
 		exc |= IBit
 	case 4*num + num:
 
-//line mmixarith.w:886
+//line mmixarith.w:882
 		xe := ye - ze + 0x3fd // the raw exponent
 		xf, aux := Div(yf, 0, zf<<9)
 		if xf >= 1<<55 {
@@ -522,7 +522,7 @@ func FDivide(y, z Octa, r Round) (x Octa, exc int) {
 		}
 		return fpack(xf, xe, xs, r)
 
-//line mmixarith.w:873
+//line mmixarith.w:869
 	}
 	if xs {
 		x |= SignBit
@@ -530,14 +530,14 @@ func FDivide(y, z Octa, r Round) (x Octa, exc int) {
 	return
 }
 
-//line mmixarith.w:908
+//line mmixarith.w:904
 func FPlus(y, z Octa, r Round) (x Octa, exc int) {
 	yt, yf, ye, ys := funpack(y)
 	zt, zf, ze, zs := funpack(z)
 	var xs bool
 	switch 4*yt + zt {
 
-//line mmixarith.w:808
+//line mmixarith.w:804
 	case 4*nan + nan:
 		if y&(1<<51) == 0 {
 			exc |= IBit // |y| is signaling
@@ -556,17 +556,17 @@ func FPlus(y, z Octa, r Round) (x Octa, exc int) {
 		}
 		return y, exc
 
-//line mmixarith.w:914
+//line mmixarith.w:910
 
-//line mmixarith.w:938
+//line mmixarith.w:934
 	case 4*zro + num:
 		return fpack(zf, ze, zs, RoundOff) // may underflow
 	case 4*num + zro:
 		return fpack(yf, ye, ys, RoundOff) // may underflow
 
-//line mmixarith.w:915
+//line mmixarith.w:911
 
-//line mmixarith.w:947
+//line mmixarith.w:943
 	case 4*inf + inf:
 		if ys != zs {
 			exc |= IBit
@@ -579,26 +579,26 @@ func FPlus(y, z Octa, r Round) (x Octa, exc int) {
 	case 4*inf + num, 4*inf + zro:
 		x, xs = InfOcta, ys
 
-//line mmixarith.w:916
+//line mmixarith.w:912
 	case 4*num + num:
 		if y != z^SignBit {
 
-//line mmixarith.w:965
+//line mmixarith.w:961
 			if ye < ze || (ye == ze && yf < zf) {
 
-//line mmixarith.w:999
+//line mmixarith.w:995
 				yf, zf = zf, yf
 				ye, ze = ze, ye
 				ys, zs = zs, ys
 
-//line mmixarith.w:967
+//line mmixarith.w:963
 			}
 			d := ye - ze
 			xs = ys
 			xe := ye
 			if d != 0 {
 
-//line mmixarith.w:1030
+//line mmixarith.w:1026
 				if d <= 2 {
 					zf >>= d // exact result
 				} else if d > 54 {
@@ -616,7 +616,7 @@ func FPlus(y, z Octa, r Round) (x Octa, exc int) {
 					}
 				}
 
-//line mmixarith.w:973
+//line mmixarith.w:969
 			}
 			var xf Octa
 			if ys == zs {
@@ -639,7 +639,7 @@ func FPlus(y, z Octa, r Round) (x Octa, exc int) {
 			}
 			return fpack(xf, xe, xs, r)
 
-//line mmixarith.w:919
+//line mmixarith.w:915
 		}
 		fallthrough
 	case 4*zro + zro:
@@ -656,10 +656,10 @@ func FPlus(y, z Octa, r Round) (x Octa, exc int) {
 	return
 }
 
-//line mmixarith.w:1064
+//line mmixarith.w:1060
 func FEpsComp(y, z, e Octa, s bool) int {
 
-//line mmixarith.w:1075
+//line mmixarith.w:1071
 	et, ef, ee, es := funpack(e)
 	if es {
 		return 2
@@ -671,11 +671,11 @@ func FEpsComp(y, z, e Octa, s bool) int {
 		ee = 10000
 	}
 
-//line mmixarith.w:1066
+//line mmixarith.w:1062
 	yt, yf, ye, ys := funpack(y)
 	zt, zf, ze, zs := funpack(z)
 
-//line mmixarith.w:1091
+//line mmixarith.w:1087
 	switch 4*yt + zt {
 	case 4*nan + nan, 4*nan + inf, 4*nan + num, 4*nan + zro,
 		4*inf + nan, 4*num + nan, 4*zro + nan:
@@ -698,9 +698,9 @@ func FEpsComp(y, z, e Octa, s bool) int {
 		}
 	}
 
-//line mmixarith.w:1069
+//line mmixarith.w:1065
 
-//line mmixarith.w:1154
+//line mmixarith.w:1150
 	if ye < 0 && yt != zro {
 		yf, ye = y<<2, 0
 	}
@@ -708,15 +708,15 @@ func FEpsComp(y, z, e Octa, s bool) int {
 		zf, ze = z<<2, 0
 	}
 
-//line mmixarith.w:1118
+//line mmixarith.w:1114
 	if ye < ze || (ye == ze && yf < zf) {
 
-//line mmixarith.w:999
+//line mmixarith.w:995
 		yf, zf = zf, yf
 		ye, ze = ze, ye
 		ys, zs = zs, ys
 
-//line mmixarith.w:1120
+//line mmixarith.w:1116
 	}
 	if ze == zeroExponent {
 		ze = ye
@@ -729,7 +729,7 @@ func FEpsComp(y, z, e Octa, s bool) int {
 		return 1 // if $\epsilon\ge2$, $z\in N_\epsilon(y)$
 	}
 
-//line mmixarith.w:1175
+//line mmixarith.w:1171
 	var o, oo Octa
 	if d > 54 {
 		o, oo = 0, zf
@@ -751,7 +751,7 @@ func FEpsComp(y, z, e Octa, s bool) int {
 		o = yf + o
 	}
 
-//line mmixarith.w:1132
+//line mmixarith.w:1128
 	if o == 0 {
 		return 1
 	}
@@ -768,35 +768,35 @@ func FEpsComp(y, z, e Octa, s bool) int {
 	}
 	return 0
 
-//line mmixarith.w:1070
+//line mmixarith.w:1066
 }
 
-//line mmixarith.w:1205
+//line mmixarith.w:1201
 func FloatString(x Octa) string {
 
-//line mmixarith.w:1279
+//line mmixarith.w:1275
 	var f, g Octa // lower and upper bounds on the fraction part
 	var e int     // exponent part
 	var j, k int  // all purpose indices
 
-//line mmixarith.w:1587
+//line mmixarith.w:1583
 	var ff, gg bignum        // fractions or numerators of fractions
 	var tt bignum            // power of ten (used as the denominator)
 	s := make([]byte, 0, 17) // significant digits
 
-//line mmixarith.w:1207
+//line mmixarith.w:1203
 	var sb strings.Builder
 	if x&SignBit != 0 {
 		sb.WriteByte('-')
 	}
 
-//line mmixarith.w:1256
+//line mmixarith.w:1252
 	f = x << 1
 	e = int(f >> 53)
 	f &= 1<<53 - 1
 	if f == 0 {
 
-//line mmixarith.w:1292
+//line mmixarith.w:1288
 		if e == 0 {
 			sb.WriteString("0.")
 			return sb.String()
@@ -809,7 +809,7 @@ func FloatString(x Octa) string {
 		f = 1<<54 - 1
 		g = 1<<54 + 2
 
-//line mmixarith.w:1261
+//line mmixarith.w:1257
 	} else {
 		g = f + 1
 		f--
@@ -827,9 +827,9 @@ func FloatString(x Octa) string {
 		}
 	}
 
-//line mmixarith.w:1212
+//line mmixarith.w:1208
 
-//line mmixarith.w:1466
+//line mmixarith.w:1462
 	k = (magicOffset - e) / 28
 	ff.dat[k-1] = Tetra(f>>(magicOffset+28-e-28*k)) & 0xfffffff
 	gg.dat[k-1] = Tetra(g>>(magicOffset+28-e-28*k)) & 0xfffffff
@@ -838,7 +838,7 @@ func FloatString(x Octa) string {
 	ff.dat[k+1] = Tetra(f<<(e+28*k-(magicOffset-28))) & 0xfffffff
 	gg.dat[k+1] = Tetra(g<<(e+28*k-(magicOffset-28))) & 0xfffffff
 
-//line mmixarith.w:1476
+//line mmixarith.w:1472
 	ff.a, ff.b, gg.a, gg.b = k, k, k, k
 	if ff.dat[k-1] != 0 {
 		ff.a = k - 1
@@ -853,12 +853,12 @@ func FloatString(x Octa) string {
 		gg.b = k + 1
 	}
 
-//line mmixarith.w:1213
+//line mmixarith.w:1209
 
-//line mmixarith.w:1508
+//line mmixarith.w:1504
 	if e > 0x401 {
 
-//line mmixarith.w:1546
+//line mmixarith.w:1542
 		open := int(x & 1)
 		tt.dat[origin] = 10
 		tt.a, tt.b = origin, origin
@@ -884,16 +884,16 @@ func FloatString(x Octa) string {
 		}
 		if !done {
 
-//line mmixarith.w:1577
+//line mmixarith.w:1573
 			for k = j; gg.compare(&tt) >= open; k++ {
 				gg.dec(&tt, 0x10000000)
 			}
 			s = append(s, byte((j+1+k)>>1)) // the middle digit
 
-//line mmixarith.w:1571
+//line mmixarith.w:1567
 		}
 
-//line mmixarith.w:1510
+//line mmixarith.w:1506
 	} else { // if |e<=0x401| we have |gg.a>=origin| and |gg.dat[origin]<=8|
 		if ff.a > origin {
 			ff.dat[origin] = 0
@@ -911,9 +911,9 @@ func FloatString(x Octa) string {
 		s = append(s, byte((ff.dat[origin]+1+gg.dat[origin])>>1)+'0') // the middle digit
 	}
 
-//line mmixarith.w:1214
+//line mmixarith.w:1210
 
-//line mmixarith.w:1601
+//line mmixarith.w:1597
 	switch s, n := string(s), len(s); {
 	case e > 17 || e < n-17:
 		dot := ""
@@ -929,11 +929,11 @@ func FloatString(x Octa) string {
 		fmt.Fprintf(&sb, "%s%0*d.", s, e-n, 0)
 	}
 
-//line mmixarith.w:1215
+//line mmixarith.w:1211
 	return sb.String()
 }
 
-//line mmixarith.w:1356
+//line mmixarith.w:1352
 func (f *bignum) timesTen() {
 	var carry Tetra
 	p := f.b
@@ -951,7 +951,7 @@ func (f *bignum) timesTen() {
 	}
 }
 
-//line mmixarith.w:1377
+//line mmixarith.w:1373
 func (f *bignum) compare(g *bignum) int {
 	if f.a != g.a {
 		if f.a > g.a {
@@ -976,7 +976,7 @@ func (f *bignum) compare(g *bignum) int {
 	return -1
 }
 
-//line mmixarith.w:1405
+//line mmixarith.w:1401
 func (f *bignum) dec(g *bignum, r Tetra) {
 	for g.b > f.b {
 		f.b++
@@ -1001,7 +1001,7 @@ func (f *bignum) dec(g *bignum, r Tetra) {
 		}
 	}
 
-//line mmixarith.w:1435
+//line mmixarith.w:1431
 	for f.dat[f.a] == 0 {
 		if f.a == f.b { // the result is zero
 			f.a, f.b = bignumPrec-1, bignumPrec-1
@@ -1014,26 +1014,26 @@ func (f *bignum) dec(g *bignum, r Tetra) {
 		f.b--
 	}
 
-//line mmixarith.w:1429
+//line mmixarith.w:1425
 }
 
-//line mmixarith.w:1673
+//line mmixarith.w:1669
 func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 
-//line mmixarith.w:1710
+//line mmixarith.w:1706
 	var q int     // where we put the next digit in |buf|
 	var decPt int // position of decimal point in |buf|; $-1$ if none
 
-//line mmixarith.w:1808
+//line mmixarith.w:1804
 	var buf [785]byte // where we put significant input digits
 	copy(buf[:], "00000000")
 	var exp int   // scanned exponent; later used for raw binary exponent
 	var zeros int // leading zeros removed after decimal point
 
-//line mmixarith.w:1914
+//line mmixarith.w:1910
 	var ff, tt bignum
 
-//line mmixarith.w:1675
+//line mmixarith.w:1671
 	s += "\x00" // a sentinel at the end, like a \CEE/ string
 	p := 0
 	sign := byte('+')
@@ -1048,7 +1048,7 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 	switch {
 	case isDigit(s[p]) && !NaN || s[p] == '.' && isDigit(s[p+1]):
 
-//line mmixarith.w:1745
+//line mmixarith.w:1741
 		q, decPt = buf0, -1
 		for ; isDigit(s[p]); p++ {
 			val = val + val<<2 // multiply by 5
@@ -1068,7 +1068,7 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 		}
 		if s[p] == '.' {
 
-//line mmixarith.w:1781
+//line mmixarith.w:1777
 			decPt = q
 			p++
 			for zeros = 0; isDigit(s[p]); p++ {
@@ -1082,13 +1082,13 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 				}
 			}
 
-//line mmixarith.w:1764
+//line mmixarith.w:1760
 		}
 		next = p
 		exp = 0
 		if s[p] == 'e' && !NaN {
 
-//line mmixarith.w:1821
+//line mmixarith.w:1817
 			p++
 			expSign := byte('+')
 			if s[p] == '+' || s[p] == '-' {
@@ -1111,7 +1111,7 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 				next = p
 			}
 
-//line mmixarith.w:1769
+//line mmixarith.w:1765
 		}
 		if decPt < 0 {
 			if sign == '-' {
@@ -1120,7 +1120,7 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 			return val, next, DecimalConst
 		}
 
-//line mmixarith.w:1867
+//line mmixarith.w:1863
 		x := 341 + zeros - decPt - exp
 		switch {
 		case q == buf0 || x >= 1413:
@@ -1129,7 +1129,7 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 			exp = 99999 // make it infinity
 		default:
 
-//line mmixarith.w:1885
+//line mmixarith.w:1881
 			ff.a = x / 9
 			for i := q; i < q+8; i++ {
 				buf[i] = '0' // pad with trailing zeros
@@ -1138,14 +1138,14 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 			i, k := buf0-x%9, ff.a
 			for ; i <= q && k <= 156; i, k = i+9, k+1 {
 
-//line mmixarith.w:1907
+//line mmixarith.w:1903
 				d := Tetra(buf[i] - '0')
 				for j := i + 1; j < i+9; j++ {
 					d = 10*d + Tetra(buf[j]-'0')
 				}
 				ff.dat[k] = d
 
-//line mmixarith.w:1893
+//line mmixarith.w:1889
 			}
 			ff.b = k - 1
 			x = 0
@@ -1159,9 +1159,9 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 				ff.b--
 			}
 
-//line mmixarith.w:1875
+//line mmixarith.w:1871
 
-//line mmixarith.w:1955
+//line mmixarith.w:1951
 			val = 0
 			if ff.a > 36 {
 				for exp = 0x3fe; ff.a > 36; exp-- {
@@ -1197,29 +1197,29 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 				val |= 1 // add sticky bit if |ff| nonzero
 			}
 
-//line mmixarith.w:1876
+//line mmixarith.w:1872
 		}
 
-//line mmixarith.w:1689
+//line mmixarith.w:1685
 	case NaN:
 
-//line mmixarith.w:1717
+//line mmixarith.w:1713
 		next = p
 		val, exp = 0x60000000000000, 0x3fe
 
-//line mmixarith.w:1691
+//line mmixarith.w:1687
 	case strings.HasPrefix(s[p:], "Inf"):
 
-//line mmixarith.w:1723
+//line mmixarith.w:1719
 		next = p + 3
 		exp = 99999
 
-//line mmixarith.w:1693
+//line mmixarith.w:1689
 	default:
 		return 0, 0, NoConst
 	}
 
-//line mmixarith.w:2005
+//line mmixarith.w:2001
 	val, _ = fpack(val, exp, sign == '-', RoundNear)
 	if NaN {
 		switch {
@@ -1232,14 +1232,14 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 		}
 	}
 
-//line mmixarith.w:1697
+//line mmixarith.w:1693
 	return val, next, FloatConst
 }
 
-//line mmixarith.w:1703
+//line mmixarith.w:1699
 func isDigit(c byte) bool { return '0' <= c && c <= '9' }
 
-//line mmixarith.w:1920
+//line mmixarith.w:1916
 func (f *bignum) double() {
 	var carry Tetra
 	p := f.b
@@ -1260,7 +1260,7 @@ func (f *bignum) double() {
 	}
 }
 
-//line mmixarith.w:2030
+//line mmixarith.w:2026
 func FComp(y, z Octa) int {
 	yt, _, _, ys := funpack(y)
 	zt, _, _, zs := funpack(z)
@@ -1290,7 +1290,7 @@ func FComp(y, z Octa) int {
 	return x
 }
 
-//line mmixarith.w:2063
+//line mmixarith.w:2059
 func FIntegerize(z Octa, r Round) (x Octa, exc int) {
 	zt, zf, ze, zs := funpack(z)
 	switch zt {
@@ -1304,7 +1304,7 @@ func FIntegerize(z Octa, r Round) (x Octa, exc int) {
 		return z, exc
 	}
 
-//line mmixarith.w:2089
+//line mmixarith.w:2085
 	if ze >= 1074 {
 		return fpack(zf, ze, zs, RoundOff) // already an integer
 	}
@@ -1318,7 +1318,7 @@ func FIntegerize(z Octa, r Round) (x Octa, exc int) {
 		}
 	}
 
-//line mmixarith.w:2115
+//line mmixarith.w:2111
 	switch r {
 	case RoundDown:
 		if zs {
@@ -1336,7 +1336,7 @@ func FIntegerize(z Octa, r Round) (x Octa, exc int) {
 		}
 	}
 
-//line mmixarith.w:2102
+//line mmixarith.w:2098
 	xf &^= 3
 	if ze >= 1022 {
 		return fpack(xf<<(1074-ze), ze, zs, RoundOff)
@@ -1349,10 +1349,10 @@ func FIntegerize(z Octa, r Round) (x Octa, exc int) {
 	}
 	return xf, exc
 
-//line mmixarith.w:2076
+//line mmixarith.w:2072
 }
 
-//line mmixarith.w:2142
+//line mmixarith.w:2138
 func FixIt(z Octa, r Round) (Octa, int) {
 	zt, _, _, _ := funpack(z)
 	switch zt {
@@ -1367,7 +1367,7 @@ func FixIt(z Octa, r Round) (Octa, int) {
 		return 0, 0
 	}
 
-//line mmixarith.w:2159
+//line mmixarith.w:2155
 	var o Octa
 	exc := 0
 	if ze <= 1076 {
@@ -1386,10 +1386,10 @@ func FixIt(z Octa, r Round) (Octa, int) {
 	}
 	return o, exc
 
-//line mmixarith.w:2156
+//line mmixarith.w:2152
 }
 
-//line mmixarith.w:2185
+//line mmixarith.w:2181
 func FloatIt(z Octa, r Round, unsigned, short bool) (Octa, int) {
 	if z == 0 {
 		return 0, 0
@@ -1410,18 +1410,18 @@ func FloatIt(z Octa, r Round, unsigned, short bool) (Octa, int) {
 	exc := 0
 	if short {
 
-//line mmixarith.w:2216
+//line mmixarith.w:2212
 		var t Tetra
 		t, exc = sfpack(z, e, s, r)
 		_, z, e, s = sfunpack(t)
 
-//line mmixarith.w:2205
+//line mmixarith.w:2201
 	}
 	x, ex := fpack(z, e, s, r)
 	return x, exc | ex
 }
 
-//line mmixarith.w:2223
+//line mmixarith.w:2219
 func FRoot(z Octa, r Round) (x Octa, exc int) {
 	zt, zf, ze, zs := funpack(z)
 	if zs && zt != zro {
@@ -1439,7 +1439,7 @@ func FRoot(z Octa, r Round) (x Octa, exc int) {
 			x = z
 		case num:
 
-//line mmixarith.w:2268
+//line mmixarith.w:2264
 			xf := Octa(2)
 			xe := (ze + 0x3fe) >> 1
 			if ze&1 != 0 {
@@ -1463,7 +1463,7 @@ func FRoot(z Octa, r Round) (x Octa, exc int) {
 			}
 			return fpack(xf, xe, false, r)
 
-//line mmixarith.w:2240
+//line mmixarith.w:2236
 		}
 	}
 	if zs {
@@ -1472,13 +1472,13 @@ func FRoot(z Octa, r Round) (x Octa, exc int) {
 	return
 }
 
-//line mmixarith.w:2302
+//line mmixarith.w:2298
 func FRemStep(y, z Octa, delta int) (x Octa, exc int) {
 	yt, yf, ye, ys := funpack(y)
 	zt, zf, ze, _ := funpack(z)
 	switch 4*yt + zt {
 
-//line mmixarith.w:808
+//line mmixarith.w:804
 	case 4*nan + nan:
 		if y&(1<<51) == 0 {
 			exc |= IBit // |y| is signaling
@@ -1497,7 +1497,7 @@ func FRemStep(y, z Octa, delta int) (x Octa, exc int) {
 		}
 		return y, exc
 
-//line mmixarith.w:2307
+//line mmixarith.w:2303
 	case 4*zro + zro, 4*num + zro, 4*inf + zro, 4*inf + num, 4*inf + inf:
 		x = StandardNaN
 		exc |= IBit
@@ -1505,13 +1505,13 @@ func FRemStep(y, z Octa, delta int) (x Octa, exc int) {
 		return y, exc
 	case 4*num + num:
 
-//line mmixarith.w:2336
+//line mmixarith.w:2332
 		odd := false // becomes true if we've subtracted an odd multiple of~$z$ from $y$
 		zero, complement := false, false
 		thresh := max(ye-delta, ze)
 		for ye >= thresh {
 
-//line mmixarith.w:2351
+//line mmixarith.w:2347
 			if yf == zf {
 				zero = true
 				break
@@ -1533,11 +1533,11 @@ func FRemStep(y, z Octa, delta int) (x Octa, exc int) {
 				yf <<= 1
 			}
 
-//line mmixarith.w:2341
+//line mmixarith.w:2337
 		}
 		if !zero {
 
-//line mmixarith.w:2382
+//line mmixarith.w:2378
 			if !complement {
 				if ye >= ze {
 					exc |= EBit
@@ -1559,10 +1559,10 @@ func FRemStep(y, z Octa, delta int) (x Octa, exc int) {
 			}
 			return fpack(xf, xe, xs, RoundOff)
 
-//line mmixarith.w:2344
+//line mmixarith.w:2340
 		}
 
-//line mmixarith.w:2314
+//line mmixarith.w:2310
 	}
 	if ys {
 		x |= SignBit

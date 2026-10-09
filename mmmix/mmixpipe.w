@@ -2,16 +2,6 @@
 % 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
 @i ../boilerplate.w
 
-@s io.Writer int
-@s bufio.Writer int
-@s mmixarith.Octa int
-@s mmixarith.Tetra int
-@s mmixarith.Round int
-@s mmixio.IO int
-@s mmixio.Simulator int
-@s cfile int
-@s hio int
-@s blk int
 
 \input kotexgweb
 \def\title{MMIXPIPE}
@@ -368,7 +358,7 @@ $t+|ringSize|-1$마다 큐가 하나씩 있다.
 파이프라인의 뒤 단계들을 먼저 처리하고 싶다. 다른 차가 M~정거장에 들어오려면 먼저 있던 차가
 M~정거장에서 W~정거장으로 가야 하는 것과 같은 이치다.
 
-각 큐는 \KW{coroutine} 노드들이 |next| 필드로 이어진 원형 리스트다. 단계 번호가 |maxStage|인 머리 노드~$h$가 큐의 끝이자 처음에 온다. (정상적인 코루틴의 |stage| 번호는 모두 |maxStage|보다
+각 큐는 |coroutine| 노드들이 |next| 필드로 이어진 원형 리스트다. 단계 번호가 |maxStage|인 머리 노드~$h$가 큐의 끝이자 처음에 온다. (정상적인 코루틴의 |stage| 번호는 모두 |maxStage|보다
 작다.) 큐에 든 항목은 뒤에서 앞으로 |h.next|, |h.next.next| 등이고, |c=h|가 아니면
 |c.stage<=c.next.stage|이다.
 
@@ -473,7 +463,7 @@ sentinel coroutine // dummy coroutine at origin of circular list
 모든 코루틴은 갑자기 끝나더라도 중요한 데이터 구조가 온전히 남도록 짜야 한다. 특히 공유
 자원에 대한 ``잠금''은, 그 잠금을 쥔 코루틴이 중단될 때 풀린 상태로 되돌려 놓아야 한다.
 
-타입 \KW{lockvar}의 변수는 풀려 있으면 |nil|이고, 그렇지 않으면 그것을 풀 책임이 있는 코루틴을
+타입 |lockvar|의 변수는 풀려 있으면 |nil|이고, 그렇지 않으면 그것을 풀 책임이 있는 코루틴을
 가리킨다.
 
 보충: 원본의 매크로 |set_lock(c,l)|과 |release_lock(c,l)|은 잠금 변수 자체를 받았다.
@@ -523,16 +513,16 @@ func (mx *machine) printLocks() {
 @ 우리가 다루는 양 가운데 많은 것은 아직 ``진짜'' 계산의 일부로 인정받지 못한 투기적인
 값이다. 사실 아직 계산되지 않았을 수도 있다.
 
-타입 \KW{spec}은 64비트 양 |o|와 \KW{specnode}를 가리키는 포인터~|p|로 이루어진다. 값~|o|는
+타입 |spec|은 64비트 양 |o|와 |specnode|를 가리키는 포인터~|p|로 이루어진다. 값~|o|는
 포인터~|p|가 |nil|일 때만 뜻이 있다. 그렇지 않으면 |p|는 더 많은 정보가 있는 곳을 가리킨다.
 
-타입 \KW{specnode}는 64비트 양 |o|와, 이중 연결 리스트에서 그 위와 아래에 있는 다른 \KW{specnode}들에
+타입 |specnode|는 64비트 양 |o|와, 이중 연결 리스트에서 그 위와 아래에 있는 다른 |specnode|들에
 대한 링크로 이루어진다. 비트 |known|이 더 있어서 |o|~필드가 계산되었는지 알려 준다. 또 리스트를
-식별하고 정보를 더 주는 64비트 |addr| 필드가 있다. 이 \KW{specnode} 리스트는 특정한 레지스터나
+식별하고 정보를 더 주는 64비트 |addr| 필드가 있다. 이 |specnode| 리스트는 특정한 레지스터나
 주 메모리 전체와 관련된 투기적 값들을 추적한다. 이런 리스트는 나중에 자세히 다룬다.
 
-보충: 필드 |ctl|은 옮긴이가 덧붙인 것이다. 제어 블록 안에 든 \KW{specnode}이면 그 제어 블록을
-가리킨다. 원본은 이 정보를 두 가지 방식으로 얻었다. 하나는 주소 비교로, \KW{specnode}가 재정렬
+보충: 필드 |ctl|은 옮긴이가 덧붙인 것이다. 제어 블록 안에 든 |specnode|이면 그 제어 블록을
+가리킨다. 원본은 이 정보를 두 가지 방식으로 얻었다. 하나는 주소 비교로, |specnode|가 재정렬
 버퍼의 어느 제어 블록 안에 있는지 가렸다. 다른 하나는 |go| 필드의 |up|에 제어 블록의 주소를
 억지로 넣어 두는 것이었다.
 
@@ -547,7 +537,7 @@ type specnode struct {
 	known    bool
 	addr     Octa
 	up, down *specnode
-	ctl      *control // the control block containing this \KW{specnode}
+	ctl      *control // the control block containing this |specnode|
 }
 
 @ 원본의 전역 변수 |zero_spec|은 \GO/에서 |spec{}|이다.
@@ -575,32 +565,32 @@ func (mx *machine) printSpecnode(s *specnode) {
 	mx.printSpecnodeID(s.addr)
 }
 
-@ 우리 시뮬레이터에서 자동차에 해당하는 것은 \KW{control}이라는 데이터 블록이다. 이것은
+@ 우리 시뮬레이터에서 자동차에 해당하는 것은 |control|이라는 데이터 블록이다. 이것은
 \MMIX\ 명령에 관한 모든 사실을 나타낸다. 차의 앞유리에 붙은 작업 지시서라고 생각하면 된다.
 차가 정비소를 지나가면서 직원 무리마다 작업 지시서를 고쳐 쓴다.
 
-타입 \KW{control}의 레코드에는 명령이 원래 있던 위치와 그 명령의 네 바이트 OP~X~Y~Z가 들어 있다.
-명령은 입력이 넷까지 있는데, |y|, |z|, |b|, |ra|라는 \KW{spec} 레코드다. 출력은 셋까지 있는데,
-|x|, |a|, |rl|이라는 \KW{specnode} 레코드다. (특별한 입력~|ra|와 특별한 출력~|rl|은 대개
+타입 |control|의 레코드에는 명령이 원래 있던 위치와 그 명령의 네 바이트 OP~X~Y~Z가 들어 있다.
+명령은 입력이 넷까지 있는데, |y|, |z|, |b|, |ra|라는 |spec| 레코드다. 출력은 셋까지 있는데,
+|x|, |a|, |rl|이라는 |specnode| 레코드다. (특별한 입력~|ra|와 특별한 출력~|rl|은 대개
 말하지 않는다. 이것들은 \.{MMIX}의 내부 레지스터 rA와~rL을 가리킨다.) 이를테면 \.{DIVU}
 명령의 주 입력은 \$Y, \$Z, rD이고, 출력은 몫~\$X와 나머지~rR이다. \.{STO} 명령의 입력은
 \$Y, \$Z, \$X다. ``출력''은 하나인데, 필드~|x.addr|에 가상 주소 $\rm \$Y+\$Z$에 해당하는
 메모리 위치의 물리 주소가 들어간다.
 
-타입 \KW{control}의 블록마다 그것을 가진 코루틴이 있으면 그 코루틴도 가리킨다. 그 밖의 여러 필드에는
+타입 |control|의 블록마다 그것을 가진 코루틴이 있으면 그 코루틴도 가리킨다. 그 밖의 여러 필드에는
 이런저런 정보가 들어 있다. 이를테면 앞서 말한 |state|~필드가 있는데, 이 필드는 흔히
 코루틴의 행동을 지배한다. 필드~|i|에는 내부 연산 코드 번호가 들어 있고, 대개 |state|와 함께
 여러 계산 단계 가운데 하나로 갈라지는 데 쓰인다. 이를테면 |op|~필드가 \.{SUB}나 \.{SUBI}나
-\.{NEG}나 \.{NEGI}이면 내부 연산 코드~|i|는 그냥 |sub|다. 이제 \KW{control} 레코드의 필드를
+\.{NEG}나 \.{NEGI}이면 내부 연산 코드~|i|는 그냥 |sub|다. 이제 |control| 레코드의 필드를
 모두 정의하고, 설명은 나중에 한다.
 
-실제 하드웨어 구현이라면 우리가 \KW{control} 블록에 넣는 정보가 다 필요하지는 않을 것이다.
+실제 하드웨어 구현이라면 우리가 |control| 블록에 넣는 정보가 다 필요하지는 않을 것이다.
 그 정보의 일부는 대개 파이프라인 단계 사이에서 래치에 붙잡힐 것이고, 다른 일부는 이른바
 ``이름 바꾸기 레지스터''에 나타날 것이다.
 @^rename registers@>
 우리는 이름 바꾸기 레지스터를 간접적으로만 흉내 낸다. 저수준 하드웨어의 세부를 더 정확히
 흉내 낸다면 그런 레지스터가 몇 개나 쓰이고 있을지를 세는 것이다. 필드 |go|는 프로그래밍의
-편의상 \KW{specnode}이지만, 그 가운데 |known|과 |o| 필드만 쓴다. 여기에는 대개 다음 명령의
+편의상 |specnode|이지만, 그 가운데 |known|과 |o| 필드만 쓴다. 여기에는 대개 다음 명령의
 주소가 들어 있다.
 
 보충: \GO/에서 |go|는 예약어이므로 이 필드의 이름은 |goLoc|이다. 필드 |idx|는 옮긴이가
@@ -641,7 +631,7 @@ setL       bool // does |rl| correspond to a new value of rL?
 interim    bool // does this instruction need to be reissued on interrupt?
 stackAlert bool // is there potential for stack overflow?
 
-@ 보충: 제어 블록의 네 \KW{specnode}가 자기 블록을 가리키게 하는 함수다. 제어 블록을 만든
+@ 보충: 제어 블록의 네 |specnode|가 자기 블록을 가리키게 하는 함수다. 제어 블록을 만든
 뒤에 한 번 부른다.
 
 @<함수들@>=
@@ -1101,7 +1091,7 @@ Architecture\/} 제2판(1995) 4.6절에 설명되어 있다.
 가능성이 높은 값들을 계산하느라 바쁘게 지낼 수 있다. 느린 명령이나 느린 메모리 참조가 끝나기를
 기다리지 않아도 된다.
 
-재정렬 버퍼는 사실 \KW{control} 레코드의 큐이고, 개념상으로는 시뮬레이터 안에 있는 그런
+재정렬 버퍼는 사실 |control| 레코드의 큐이고, 개념상으로는 시뮬레이터 안에 있는 그런
 레코드들의 원의 일부를 이룬다. 이 레코드들은 배정되었거나 {\it 발행되었지만\/} 아직 확정되지
 않은 모든 명령에 해당하며, 엄격한 프로그램 순서를 따른다.
 
@@ -1151,21 +1141,21 @@ Architecture\/} 제2판(1995) 4.6절에 설명되어 있다.
 
 지역 레지스터의 수 $\rm L$이 3보다 커서 \$1, \$2, \$3이 지역 레지스터라고 가정하자. 간단히 레지스터 스택이 비어
 있다고도 가정하자. 그러면 \.{ADD} 명령은 $\rm l[1]\gets l[2]+l[3]$을 해야 한다. 피연산자
-l[2]와~l[3]은 시각 1001에 알려져 있지 않을 수도 있다. 이것들은 \KW{spec} 값이어서, 목적지가
-l[2]와~l[3]인 앞선 명령들을 위해 재정렬 버퍼에 만든 \KW{specnode} 항목을 가리킬 수 있다.
+l[2]와~l[3]은 시각 1001에 알려져 있지 않을 수도 있다. 이것들은 |spec| 값이어서, 목적지가
+l[2]와~l[3]인 앞선 명령들을 위해 재정렬 버퍼에 만든 |specnode| 항목을 가리킬 수 있다.
 배정기는 재정렬 버퍼에서 다음에 쓸 수 있는 제어 블록을 \.{ADD}의 정보로 채우는데, 그 |y|와~|z|
-필드에는 l[2]와~l[3]에 해당하는 알맞은 \KW{spec} 값이 들어간다. 이 제어 블록의 |x|~필드는
-\KW{specnode} 레코드의 이중 연결 리스트에 끼워 넣는다. 그 리스트는 l[1]과, 재정렬 버퍼에서
+필드에는 l[2]와~l[3]에 해당하는 알맞은 |spec| 값이 들어간다. 이 제어 블록의 |x|~필드는
+|specnode| 레코드의 이중 연결 리스트에 끼워 넣는다. 그 리스트는 l[1]과, 재정렬 버퍼에서
 l[1]을 목적지로 가진 모든 명령에 해당한다. 불 값 |x.known|은 거짓이 되는데, 이 투기적 값을
 아직 계산해야 한다는 뜻이다. 합 |x.o|가 계산되기 전에 발행된, l[1]을 원천으로 쓰는 뒤따르는
-명령들은 |x|를 가리킨다. 이 \KW{specnode} 리스트를 이중으로 잇는 것은, \.{ADD} 명령이 끝내
+명령들은 |x|를 가리킨다. 이 |specnode| 리스트를 이중으로 잇는 것은, \.{ADD} 명령이 끝내
 확정되기 전에 취소될 수도 있기 때문이다. 그래서 l[1]의 리스트에서는 양쪽 끝에서 지우기가
 일어날 수 있다.
 
 @ 시각 1002에 \.{ADD}를 다루는 ALU는 입력 |y|와~|z|가 둘 다 알려져 있지 않으면(곧 |y.p!=nil|이거나
 |z.p!=nil|이면) 멈춘다. 사실 셋째 입력인 rA가 알려져 있지 않을 때도 멈춘다. rA의 현재 투기적
 값은 사건 비트를 빼고 제어 블록의 |ra|~필드에 나타나 있는데, |ra.p==nil|이어야 한다. 그런
-경우에 ALU는 |y.p|나 |z.p|나 |ra.p|가 가리키는 \KW{spec} 값들이 이 클럭 사이클에 정해지는지
+경우에 ALU는 |y.p|나 |z.p|나 |ra.p|가 가리키는 |spec| 값들이 이 클럭 사이클에 정해지는지
 살펴보고, 그에 따라 자기 입력 값을 고친다.
 
 그러나 |y|, |z|, |ra|가 시각 1002에 이미 알려져 있다고 하자. 그러면 |x.o|는 |y.o+z.o|가 되고
@@ -1338,7 +1328,7 @@ for ; m > 0; m-- {
 나타났다고 가정하자.
 
 가져오기 버퍼는 모든 코루틴의 원형 우선순위 큐나 재정렬 버퍼에 쓰는 원형 큐처럼, 원소들의
-고리로 보는 것이 가장 좋은 배열 안에 산다. 원소는 \KW{fetch} 타입의 구조체로, 다섯 필드가 있다.
+고리로 보는 것이 가장 좋은 배열 안에 산다. 원소는 |fetch| 타입의 구조체로, 다섯 필드가 있다.
 32비트 |inst|는 \MMIX\ 명령이다. 64비트 |loc|은 그 명령의 가상 주소다. 필드 |interrupt|는 이를테면 이 주소에 해당하는 페이지 테이블 항목의 보호 비트가 실행 접근을 허락하지 않으면 0이
 아니다. 불 필드 |noted|는 배정 장치가 그 명령이 점프이거나 그럴듯한 분기인지 엿본 뒤에 참이
 된다. 필드 |hist|는 최근의 분기 이력을 기록한다. (필드 |hist|의 가장 아래 비트들이 가장 최근의
@@ -1378,7 +1368,7 @@ func (mx *machine) prevFetch(p *fetch) *fetch {
 }
 
 @ 원본의 \.{UNKNOWN\_SPEC}은 포인터로 쓸 수 없는 값 |(specnode*)1|이었다. 여기서는 그 뜻으로만
-쓰는 \KW{specnode} 필드 |unknownSpec|의 주소를 쓴다.
+쓰는 |specnode| 필드 |unknownSpec|의 주소를 쓴다.
 
 @<모든 것을 초기화한다@>=
 mx.head, mx.tail = mx.fetchTop, mx.fetchTop
@@ -1388,7 +1378,7 @@ mx.instPtr.p = &mx.unknownSpec
 unknownSpec specnode // where the original's \.{UNKNOWN\_SPEC} points
 
 @ 보충: 원본은 |go| 필드의 |up|에 제어 블록의 주소를 넣어 두었다가 여기서 되찾았다. 여기서는
-\KW{specnode}의 |ctl| 필드가 그 제어 블록이다.
+|specnode|의 |ctl| 필드가 그 제어 블록이다.
 
 @<함수들@>=
 func (mx *machine) printFetchBuffer() {
@@ -1516,7 +1506,7 @@ mx.coolHist = mx.peekHist
 배열에는 코루틴이 $k$개 있는데, $k$는 그 장치가 지원하는 연산 코드들이 필요로 하는 단계 수의
 최댓값이다.
 
-보충: \GO/에서 |func|는 예약어이므로 이 타입의 이름은 \KW{funcUnit}이다. 원본의 |co|는 $k$개의
+보충: \GO/에서 |func|는 예약어이므로 이 타입의 이름은 |funcUnit|이다. 원본의 |co|는 $k$개의
 코루틴 가운데 첫째를 가리키는 포인터였는데, 여기서는 그 배열 자체다.
 
 @<타입 정의@>=
@@ -1696,7 +1686,7 @@ if op&1 != 0 {
 cool.y = spec{o: mx.head.loc + 4}
 cool.z = spec{o: mx.head.loc + Octa(yz<<2)}
 
-@ 다음에 가져올 명령의 위치는 |instPtr|이라는 \KW{spec} 변수에 있다. rJ의 투기적 값이 알려져
+@ 다음에 가져올 명령의 위치는 |instPtr|이라는 |spec| 변수에 있다. rJ의 투기적 값이 알려져
 있는 흔한 경우에는 \.{POP} 명령을 조금 까다롭게 최적화한다.
 
 @<이 명령에서 제어가 바뀌면...@>=
@@ -1733,15 +1723,15 @@ cool.z = spec{o: mx.head.loc + Octa(yz<<2)}
 상태''다. 배정기는 차가운 명령들을 다루며 그것들을 재정렬 버퍼에 넣는데, 거기서 명령들은 점점
 따뜻해진다. 포인터 |hot|과 |cool| 사이의 중간 명령들은 중간 온도를 가진다.
 
-l[101]이나 g[250] 같은 기계 레지스터는 \KW{specnode}로 나타내는데, 그 |o|~필드가 레지스터의
-현재 뜨거운 값이다. 이 \KW{specnode}의 |up|과 |down| 필드가 노드 자신을 가리키면, 레지스터의
+l[101]이나 g[250] 같은 기계 레지스터는 |specnode|로 나타내는데, 그 |o|~필드가 레지스터의
+현재 뜨거운 값이다. 이 |specnode|의 |up|과 |down| 필드가 노드 자신을 가리키면, 레지스터의
 뜨거운 값과 차가운 값이 같다. 그렇지 않으면 |up|과 |down|은 중간의 투기적 값들(흔히 ``이름
-바꾸기 레지스터''라고 부른다)을 나타내는 \KW{specnode} 이중 연결 리스트의 가장 차가운 끝과
+바꾸기 레지스터''라고 부른다)을 나타내는 |specnode| 이중 연결 리스트의 가장 차가운 끝과
 가장 뜨거운 끝을 가리킨다.
 @^rename registers@>
 이름 바꾸기 레지스터는 이 레지스터를 목적지로 쓰는 투기적 명령들의 제어 블록 안에 든 |x|나~|a|
-\KW{specnode}로 구현된다. 이 레지스터를 원천 피연산자로 쓰는 투기적 명령들은 값이 알려질 때까지
-리스트에서 그다음으로 뜨거운 \KW{specnode}를 가리킨다. 이 \KW{specnode}들의 이중 연결 리스트는
+|specnode|로 구현된다. 이 레지스터를 원천 피연산자로 쓰는 투기적 명령들은 값이 알려질 때까지
+리스트에서 그다음으로 뜨거운 |specnode|를 가리킨다. 이 |specnode|들의 이중 연결 리스트는
 입력이 제한된 덱이다. 배정기가 이 레지스터를 목적지로 하는 명령을 발행하면 차가운 끝에 노드를
 넣고, 명령의 발행을 취소해야 하면 차가운 끝에서 노드를 빼고, 명령이 확정되면 뜨거운 끝에서
 노드를 뺀다.
@@ -1763,7 +1753,7 @@ renameRegs, memSlots        int           // currently unused capacity
 ticks     Octa // the internal clock
 lringMask int  // for calculations modulo |lringSize|
 
-@ 레지스터의 \KW{specnode} 리스트에 있는 |addr| 필드는 진단 메시지에서 그 레지스터를
+@ 레지스터의 |specnode| 리스트에 있는 |addr| 필드는 진단 메시지에서 그 레지스터를
 식별하는 데 쓰인다. 이런 주소는 음수이고, 메모리 주소는 양수다.
 
 모든 레지스터는 처음에 0이다. 다만 rG는 처음에 255이고, rN은 컴파일한 때를 나타내는 상수
@@ -1821,10 +1811,10 @@ func (mx *machine) printSpecnodeID(a Octa) {
 }
 
 @ 서브루틴 |specval|은 주어진 지역 레지스터나 전역 레지스터의 지금 가장 차가운 값에 해당하는
-\KW{spec}을 만든다.
+|spec|을 만든다.
 
 보충: 원본은 값을 모를 때 |o| 필드를 초기화하지 않은 채 돌려주었다. 여기서는 0이다. 그런
-\KW{spec}은 |p|가 |nil|이 될 때까지 |o|를 보지 않는다.
+|spec|은 |p|가 |nil|이 될 때까지 |o|를 보지 않는다.
 
 @<함수들@>=
 func (mx *machine) specval(r *specnode) spec {
@@ -1856,7 +1846,7 @@ func specRem(t *specnode) { // remove |t| from its list
 
 @ 어떤 특수 레지스터들은 \MMIX의 동작에 너무나 중요해서, 명령마다 원천 레지스터와 목적지
 레지스터로 다루지 않고 재정렬 버퍼의 제어 블록마다 함께 싣고 다닌다. 이를테면 레지스터 스택
-포인터 rO와~rS가 그렇게 다루어진다. rO와~rS의 보통 \KW{specnode}인 |g[rO]|와~|g[rS]|는 실제로
+포인터 rO와~rS가 그렇게 다루어진다. rO와~rS의 보통 |specnode|인 |g[rO]|와~|g[rS]|는 실제로
 쓰이지 않는다. 차가운 값은 |coolO|와 |coolS|라고 부른다. (사실 |coolO|와 |coolS|는 레지스터
 값을~8로 나눈 것에 해당한다. rO와~rS는 늘 8의 배수이기 때문이다.)
 
@@ -2166,14 +2156,14 @@ cool.needB = false
 cool.renX, cool.interim = true, true
 break dispatchDone
 
-@ 메모리에 저장하려면 지역 레지스터와 전역 레지스터에 쓰는 것과 같은 \KW{specnode}의 이중
+@ 메모리에 저장하려면 지역 레지스터와 전역 레지스터에 쓰는 것과 같은 |specnode|의 이중
 연결 데이터 리스트가 필요하다. 이 경우에 리스트의 머리는 |mem|이라고 부르고, |addr| 필드는
 메모리의 물리 주소다.
 
 @<기계의 상태@>=
 mem specnode
 
-@ 메모리 \KW{specnode}의 |addr| 필드는 물리 주소를 계산할 때까지 모두 1이다.
+@ 메모리 |specnode|의 |addr| 필드는 물리 주소를 계산할 때까지 모두 1이다.
 
 @<모든 것을 초기화한다@>=
 mx.mem.addr = negOne
@@ -2403,7 +2393,7 @@ break
 이 프로그램에서 지금 관심 있는 코루틴은 |self|라고 부른다. 그러니 |self.stage|가 지금 관심
 있는 단계 번호다. 또 다른 핵심 변수 |self.ctl|은 |data|라고 부른다. 현재 코루틴이 다루고 있는
 제어 블록이다. 우리는 대개 |data.x|를 |data.y|와 |data.z|의 함수로 계산하는 연산을 흉내 낸다.
-레코드 |data|에는 앞서 \KW{control} 구조를 정의할 때 설명한 대로 필드가 많다. 이를테면 실행
+레코드 |data|에는 앞서 |control| 구조를 정의할 때 설명한 대로 필드가 많다. 이를테면 실행
 단계 동안 |data.owner|가 |nil|이 아니면 |self|와 같다.
 
 시뮬레이터의 이 부분은 기능 장치마다 256가지 연산을 모두 다룰 수 있는 것처럼 쓰여 있다.
@@ -2424,7 +2414,7 @@ break
 스위치 하나로 짜여 있었다. 이 스위치 안에서 코드는 |goto|로 이름표 사이를 넘나들고, |case|
 사이를 흘러내리고, 안쪽 블록 한가운데로 뛰어든다. 그런 구조를 \GO/로 옮기려고, 옮긴이는 그
 스위치를 메서드 |step| 하나로 만들고 ``지점 기계''로 짰다. 원본의 이름표 하나하나와 상태
-스위치의 |case| 하나하나가 \KW{label} 타입의 지점이 된다. 메서드는 |for| 루프 안의 |switch pc|로
+스위치의 |case| 하나하나가 |label| 타입의 지점이 된다. 메서드는 |for| 루프 안의 |switch pc|로
 돌면서, 지점마다 원본의 코드를 수행한다. 원본에서 다음 |case|로 흘러내리던 곳은 \GO/의
 |fallthrough|가 되고, |goto X|는 |pc=X|와 |continue|가 된다. 원본의 |goto done|은 |return false|이고,
 |goto terminate|는 |return true|다.
@@ -3464,8 +3454,8 @@ const (
 	writeAlloc = 2 // use this if not write-around
 )
 
-@ 앞에서 보았듯이 여러 종류의 캐시를 흉내 낼 수 있다. 캐시는 \KW{cache} 구조체로 나타내는데,
-여기에는 \KW{cacheset} 구조체의 배열이 들어 있고, 그 안에는 개별 블록을 위한 \KW{cacheblock}
+@ 앞에서 보았듯이 여러 종류의 캐시를 흉내 낼 수 있다. 캐시는 |cache| 구조체로 나타내는데,
+여기에는 |cacheset| 구조체의 배열이 들어 있고, 그 안에는 개별 블록을 위한 |cacheblock|
 구조체의 배열이 들어 있다. 우리는 더러움 비트마다 한 바이트를 쓰고, LRU 처리 등을 위한 |rank|
 필드에는 정수 한 낱말을 쓴다. 이 시뮬레이터에서는 메모리 절약보다 단순함이 더 중요하다.
 
@@ -3825,7 +3815,7 @@ func (mx *machine) useAndFix(c *cache, p *cacheblock) *cacheblock {
 	return p
 }
 
-@ 데이터를 복사하는 대신 캐시의 \KW{cacheblock} 구조 안에 있는 포인터들을 맞바꿀 수 있다.
+@ 데이터를 복사하는 대신 캐시의 |cacheblock| 구조 안에 있는 포인터들을 맞바꿀 수 있다.
 다만 그 포인터들이 다른 데이터 구조로 새어 나가지 않도록 조심해야 한다.
 
 @<함수들@>=
@@ -4727,7 +4717,7 @@ IPTctl, DPTctl [5]control    // control blocks for I and D page translation
 IPTco, DPTco   [10]coroutine // each coroutine is a two-stage pipeline
 
 @ 보충: 원본은 |co[2*j]|의 다음 단계를 |self+1|로 얻었다. 여기서는 |succ| 필드를 정한다. 제어
-블록의 \KW{specnode}들이 자기 블록을 가리키게 하는 일도 여기서 한다.
+블록의 |specnode|들이 자기 블록을 가리키게 하는 일도 여기서 한다.
 
 @<모든 것을 초기화한다@>=
 for j = 0; j < 5; j++ {
@@ -6069,7 +6059,7 @@ IT-캐시를 동시에 읽는 복잡함을 여기에도 넣는다.
 
 보통 상황에서 가져오기 코루틴은 가상 주소가 |instPtr|(명령 포인터)로 주어진 명령이 든 캐시
 블록에 접근해서, 그 블록에서 명령을 |fetchMax|개까지 가져오기 버퍼로 옮긴다. 명령이 캐시에
-없거나, IT-캐시를 놓쳐서 가상 주소를 변환할 수 없으면 복잡해진다. 더욱이 |instPtr|는 \KW{spec}
+없거나, IT-캐시를 놓쳐서 가상 주소를 변환할 수 없으면 복잡해진다. 더욱이 |instPtr|는 |spec|
 변수여서 그 값을 아직 모를 수도 있다. 포인터 |instPtr.p|가 |nil|이 아니면 무엇을 가져올지 모른다.
 @^program counter@>
 
@@ -6736,8 +6726,8 @@ if mx.g[rI].o == 0 {
 		mx.printf("\n")
 	}
 }
-if mx.blk != nil {
-	mx.blk.tick() // supplement: the block device of \.{mmixmem.w} spends time
+if mx.blkDev != nil {
+	mx.blkDev.tick() // supplement: the block device of \.{mmixmem.w} spends time
 }
 mx.tryingToInterrupt = false
 if mx.g[rQ].o&mx.g[rK].o != 0 && mx.cool != mx.hot &&
@@ -8591,8 +8581,8 @@ stdinBufEnd   int       // current end of that buffer
 @* 기계. 보충: 이 장은 옮긴이가 덧붙인 것이다. 원본의 전역 변수들은 모두 앞에서 조금씩 정의한
 절 ``기계의 상태''에 모였다. 그것들을 필드로 가진 구조체가 |machine|이다. 여기에 입출력을 위한
 필드를 더한다. 표준 출력은 버퍼를 거치고, 표준 오류는 바로 쓴다. 필드 |io|는 \.{mmixio}의 상태이고,
-|stdin|은 표준 입력을 \CEE/의 |fgets|처럼 읽는 파일이다. 타입 \KW{cfile}은 \.{mmmix.w}에서 정의한다.
-필드 |specBuf|는 \.{mmixmem.w}의 원본에서 정적 버퍼였다. 필드 |hio|와 |blk|는 \NNIX\ 커널을 위해
+|stdin|은 표준 입력을 \CEE/의 |fgets|처럼 읽는 파일이다. 타입 |cfile|은 \.{mmmix.w}에서 정의한다.
+필드 |specBuf|는 \.{mmixmem.w}의 원본에서 정적 버퍼였다. 필드 |hioDev|와 |blkDev|는 \NNIX\ 커널을 위해
 \.{mmixmem.w}에 덧붙인 장치다.
 
 @<타입 정의@>=
@@ -8603,8 +8593,8 @@ type machine struct {
 	io     *mmixio.IO    // files of the simulated program
 	stdin  *cfile        // standard input
 	specBuf [20]byte     // buffer used by |specRead| of \.{mmixmem.w}
-	hio     *hio         // host I/O device of \.{mmixmem.w} (only when \.{-k} is given)
-	blk     *blk         // block device of \.{mmixmem.w} (only when \.{-d} is given)
+	hioDev  *hio         // host I/O device of \.{mmixmem.w} (only when \.{-k} is given)
+	blkDev  *blk         // block device of \.{mmixmem.w} (only when \.{-d} is given)
 }
 
 @ 원본의 |exit(n)|은 종료 코드를 담은 |exitSignal|을 던지는 공황이 된다. 주 프로그램이 그것을

@@ -2,14 +2,6 @@
 % 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
 @i ../boilerplate.w
 
-@s os.File int
-@s io.Writer int
-@s bufio.Reader int
-@s bufio.Writer int
-@s bytes.Buffer int
-@s mmixarith.Octa int
-@s mmixarith.Tetra int
-@s testing.T int
 
 \input kotexgweb
 \def\title{MMIXIO}
@@ -27,8 +19,8 @@ Y 필드가 호출 번호, Z 필드가 핸들(handle)이고, 인자는 \$255와 
 
 원본에서는 핸들 256개의 정보가 전역 배열이었다. 여기서는 그것을 구조체 |IO|에 담고, 원본이
 각 시뮬레이터에서 가져다 쓰던 세 서브루틴은 인터페이스 |Simulator|로 받는다. 원본은 \CEE/
-표준 입출력 라이브러리의 \KW{FILE}을 썼는데, \GO/에는 그에 딱 맞는 것이 없다. 그래서 이 모듈이
-기대는 \KW{FILE}의 성질---읽기 버퍼, |feof|와 |ferror| 표시, |fgets|의 경계 동작, |fseek|와
+표준 입출력 라이브러리의 |FILE|을 썼는데, \GO/에는 그에 딱 맞는 것이 없다. 그래서 이 모듈이
+기대는 |FILE|의 성질---읽기 버퍼, |feof|와 |ferror| 표시, |fgets|의 경계 동작, |fseek|와
 |ftell|---을 흉내 내는 작은 타입 |stream|을 만들었다. 그 설명은 이 문서의 끝에 있다.
 
 @c
@@ -608,7 +600,7 @@ var tripWarning = [...]string{
 	"floating point inexact"}
 
 @* \CEE/의 파일 흉내 내기. 이 장은 옮긴이가 덧붙인 것이다. 원본의 루틴들이 기대는 \CEE/
-\KW{FILE}의 성질을 흉내 내는 타입 |stream|을 만든다. 스트림은 세 가지다. 모의 프로그램의 표준
+|FILE|의 성질을 흉내 내는 타입 |stream|을 만든다. 스트림은 세 가지다. 모의 프로그램의 표준
 입력(|isStdin|)은 시뮬레이터의 |StdinChr|로 읽으므로 이 타입이 하는 일이 없다. 표준 출력과
 표준 오류는 |w|로 쓰기만 한다. 나머지는 진짜 파일 |f|이고, 읽을 때는 버퍼 |r|을 거친다.
 

@@ -1,4 +1,4 @@
-//line mmixarith.w:2417
+//line mmixarith.w:2413
 package mmixarith
 
 import (
@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-//line mmixarith.w:2432
+//line mmixarith.w:2428
 func TestScanConstExamples(t *testing.T) {
 	for _, c := range []struct {
 		in   string
@@ -43,7 +43,7 @@ func TestScanConstExamples(t *testing.T) {
 	}
 }
 
-//line mmixarith.w:2467
+//line mmixarith.w:2463
 func TestFloatStringExamples(t *testing.T) {
 	for _, c := range []struct {
 		in  Octa
@@ -66,7 +66,7 @@ func TestFloatStringExamples(t *testing.T) {
 	}
 }
 
-//line mmixarith.w:2495
+//line mmixarith.w:2491
 func TestBorderline(t *testing.T) {
 	n := new(big.Int).Lsh(big.NewInt(1), 53)
 	n.Add(n, big.NewInt(1))
@@ -91,7 +91,7 @@ func TestBorderline(t *testing.T) {
 	}
 }
 
-//line mmixarith.w:2524
+//line mmixarith.w:2520
 func TestArithExamples(t *testing.T) {
 	q, r := Div(0, 0x7fff800100000000, 0x800080020005)
 	if q != 0x7fff800100000000/0x800080020005 || r != 0x7fff800100000000%0x800080020005 {
@@ -120,7 +120,7 @@ func TestArithExamples(t *testing.T) {
 		t.Errorf("inf-inf의 예외 %#x", e)
 	}
 
-//line mmixarith.w:2555
+//line mmixarith.w:2551
 	if z, e := StoreSF(0x3800000000000000, RoundNear); z != 0x00400000 || e != UBit {
 		t.Errorf("StoreSF(2^-127) = %#x, %#x", z, e)
 	}
@@ -128,10 +128,10 @@ func TestArithExamples(t *testing.T) {
 		t.Errorf("-2^64+1853.17... = %#x", x)
 	}
 
-//line mmixarith.w:2552
+//line mmixarith.w:2548
 }
 
-//line mmixarith.w:2567
+//line mmixarith.w:2563
 var specials = [...]Octa{0, InfOcta, StandardNaN, 0x7ff0000000000001, 1,
 	0x000fffffffffffff, 0x0010000000000000, 0x7fefffffffffffff,
 	0x3ff0000000000000, 0x43e0000000000000, 0x43f0000000000000}
@@ -161,7 +161,7 @@ func randPair(r *rand.Rand) (Octa, Octa) {
 	return y, r.Uint64()&0x800fffffffffffff | Octa(e)<<52
 }
 
-//line mmixarith.w:2602
+//line mmixarith.w:2598
 func same(got Octa, want float64) bool {
 	g := math.Float64frombits(got)
 	return got == math.Float64bits(want) || (g != g && want != want)
@@ -173,7 +173,7 @@ func TestAgainstHardware(t *testing.T) {
 	for range 300000 {
 		y, z := randPair(rng)
 
-//line mmixarith.w:2619
+//line mmixarith.w:2615
 		if x, _ := FPlus(y, z, RoundNear); !same(x, f(y)+f(z)) {
 			t.Fatalf("FPlus(%#x, %#x) = %#x", y, z, x)
 		}
@@ -202,9 +202,9 @@ func TestAgainstHardware(t *testing.T) {
 			t.Fatalf("FComp(%#x, %#x) = %d", y, z, c)
 		}
 
-//line mmixarith.w:2613
+//line mmixarith.w:2609
 
-//line mmixarith.w:2657
+//line mmixarith.w:2653
 		for mode, g := range integerizers {
 			if x, _ := FIntegerize(z, mode); !same(x, g(f(z))) {
 				t.Fatalf("FIntegerize(%#x, %d) = %#x", z, mode, x)
@@ -225,9 +225,9 @@ func TestAgainstHardware(t *testing.T) {
 			t.Fatalf("FloatIt(%#x, 짧음) = %#x", y, x)
 		}
 
-//line mmixarith.w:2614
+//line mmixarith.w:2610
 
-//line mmixarith.w:2678
+//line mmixarith.w:2674
 		if s, _ := StoreSF(z, RoundNear); f(z) == f(z) && s != math.Float32bits(float32(f(z))) {
 			t.Fatalf("StoreSF(%#x) = %#x", z, s)
 		}
@@ -236,17 +236,17 @@ func TestAgainstHardware(t *testing.T) {
 			t.Fatalf("LoadSF(%#x) = %#x", w, LoadSF(w))
 		}
 
-//line mmixarith.w:2615
+//line mmixarith.w:2611
 	}
 }
 
-//line mmixarith.w:2651
+//line mmixarith.w:2647
 var integerizers = map[Round]func(float64) float64{
 	RoundOff: math.Trunc, RoundUp: math.Ceil,
 	RoundDown: math.Floor, RoundNear: math.RoundToEven,
 }
 
-//line mmixarith.w:2692
+//line mmixarith.w:2688
 func sigDigits(s string) int {
 	if i := strings.IndexAny(s, "e"); i >= 0 {
 		s = s[:i]
@@ -277,7 +277,7 @@ func TestFloatStringRoundTrip(t *testing.T) {
 	}
 }
 
-//line mmixarith.w:2723
+//line mmixarith.w:2719
 func TestScanConstAgainstStrconv(t *testing.T) {
 	rng := rand.New(rand.NewPCG(308, 324))
 	for range 200000 {
@@ -299,7 +299,7 @@ func TestScanConstAgainstStrconv(t *testing.T) {
 	}
 }
 
-//line mmixarith.w:2749
+//line mmixarith.w:2745
 func TestIntegerOps(t *testing.T) {
 	rng := rand.New(rand.NewPCG(64, 32))
 	for range 300000 {
@@ -308,15 +308,15 @@ func TestIntegerOps(t *testing.T) {
 			z >>= rng.IntN(64)
 		}
 
-//line mmixarith.w:2763
+//line mmixarith.w:2759
 		p := new(big.Int).Mul(big.NewInt(int64(y)), big.NewInt(int64(z)))
 		if x, ov := SignedMult(y, z); x != Octa(int64(y)*int64(z)) || ov != !p.IsInt64() {
 			t.Fatalf("SignedMult(%#x, %#x) = %#x, %v", y, z, x, ov)
 		}
 
-//line mmixarith.w:2757
+//line mmixarith.w:2753
 
-//line mmixarith.w:2769
+//line mmixarith.w:2765
 		if z != 0 && !(y == SignBit && z == NegOne) {
 			a, b := int64(y), int64(z)
 			wq, wr := a/b, a%b
@@ -328,9 +328,9 @@ func TestIntegerOps(t *testing.T) {
 			}
 		}
 
-//line mmixarith.w:2758
+//line mmixarith.w:2754
 
-//line mmixarith.w:2781
+//line mmixarith.w:2777
 		var bd, wd, mor, mxor Octa
 		for i := 0; i < 64; i += 8 {
 			bd |= Octa(max(int(y>>i&0xff)-int(z>>i&0xff), 0)) << i
@@ -350,6 +350,6 @@ func TestIntegerOps(t *testing.T) {
 			t.Fatalf("비트 연산 (%#x, %#x)", y, z)
 		}
 
-//line mmixarith.w:2759
+//line mmixarith.w:2755
 	}
 }

@@ -1,4 +1,4 @@
-//line mmixsim.w:4759
+//line mmixsim.w:4744
 package main
 
 import (
@@ -32,7 +32,7 @@ func writeMMO(t *testing.T, name string, main Octa, code ...Tetra) {
 	}
 }
 
-//line mmixsim.w:4799
+//line mmixsim.w:4784
 func TestSilly(t *testing.T) {
 	var files [3][]byte
 	for i, name := range []string{"silly.mms", "silly.run", "silly.out"} {
@@ -70,7 +70,7 @@ func TestSilly(t *testing.T) {
 	}
 }
 
-//line mmixsim.w:4837
+//line mmixsim.w:4822
 const sillyMMOHex = `
 98090101 6ab7bebd 98012001 00000000 2404fc01 3f04fc01 80818283 84858687
 88898a8b 8c8d8e8f f0000002 f8000000 5f030405 97030405 9f28f305 ef28f305
@@ -117,7 +117,7 @@ fe010004 f2030010 240a0304 f6040001 f80b0003 980a00f1 20000000 00000000
 20660f66 f9872075 0f70f888 1f79f38d 0f7af28e 20736020 69206720 5f206e20
 610f6efa 866d2061 206c0f6c fe820000 980c004f`
 
-//line mmixsim.w:4888
+//line mmixsim.w:4873
 var helloCode = []Tetra{
 	0x8fff0100,                         // |LDOU $255,argv,0|
 	0x00000701,                         // |TRAP 0,Fputs,StdOut|
@@ -158,7 +158,7 @@ const helloTrace = "" +
 	"  5 instructions, 1 mem, 17 oops; 0 good guesses, 0 bad\n" +
 	"  (halted at location #0000000000000110)\n"
 
-//line mmixsim.w:4931
+//line mmixsim.w:4916
 func TestBadInputs(t *testing.T) {
 	t.Chdir(t.TempDir())
 	_, errs, code := simulate(t, "")
@@ -182,7 +182,7 @@ func TestBadInputs(t *testing.T) {
 	}
 }
 
-//line mmixsim.w:4962
+//line mmixsim.w:4947
 func TestOddities(t *testing.T) {
 	t.Chdir(t.TempDir())
 	writeMMO(t, "ovf.mmo", 0x100,

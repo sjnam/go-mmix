@@ -2,21 +2,6 @@
 % 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
 @i ../boilerplate.w
 
-@s io.Writer int
-@s bufio.Reader int
-@s bufio.Writer int
-@s bytes.Buffer int
-@s atomic.Bool int
-@s mmixio.IO int
-@s io.Reader int
-@s os.File int
-@s os.Signal int
-@s mmixarith.Octa int
-@s mmixarith.Tetra int
-@s mmixarith.Round int
-@s mmixio.Simulator int
-@s testing.T int
-@s FILE int
 
 \input kotexgweb
 \def\title{MMIXSIM}
@@ -1134,7 +1119,7 @@ m.g[255] = 0x6000000000000000 + Octa(4*k) + 12*8 // we will \.{UNSAVE} from here
 참조가 들어 있다. 그래서 명령마다 그 문맥을 알 수 있다. 이 프로그램의 다음 절들은 그런
 정보를 원할 때 쓸 수 있게 해 준다.
 
-원시 파일의 데이터는 \KW{fileNode} 구조체에 둔다.
+원시 파일의 데이터는 |fileNode| 구조체에 둔다.
 
 @<타입 정의@>=
 type fileNode struct {
@@ -1144,7 +1129,7 @@ type fileNode struct {
 }
 
 @ 원시 파일이 유니코드로 된 날을 조금이나마 대비해서, 원시 파일의 문자를 나타내는 타입
-\KW{Char}를 정의한다.
+|Char|를 정의한다.
 
 @<타입 정의@>=
 type Char = byte // bytes that will become wydes some day
@@ -1298,8 +1283,8 @@ profileShowingSource bool   // |showingSource| within final frequencies
 @ @<시뮬레이터의 초깃값@>=
 shownFile: -1,
 
-@ 보충: 원본은 처음에는 |fopen|으로 열고, 그 뒤로는 |freopen|으로 같은 \KW{FILE}을 다시 열었다.
-그런데 |freopen|의 결과를 버렸으므로, 다시 열기에 실패하면 |src_file|은 닫힌 \KW{FILE}을
+@ 보충: 원본은 처음에는 |fopen|으로 열고, 그 뒤로는 |freopen|으로 같은 |FILE|을 다시 열었다.
+그런데 |freopen|의 결과를 버렸으므로, 다시 열기에 실패하면 |src_file|은 닫힌 |FILE|을
 가리킨 채 남는다. 그러면 파일 이름만 찍히고, 그 뒤의 읽기는 모두 실패해서 줄이 하나도
 보이지 않는다. 여기서도 다시 열기에 실패하면 닫힌 파일을 그대로 두어 이것을 흉내 낸다. 원시
 줄 지도를 만드는 일은 한 곳에서만 하므로 원본의 |make_map|을 절로 두었다.
@@ -1586,7 +1571,7 @@ if ll[0].bkpt&execBit != 0 {
 m.tracing = m.breakpoint || ll[0].bkpt&traceBit != 0 || ll[0].freq <= m.traceThreshold
 m.instPtr += 4
 
-@ 시뮬레이션의 많은 부분은 표로 움직인다. 연산 코드마다 \KW{opInfo}라는 정적 데이터
+@ 시뮬레이션의 많은 부분은 표로 움직인다. 연산 코드마다 |opInfo|라는 정적 데이터
 구조가 있다.
 
 @<타입 정의@>=

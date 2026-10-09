@@ -1,4 +1,4 @@
-//line mmotype.w:731
+//line mmotype.w:723
 package main
 
 import (
@@ -30,7 +30,7 @@ func testMMO(t *testing.T) []byte {
 	return b
 }
 
-//line mmotype.w:768
+//line mmotype.w:760
 const testMMOHex = `98090101 36f4a363 98012001 00000000 00000000 00000000 61620000
 98010002 00000001 2345678c 98060002 74657374 2e6d6d73 98070007 f0000000
 98024000 98070009 8103fe01 42030000 9807000a 00000000 98010002 00000001
@@ -40,7 +40,7 @@ const testMMOHex = `98090101 36f4a363 98012001 00000000 00000000 00000000 616200
 980b0000 203a5040 50404020 41204220 43094408 83404020 4d206120 69056e01
 2345678c 81400f61 fe820000 980c000a`
 
-//line mmotype.w:778
+//line mmotype.w:770
 func TestKnuthExample(t *testing.T) {
 	out, errs, code := typeFile(t, testMMO(t))
 	if code != 0 || errs != "" || out != testOut {
@@ -77,7 +77,7 @@ Symbol table (beginning at tetra 48):
     a = $254 (2)
 `
 
-//line mmotype.w:817
+//line mmotype.w:809
 func TestBrokenInputs(t *testing.T) {
 	good := testMMO(t)
 	bad := bytes.Clone(good)

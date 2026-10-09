@@ -2,13 +2,6 @@
 % 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
 @i ../boilerplate.w
 
-@s Octa int
-@s Tetra int
-@s machine int
-@s hio int
-@s mmixio.IO int
-@s blk int
-@s os.File int
 
 \input kotexgweb
 \def\title{MMIXMEM}
@@ -59,9 +52,9 @@ func (mx *machine) specRead(addr Octa, size int) Octa {
 	var val Octa
 	size &= 0x3
 	addr = addr&^0xffffffff | Octa(Tetra(addr)&-(Tetra(1)<<size))
-	if mx.hio != nil && addr-hioBase < hioSize {
+	if mx.hioDev != nil && addr-hioBase < hioSize {
 		@<장치 0의 레지스터를 읽어 |val|에 넣는다@>
-	} else if mx.blk != nil && addr-blkBase < hioSize {
+	} else if mx.blkDev != nil && addr-blkBase < hioSize {
 		@<장치 1의 레지스터를 읽어 |val|에 넣는다@>
 	} else if mx.verbose&interactiveReadBit != 0 {
 		mx.printf("** Read %s from loc %016x: ", kind[size], addr)
@@ -112,10 +105,10 @@ func (mx *machine) specWrite(addr, val Octa, size int) {
 		@<크기 |size|의 값...@>
 		mx.printf(" to %016x at time %d)\n", addr, int32(Tetra(mx.ticks)))
 	}
-	if mx.hio != nil && addr-hioBase < hioSize && size == 3 && addr&7 == 0 {
+	if mx.hioDev != nil && addr-hioBase < hioSize && size == 3 && addr&7 == 0 {
 		@<장치 0의 레지스터에 |val|을 쓴다@>
 	}
-	if mx.blk != nil && addr-blkBase < hioSize && size == 3 && addr&7 == 0 {
+	if mx.blkDev != nil && addr-blkBase < hioSize && size == 3 && addr&7 == 0 {
 		@<장치 1의 레지스터에 |val|을 쓴다@>
 	}
 }
@@ -183,11 +176,11 @@ switch addr&^7 - hioBase {
 case hioID:
 	reg = hioMagic
 case hioResult:
-	reg = mx.hio.result
+	reg = mx.hioDev.result
 case hioDone:
-	reg = mx.hio.done
+	reg = mx.hioDev.done
 case hioRV:
-	reg = mx.hio.rv
+	reg = mx.hioDev.rv
 }
 val = reg >> ((8 - (1 << size) - int(addr&7)) << 3)
 
@@ -196,7 +189,7 @@ val = reg >> ((8 - (1 << size) - int(addr&7)) << 3)
 기다린 뒤에 \.{RESULT}를 읽는다. 트립 경고는 \.{RESULT}를 바꾸지 않는다.
 
 @<장치 0의 레지스터에...@>=
-h := mx.hio
+h := mx.hioDev
 switch addr - hioBase {
 case hioArg0:
 	h.arg0 = val
@@ -406,11 +399,11 @@ switch addr&^7 - blkBase {
 case hioID:
 	reg = blkMagic
 case hioResult:
-	reg = mx.blk.result
+	reg = mx.blkDev.result
 case hioDone:
-	reg = mx.blk.done
+	reg = mx.blkDev.done
 case blkNblk:
-	reg = mx.blk.nblk
+	reg = mx.blkDev.nblk
 }
 val = reg >> ((8 - (1 << size) - int(addr&7)) << 3)
 
@@ -419,7 +412,7 @@ val = reg >> ((8 - (1 << size) - int(addr&7)) << 3)
 실패해도 \.{RESULT}가 $-1$이 된다.
 
 @<장치 1의 레지스터에...@>=
-d := mx.blk
+d := mx.blkDev
 switch addr - blkBase {
 case blkBlock:
 	d.block = val

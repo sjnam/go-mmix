@@ -23,3 +23,45 @@
 \def\dts{\mathinner{\ldotp\ldotp}}
 \def\<#1>{\hbox{$\langle\,$#1$\,\rangle$}}\let\is=\longrightarrow
 \def\bull{\smallbreak\textindent{$\bullet$}}
+
+% gweave가 형으로 알아보지 못하는 이름들. 표준 꾸러미와 이 저장소의 다른 꾸러미,
+% 같은 꾸러미의 다른 .w에서 정의한 형이다.
+@s atomic.Bool int
+@s big.Int int
+@s bufio.Reader int
+@s bufio.Writer int
+@s bytes.Buffer int
+@s io.Reader int
+@s io.Writer int
+@s os.File int
+@s os.Signal int
+@s rand.Rand int
+@s strings.Builder int
+@s testing.T int
+@s time.Location int
+@s mmixarith.Octa int
+@s mmixarith.Tetra int
+@s mmixarith.Round int
+@s mmixio.IO int
+@s mmixio.Simulator int
+@s Octa int
+@s Tetra int
+@s exitSignal int
+@s machine int
+@s coroutine int
+@s control int
+@s fetch int
+@s specnode int
+@s funcUnit int
+@s cache int
+@s cacheset int
+@s cacheblock int
+@s chunknode int
+@s writeNode int
+@s replacePolicy int
+@s cfile int
+@s hio int
+@s blk int
+@s FILE int
+@s do int
+@s while int

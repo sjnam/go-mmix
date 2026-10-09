@@ -2,17 +2,6 @@
 % 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
 @i ../boilerplate.w
 
-@s io.Reader int
-@s io.Writer int
-@s bufio.Reader int
-@s os.File int
-@s bytes.Buffer int
-@s testing.T int
-@s Octa int
-@s Tetra int
-@s machine int
-@s exitSignal int
-@s blk int
 
 \input kotexgweb
 \def\title{MMMIX}
@@ -90,11 +79,11 @@ mx.out.Flush()
 if mx.io != nil {
 	mx.io.FlushAll()
 }
-if mx.hio != nil {
-	mx.hio.io.FlushAll() // supplement: files opened by the kernel's devices
+if mx.hioDev != nil {
+	mx.hioDev.io.FlushAll() // supplement: files opened by the kernel's devices
 }
-if mx.blk != nil {
-	mx.blk.f.Close() // supplement: the disk image
+if mx.blkDev != nil {
+	mx.blkDev.f.Close() // supplement: the disk image
 }
 if r := recover(); r != nil {
 	e, ok := r.(exitSignal)
@@ -433,8 +422,8 @@ if diskFileName != "" {
 	@<디스크 이미지를 블록 장치로 붙인다@>
 }
 if kernelFileName != "" {
-	mx.hio = &hio{mx: mx}
-	mx.hio.io = mmixio.New(mx.hio, mx.out, stderr)
+	mx.hioDev = &hio{mx: mx}
+	mx.hioDev.io = mmixio.New(mx.hioDev, mx.out, stderr)
 	@<커널 목적 파일을 싣는다@>
 	if len(progFileName) > 4 && progFileName[len(progFileName)-4:] == ".mmb" {
 		mx.g[rWW].o = mx.instPtr.o
@@ -458,7 +447,7 @@ if err != nil {
 	panic(exitSignal(-3))
 }
 st, _ := f.Stat()
-mx.blk = &blk{mx: mx, f: f, nblk: Octa(st.Size() / blkSize)}
+mx.blkDev = &blk{mx: mx, f: f, nblk: Octa(st.Size() / blkSize)}
 
 @ 목적 파일 형식 \.{mmo}는 {\mc MMIXAL}의 프로그램에 나온다. 여기서는 \.{mmixsim}의 적재기를 줄여
 쓴다. 기호표는 싣지 않고, 후기에 이르면 멈춘다. 커널에는 특수 데이터(\.{lop\_spec})를 쓰지 않으므로
