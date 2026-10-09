@@ -146,15 +146,15 @@ $$\vbox{\halign{\hfil\tt#\quad&\.{#}\hfil\quad&#\hfil\cr
 
 @<상수@>=
 const (
-	hioBase   = 1 << 48            // 장치 0의 물리 주소
-	hioSize   = 1 << 16            // 장치 하나가 차지하는 바이트 수
-	hioID     = 0x00               // 레지스터 \.{ID}의 오프셋
-	hioArg0   = 0x08               // 레지스터 \.{ARG0}의 오프셋
-	hioArg1   = 0x10               // 레지스터 \.{ARG1}의 오프셋
-	hioCmd    = 0x18               // 레지스터 \.{CMD}의 오프셋
-	hioResult = 0x20               // 레지스터 \.{RESULT}의 오프셋
-	hioDone   = 0x28               // 레지스터 \.{DONE}의 오프셋
-	hioRV     = 0x30               // 레지스터 \.{RV}의 오프셋
+	hioBase   = 1 << 48            // physical address of device 0
+	hioSize   = 1 << 16            // number of bytes occupied by one device
+	hioID     = 0x00               // offset of register \.{ID}
+	hioArg0   = 0x08               // offset of register \.{ARG0}
+	hioArg1   = 0x10               // offset of register \.{ARG1}
+	hioCmd    = 0x18               // offset of register \.{CMD}
+	hioResult = 0x20               // offset of register \.{RESULT}
+	hioDone   = 0x28               // offset of register \.{DONE}
+	hioRV     = 0x30               // offset of register \.{RV}
 	hioMagic  = 0x4e4e49582d48494f // \.{"NNIX-HIO"}
 )
 
@@ -166,11 +166,11 @@ const (
 type hio struct {
 	mx     *machine
 	io     *mmixio.IO
-	arg0   Octa // 레지스터 \.{ARG0}
-	arg1   Octa // 레지스터 \.{ARG1}
-	result Octa // 레지스터 \.{RESULT}
-	done   Octa // 레지스터 \.{DONE}
-	rv     Octa // 레지스터 \.{RV}
+	arg0   Octa // register \.{ARG0}
+	arg1   Octa // register \.{ARG1}
+	result Octa // register \.{RESULT}
+	done   Octa // register \.{DONE}
+	rv     Octa // register \.{RV}
 }
 
 @ 파이프라인은 장치 적재를 투기적으로, 그리고 쓰기 버퍼의 앞선 저장보다 먼저 할 수 있다. 그래서
@@ -276,9 +276,9 @@ for j := 1; j <= 4; j++ {
 }
 i := v >> 61
 r := rv >> 13 & (1<<27 - 1)
-t := (r + b[i]) << 13            // 첫 페이지 테이블의 주소
-limit := (r + b[i+1]) << 13      // 마지막 페이지 테이블 다음의 주소
-a[0] = (v &^ (7 << 61)) >> sh    // 페이지 번호
+t := (r + b[i]) << 13            // address of the first page table
+limit := (r + b[i+1]) << 13      // address just past the last page table
+a[0] = (v &^ (7 << 61)) >> sh    // the page number
 if a[0] == 0 {
 	limit++
 }
@@ -375,27 +375,27 @@ $$\vbox{\halign{\hfil\tt#\quad&\.{#}\hfil\quad&#\hfil\cr
 
 @<상수@>=
 const (
-	blkBase   = hioBase + hioSize  // 장치 1의 물리 주소
-	blkSize   = 1024               // 블록의 바이트 수
-	blkBlock  = 0x08               // 레지스터 \.{BLOCK}의 오프셋
-	blkAddr   = 0x10               // 레지스터 \.{ADDR}의 오프셋
-	blkNblk   = 0x30               // 레지스터 \.{NBLK}의 오프셋
+	blkBase   = hioBase + hioSize  // physical address of device 1
+	blkSize   = 1024               // number of bytes in a block
+	blkBlock  = 0x08               // offset of register \.{BLOCK}
+	blkAddr   = 0x10               // offset of register \.{ADDR}
+	blkNblk   = 0x30               // offset of register \.{NBLK}
 	blkMagic  = 0x4e4e49582d424c4b // \.{"NNIX-BLK"}
-	blkLatency = 10000             // 명령 하나에 걸리는 사이클
-	blkInt    = 1 << 8             // 명령이 끝나면 켜는 rQ의 비트
+	blkLatency = 10000             // cycles taken by one command
+	blkInt    = 1 << 8             // bit of rQ set when a command finishes
 )
 
 @ @<타입 정의@>=
 type blk struct {
 	mx     *machine
-	f      *os.File // 디스크 이미지
-	nblk   Octa     // 레지스터 \.{NBLK}
-	block  Octa     // 레지스터 \.{BLOCK}
-	addr   Octa     // 레지스터 \.{ADDR}
-	result Octa     // 레지스터 \.{RESULT}
-	done   Octa     // 레지스터 \.{DONE}
-	cmd    Octa     // 진행 중인 명령(없으면 0)
-	count  int      // 그 명령이 끝날 때까지 남은 사이클
+	f      *os.File // the disk image
+	nblk   Octa     // register \.{NBLK}
+	block  Octa     // register \.{BLOCK}
+	addr   Octa     // register \.{ADDR}
+	result Octa     // register \.{RESULT}
+	done   Octa     // register \.{DONE}
+	cmd    Octa     // the command in progress (0 if none)
+	count  int      // cycles left until that command finishes
 }
 
 @ 레지스터 \.{ID}, \.{RESULT}, \.{DONE}의 오프셋은 장치~0과 같다.

@@ -85,8 +85,8 @@ type Simulator interface {
 
 @<타입 정의@>=
 type simFileInfo struct {
-	fp   *stream // 파일 포인터
-	mode int    // [읽기 가능] + 2[쓰기 가능] + 4[이진] + 8[읽고 쓰기]
+	fp   *stream // file pointer
+	mode int    // [read OK] + 2[write OK] + 4[binary] + 8[readwrite]
 }
 
 @ 보충: 원본의 전역 배열 |sfile|과 시뮬레이터의 세 서브루틴을 한데 담는다. 시뮬레이터마다
@@ -96,8 +96,8 @@ type simFileInfo struct {
 type IO struct {
 	sfile   [256]simFileInfo
 	sim     Simulator
-	streams []*stream // 지금까지 연 모든 파일 스트림(|FlushAll|을 위해)
-	stderr  *stream   // 원래의 표준 오류, 곧 \CEE/의 |stderr|
+	streams []*stream // every file stream opened so far (for |FlushAll|)
+	stderr  *stream   // the original standard error, i.e., \CEE/'s |stderr|
 }
 
 @ 처음 세 핸들은 처음부터 열려 있다. 원본의 |mmix_io_init|이 하던 일을 여기서는 |IO| 값을
@@ -144,12 +144,12 @@ func (x *IO) Fopen(handle byte, name, mode Octa) Octa {
 	x.sfile[handle].fp = &stream{f: f, r: bufio.NewReader(f)}
 	x.streams = append(x.streams, x.sfile[handle].fp)
 	x.sfile[handle].mode = modeCode[mode]
-	return 0 // 성공
+	return 0 // success
 }
 
 func (x *IO) abort(handle byte) Octa {
 	x.sfile[handle].mode = 0
-	return mmixarith.NegOne // 실패
+	return mmixarith.NegOne // failure
 }
 
 @ 원본은 |fopen|에 넘길 방식 문자열 \.{"r"}, \.{"w"}, \.{"rb"}, \.{"wb"}, \.{"w+b"}를 표로
@@ -172,7 +172,7 @@ var modeCode = [5]int{0x1, 0x2, 0x5, 0x6, 0xf}
 
 @<함수들@>=
 func (x *IO) FakeStdin(f *os.File) {
-	x.sfile[0].fp = &stream{f: f, r: bufio.NewReader(f)} // |f|는 읽기 방식으로 열려 있어야 한다
+	x.sfile[0].fp = &stream{f: f, r: bufio.NewReader(f)} // |f| should be open for reading
 	x.streams = append(x.streams, x.sfile[0].fp)
 }
 
@@ -185,7 +185,7 @@ func (x *IO) Fclose(handle byte) Octa {
 		return mmixarith.NegOne
 	}
 	x.sfile[handle].mode = 0
-	return 0 // 성공
+	return 0 // success
 }
 
 @ 메서드 |Fread|는 |size|바이트를 읽어서 모의 메모리의 |buffer|에 넣고, 실제로 읽은 바이트 수에서
@@ -478,7 +478,7 @@ func (x *IO) Fputws(handle byte, str Octa) Octa {
 	for {
 		n := x.sim.MMGetChars(buf[:], 256, str, 1)
 		if n < 0 {
-			x.sfile[handle].fp.bad = true // 원본의 |fwrite|가 실패하며 오류 표시를 켠다
+			x.sfile[handle].fp.bad = true // the original |fwrite| fails and sets the error indicator
 			return mmixarith.NegOne
 		}
 		if x.sfile[handle].fp.write(buf[:n]) != n {
@@ -586,7 +586,7 @@ func (x *IO) StderrError() bool {
 @<함수들@>=
 func (x *IO) FlushAll() {
 	for h := range 3 {
-		if x.sfile[h].fp.f == nil { // 원래의 표준 스트림
+		if x.sfile[h].fp.f == nil { // an original standard stream
 			x.sfile[h].fp.flush()
 		}
 	}
@@ -620,15 +620,15 @@ var tripWarning = [...]string{
 
 @<타입 정의@>=
 type stream struct {
-	f          *os.File      // 진짜 파일이면
-	r          *bufio.Reader // |f|에서 읽을 때의 버퍼
-	pending    []byte        // |f|에 아직 쓰지 않은 바이트들
-	writing    bool          // 마지막으로 한 일이 쓰기인가?
-	w          io.Writer     // 표준 출력이나 표준 오류이면
-	isStdin    bool          // 모의 프로그램의 표준 입력인가?
-	eof        bool          // 파일 끝 표시(|feof|)
-	bad        bool          // 오류 표시(|ferror|)
-	unbuffered bool          // 버퍼가 없는가(|stderr|처럼)?
+	f          *os.File      // if a real file
+	r          *bufio.Reader // buffer for reading from |f|
+	pending    []byte        // bytes not yet written to |f|
+	writing    bool          // was the last thing done a write?
+	w          io.Writer     // if standard output or standard error
+	isStdin    bool          // is it the simulated program's standard input?
+	eof        bool          // end-of-file indicator (|feof|)
+	bad        bool          // error indicator (|ferror|)
+	unbuffered bool          // is it unbuffered (like |stderr|)?
 }
 
 @ 메서드 |read|는 |fread|처럼 최대 |len(p)|바이트를 읽어서, 읽은 바이트 수를 돌려준다. 모자라게
@@ -721,7 +721,7 @@ func (s *stream) startReading() {
 func (s *stream) write(p []byte) int {
 	if s.f != nil {
 		if !s.writing {
-			s.r.Reset(s.f) // 읽기 버퍼를 버린다
+			s.r.Reset(s.f) // discard the read buffer
 			s.eof, s.writing = false, true
 		}
 		s.pending = append(s.pending, p...)
@@ -889,7 +889,7 @@ func TestReadWrite(t *testing.T) {
 	}
 	check("Fgets", x.Fgets(3, 0x300, 100), 6)
 	check("Fgets", x.Fgets(3, 0x300, 100), NegOne)
-	check("Fseek", x.Fseek(3, NegOne-1), 0) // $-2$: 마지막 바이트 앞
+	check("Fseek", x.Fseek(3, NegOne-1), 0) // $-2$: before the last byte
 	check("Fread", x.Fread(3, 0x400, 20), NegOne-18) // $1-20=-19$
 	check("Fclose", x.Fclose(3), 0)
 	check("Fclose", x.Fclose(3), NegOne)

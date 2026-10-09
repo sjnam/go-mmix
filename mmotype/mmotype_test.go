@@ -81,7 +81,7 @@ Symbol table (beginning at tetra 48):
 func TestBrokenInputs(t *testing.T) {
 	good := testMMO(t)
 	bad := bytes.Clone(good)
-	bad[len(bad)-1] = 5 // |lopEnd|의 YZ를 10에서 5로
+	bad[len(bad)-1] = 5 // YZ of |lopEnd| from 10 to 5
 	if _, errs, code := typeFile(t, bad, "-s"); code != 0 ||
 		errs != "YZ field at lop_end should have been 53!\n" {
 		t.Errorf("종료 코드 %d, %q", code, errs)

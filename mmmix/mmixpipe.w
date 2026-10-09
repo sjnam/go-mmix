@@ -124,19 +124,19 @@ $5\upsilon$)이 걸렸지만, 실행 시간은 $1\upsilon$만 늘었다.
 
 @<상수@>=
 const (
-	issueBit          = 1 << 0 // 명령을 발행하고, 발행을 취소하고, 확정할 때 제어 블록을 보인다
-	pipeBit           = 1 << 1 // 사이클마다 파이프라인과 잠금을 보인다
-	coroutineBit      = 1 << 2 // 사이클마다 시작하는 코루틴들을 보인다
-	scheduleBit       = 1 << 3 // 코루틴을 스케줄할 때 보인다
-	uninitMemBit      = 1 << 4 // 초기화하지 않은 메모리 덩이를 읽으면 알린다
-	interactiveReadBit = 1 << 5 // 입출력 위치를 읽을 때 사용자에게 묻는다
-	showSpecBit       = 1 << 6 // 특별한 읽기와 쓰기가 일어날 때 보인다
-	showPredBit       = 1 << 7 // 분기 예측의 자세한 사정을 보인다
-	showWholecacheBit = 1 << 8 // 열쇠 태그가 무효인 캐시 블록도 보인다
+	issueBit          = 1 << 0 // show control blocks when issued, deissued, committed
+	pipeBit           = 1 << 1 // show the pipeline and locks on every cycle
+	coroutineBit      = 1 << 2 // show the coroutines when started on every cycle
+	scheduleBit       = 1 << 3 // show the coroutines when scheduled
+	uninitMemBit      = 1 << 4 // complain when reading from an uninitialized chunk of memory
+	interactiveReadBit = 1 << 5 // prompt user when reading from I/O location
+	showSpecBit       = 1 << 6 // display special read/write transactions as they happen
+	showPredBit       = 1 << 7 // display branch prediction details
+	showWholecacheBit = 1 << 8 // display cache blocks even when their key tag is invalid
 )
 
 @ @<기계의 상태@>=
-verbose int // 진단 출력의 수준을 정한다
+verbose int // controls the level of diagnostic output
 
 @ 루틴 |MMIX_init()|는 |MMIX_config()|가 일을 마친 뒤, 시뮬레이터가 프로그램을 실행하기
 시작하기 전에 정확히 한 번 불러야 한다. 그다음에는 |MMIX_run()|을 사용자가 원하는 만큼
@@ -196,9 +196,9 @@ func (mx *machine) MMIXRun(cycs int, breakpoint Octa) {
 }
 
 @ @<기계의 상태@>=
-breakpointHit bool // 멈춤점의 명령을 가져왔는가?
-halted        bool // 기계가 멈추었는가?
-breakpoint    Octa // |MMIXRun|의 멈춤점
+breakpointHit bool // was the breakpoint instruction fetched?
+halted        bool // has the machine halted?
+breakpoint    Octa // the breakpoint of |MMIXRun|
 
 @ 원본은 불 타입에 거짓과 참 말고 |wow|라는 셋째 값까지 두었다(``살짝 넓힌 불 값'').
 그러나 |wow|는 어디서도 쓰지 않는다. \GO/의 |bool|로 충분하다.
@@ -222,7 +222,7 @@ func confusion(m string) string {
 	return "This can't happen: " + m
 }
 @#
-func (mx *machine) expire() { // 죽기 전 마지막 숨
+func (mx *machine) expire() { // the last gasp before dying
 	if mx.ticks>>32 != 0 {
 		mx.errprintf("(Clock time is %dH+%d.)\n",
 			int32(mx.ticks>>32), int32(Tetra(mx.ticks)))
@@ -277,8 +277,8 @@ func (mx *machine) errprintf(format string, a ...any) {
 
 @<타입 정의@>=
 type (
-	Tetra = mmixarith.Tetra // 부호 없는 32비트 정수
-	Octa  = mmixarith.Octa  // 두 테트라바이트가 모여 옥타바이트를 이룬다
+	Tetra = mmixarith.Tetra // an unsigned 32-bit integer
+	Octa  = mmixarith.Octa  // two tetrabytes make one octabyte
 )
 
 @ 원본의 |print_octa|는 윗 테트라가 0이 아니면 |"%x%08x"|로, 0이면 |"%x"|로 찍었다.
@@ -303,14 +303,14 @@ func (mx *machine) printOcta(o Octa) {
 
 @<상수@>=
 const (
-	signBit = mmixarith.SignBit // 64비트 부호 비트
+	signBit = mmixarith.SignBit // the 64-bit sign bit
 	negOne  = mmixarith.NegOne  // $-1$
-	sign32  = 0x80000000        // 32비트 부호 비트(원본의 |sign_bit|)
+	sign32  = 0x80000000        // the 32-bit sign bit (the original's |sign_bit|)
 )
 
 @ @<기계의 상태@>=
-curRound   mmixarith.Round // 현재 반올림 방식
-exceptions int             // 부동소수점 연산이 켠 비트들
+curRound   mmixarith.Round // the current rounding mode
+exceptions int             // bits set by floating point operations
 
 @ 원본은 여기서 32비트 가정이 맞는지 검사했다. \GO/에서는 타입이 크기를 보장하므로 이
 검사를 뺐다.
@@ -340,12 +340,12 @@ exceptions int             // 부동소수점 연산이 켠 비트들
 
 @<타입 정의@>=
 type coroutine struct {
-	name    string     // 코루틴의 기호 이름
-	stage   int        // 그 순위
-	next    *coroutine // 그다음 것
-	lockloc *lockvar   // 그것이 잠그고 있을지 모르는 것
-	ctl     *control   // 그 데이터
-	succ    *coroutine // 원본의 |self+1|
+	name    string     // symbolic identification of a coroutine
+	stage   int        // its rank
+	next    *coroutine // its successor
+	lockloc *lockvar   // what it might be locking
+	ctl     *control   // its data
+	succ    *coroutine // the original's |self+1|
 }
 
 @ @<함수들@>=
@@ -390,11 +390,11 @@ for k := range mx.ring {
 @<함수들@>=
 func (mx *machine) schedule(c *coroutine, d, s int) {
 	tt := (mx.curTime + d) % mx.ringSize
-	if d <= 0 || d >= mx.ringSize { // 상식 검사를 한다
+	if d <= 0 || d >= mx.ringSize { // do a sanity check
 		mx.panic(confusion("Scheduling ") + coroutineID(c) +
 			fmt.Sprintf(" with delay %d", d))
 	}
-	p := &mx.ring[tt] // 머리 노드에서 시작한다
+	p := &mx.ring[tt] // start at the list head
 	for p.next.stage < c.stage {
 		p = p.next
 	}
@@ -408,9 +408,9 @@ func (mx *machine) schedule(c *coroutine, d, s int) {
 }
 
 @ @<기계의 상태@>=
-ringSize int         // |MMIX_config|가 정한다. 넉넉히 커야 한다
-ring     []coroutine // 스케줄 큐들의 머리 노드
-curTime  int         // |ring|에서 현재 시각의 위치
+ringSize int         // set by |MMIX_config|, must be sufficiently large
+ring     []coroutine // head nodes of the scheduling queues
+curTime  int         // position of the current time in |ring|
 
 @ 코루틴의 매우 중요한 필드 |ctl|은 다루고 있는 데이터를 담는데, 아래에서 설명한다. 그
 구성 요소 가운데 핵심 하나는 |state| 필드로, 코루틴이 다음에 할 행동을 정하는 데 쓰인다.
@@ -464,7 +464,7 @@ func (mx *machine) queuelist(t int) *coroutine {
 }
 
 @ @<기계의 상태@>=
-sentinel coroutine // 원형 리스트의 원점에 있는 가짜 코루틴
+sentinel coroutine // dummy coroutine at origin of circular list
 
 @ 코루틴은 흔히 {\it 투기적인\/} 일을 시작한다. 쓸모 있을지도 모르는 결과를 미리 준비해 두고
 싶지만, 투기적인 계산이 실제로는 필요 없을 수도 있다는 뜻이다. 그래서 코루틴은 일을 마치기
@@ -547,7 +547,7 @@ type specnode struct {
 	known    bool
 	addr     Octa
 	up, down *specnode
-	ctl      *control // 이 \KW{specnode}를 담은 제어 블록
+	ctl      *control // the control block containing this \KW{specnode}
 }
 
 @ 원본의 전역 변수 |zero_spec|은 \GO/에서 |spec{}|이다.
@@ -610,36 +610,36 @@ func (mx *machine) printSpecnode(s *specnode) {
 
 @<타입 정의@>=
 type control struct {
-	loc              Octa       // 명령이 나온 가상 주소
-	op               int        // 원래의 명령 바이트들
+	loc              Octa       // virtual address where an instruction originated
+	op               int        // the original instruction bytes
 	xx, yy, zz       byte
-	y, z, b, ra      spec       // 입력
-	x, a, goLoc, rl  specnode   // 출력
-	owner            *coroutine // 이것을 |ctl|로 가진 코루틴
-	i                int        // 내부 연산 코드
-	state            int        // 내부 마음가짐
+	y, z, b, ra      spec       // inputs
+	x, a, goLoc, rl  specnode   // outputs
+	owner            *coroutine // a coroutine whose |ctl| this is
+	i                int        // internal opcode
+	state            int        // internal mindset
 	@<제어 블록의 불 필드들@>
-	arithExc         Tetra      // rA의 사건 비트를 위한 산술 예외
-	hist             Tetra      // 분기 예측에 쓰는 이력 비트
-	denin, denout    int        // 비정규수를 다루는 데 드는 실행 시간 벌칙
-	curO, curS       Octa       // 이 명령 전의 투기적 rO와 rS
-	interrupt        Tetra      // 이 명령이 인터럽트를 일으키는가?
-	ptrA, ptrB, ptrC any        // 이런저런 쓰임새의 범용 포인터
-	idx              int        // 재정렬 버퍼 안의 위치
+	arithExc         Tetra      // arithmetic exceptions for event bits of rA
+	hist             Tetra      // history bits for use in branch prediction
+	denin, denout    int        // execution time penalties for subnormal handling
+	curO, curS       Octa       // speculative rO and rS before this instruction
+	interrupt        Tetra      // does this instruction generate an interrupt?
+	ptrA, ptrB, ptrC any        // generic pointers for miscellaneous use
+	idx              int        // position in the reorder buffer
 }
 
 @ 제어 블록의 불 필드들은 다음과 같다.
 
 @<제어 블록의 불 필드들@>=
-usage      bool // rU를 늘려야 하는가?
-needB      bool // |b.p==nil|이 될 때까지 멈추어야 하는가?
-needRA     bool // |ra.p==nil|이 될 때까지 멈추어야 하는가?
-renX       bool // |x|가 이름 바꾸기 레지스터에 해당하는가?
-memX       bool // |x|가 메모리 쓰기에 해당하는가?
-renA       bool // |a|가 이름 바꾸기 레지스터에 해당하는가?
-setL       bool // |rl|이 rL의 새 값에 해당하는가?
-interim    bool // 인터럽트가 걸리면 이 명령을 다시 발행해야 하는가?
-stackAlert bool // 스택 넘침의 가능성이 있는가?
+usage      bool // should rU be increased?
+needB      bool // should we stall until |b.p==nil|?
+needRA     bool // should we stall until |ra.p==nil|?
+renX       bool // does |x| correspond to a rename register?
+memX       bool // does |x| correspond to a memory write?
+renA       bool // does |a| correspond to a rename register?
+setL       bool // does |rl| correspond to a new value of rL?
+interim    bool // does this instruction need to be reissued on interrupt?
+stackAlert bool // is there potential for stack overflow?
 
 @ 보충: 제어 블록의 네 \KW{specnode}가 자기 블록을 가리키게 하는 함수다. 제어 블록을 만든
 뒤에 한 번 부른다.
@@ -827,15 +827,15 @@ const (
 @ 첫 무리는 |MMIX_config|로 파이프라인 시간을 정할 수 있는 연산들이다.
 
 @<파이프라인 시간을 설정할...@>=
-mul0 = iota // 0을 곱한다
-mul1        // 1--8비트짜리를 곱한다
-mul2        // 9--16비트짜리를 곱한다
-mul3        // 17--24비트짜리를 곱한다
-mul4        // 25--32비트짜리를 곱한다
-mul5        // 33--40비트짜리를 곱한다
-mul6        // 41--48비트짜리를 곱한다
-mul7        // 49--56비트짜리를 곱한다
-mul8        // 57--64비트짜리를 곱한다
+mul0 = iota // multiplication by zero
+mul1        // multiplication by 1--8 bits
+mul2        // multiplication by 9--16 bits
+mul3        // multiplication by 17--24 bits
+mul4        // multiplication by 25--32 bits
+mul5        // multiplication by 33--40 bits
+mul6        // multiplication by 41--48 bits
+mul7        // multiplication by 49--56 bits
+mul8        // multiplication by 57--64 bits
 div         // \.{DIV[U][I]}
 sh          // \.{S[L,R][U][I]}
 mux         // \.{MUX[I]}
@@ -892,8 +892,8 @@ cset        // \.{CS[N][N,Z,P][I]}, \.{CSEV[I]}, \.{CSOD[I]}
 get         // \.{GET}
 put         // \.{PUT[I]}
 ld          // \.{LD[B,W,T,O][U][I]}, \.{LDHT[I]}, \.{LDSF[I]}
-ldptp       // 페이지 테이블 포인터를 적재한다
-ldpte       // 페이지 테이블 항목을 적재한다
+ldptp       // load page table pointer
+ldpte       // load page table entry
 ldunc       // \.{LDUNC[I]}
 ldvts       // \.{LDVTS[I]}
 preld       // \.{PRELD[I]}
@@ -902,7 +902,7 @@ st          // \.{STO[U][I]}, \.{STCO[I]}, \.{STUNC[I]}
 syncd       // \.{SYNCD[I]}
 syncid      // \.{SYNCID[I]}
 pst         // \.{ST[B,W,T][U][I]}, \.{STHT[I]}
-stunc       // 쓰기 버퍼 안의 \.{STUNC[I]}
+stunc       // \.{STUNC[I]}, in write buffer
 cswap       // \.{CSWAP[I]}
 br          // \.{B[N][N,Z,P][B]}
 pbr         // \.{PB[N][N,Z,P][B]}
@@ -919,12 +919,12 @@ jmp         // \.{JMP[B]}
 noop        // \.{SWYM}
 trap        // \.{TRAP}
 trip        // \.{TRIP}
-incgamma    // $\gamma$ 포인터를 늘린다
-decgamma    // $\gamma$ 포인터를 줄인다
-incrl       // rL과 $\beta$를 늘린다
-sav         // \.{SAVE}의 중간 단계
-unsav       // \.{UNSAVE}의 중간 단계
-resum       // \.{RESUME}의 중간 단계
+incgamma    // increase $\gamma$ pointer
+decgamma    // decrease $\gamma$ pointer
+incrl       // increase rL and $\beta$
+sav         // intermediate stage of \.{SAVE}
+unsav       // intermediate stage of \.{UNSAVE}
+resum       // intermediate stage of \.{RESUME}
 
 @ @<표@>=
 var internalOpName = [...]string{
@@ -985,38 +985,38 @@ rA~(21)를 여덟 바이트에 모아 저장하고 되살린다.
 
 @<상수@>=
 const (
-	rA  = 21 // 산술 상태 레지스터
-	rB  = 0  // 부트스트랩 레지스터(트립)
-	rC  = 8  // 계속 레지스터
-	rD  = 1  // 피제수 레지스터
-	rE  = 2  // 엡실론 레지스터
-	rF  = 22 // 실패 위치 레지스터
-	rG  = 19 // 전역 문턱 레지스터
-	rH  = 3  // 곱의 윗부분 레지스터
-	rI  = 12 // 구간 계수기
-	rJ  = 4  // 복귀 점프 레지스터
-	rK  = 15 // 인터럽트 마스크 레지스터
-	rL  = 20 // 지역 문턱 레지스터
-	rM  = 5  // 멀티플렉스 마스크 레지스터
-	rN  = 9  // 일련번호
-	rO  = 10 // 레지스터 스택 오프셋
-	rP  = 23 // 예측 레지스터
-	rQ  = 16 // 인터럽트 요청 레지스터
-	rR  = 6  // 나머지 레지스터
-	rS  = 11 // 레지스터 스택 포인터
-	rT  = 13 // 트랩 주소 레지스터
-	rU  = 17 // 사용 계수기
-	rV  = 18 // 가상 주소 변환 레지스터
-	rW  = 24 // 인터럽트된 곳 레지스터(트립)
-	rX  = 25 // 실행 레지스터(트립)
-	rY  = 26 // Y 피연산자(트립)
-	rZ  = 27 // Z 피연산자(트립)
-	rBB = 7  // 부트스트랩 레지스터(트랩)
-	rTT = 14 // 동적 트랩 주소 레지스터
-	rWW = 28 // 인터럽트된 곳 레지스터(트랩)
-	rXX = 29 // 실행 레지스터(트랩)
-	rYY = 30 // Y 피연산자(트랩)
-	rZZ = 31 // Z 피연산자(트랩)
+	rA  = 21 // arithmetic status register
+	rB  = 0  // bootstrap register (trip)
+	rC  = 8  // continuation register
+	rD  = 1  // dividend register
+	rE  = 2  // epsilon register
+	rF  = 22 // failure location register
+	rG  = 19 // global threshold register
+	rH  = 3  // himult register
+	rI  = 12 // interval counter
+	rJ  = 4  // return-jump register
+	rK  = 15 // interrupt mask register
+	rL  = 20 // local threshold register
+	rM  = 5  // multiplex mask register
+	rN  = 9  // serial number
+	rO  = 10 // register stack offset
+	rP  = 23 // prediction register
+	rQ  = 16 // interrupt request register
+	rR  = 6  // remainder register
+	rS  = 11 // register stack pointer
+	rT  = 13 // trap address register
+	rU  = 17 // usage counter
+	rV  = 18 // virtual translation register
+	rW  = 24 // where-interrupted register (trip)
+	rX  = 25 // execution register (trip)
+	rY  = 26 // Y operand (trip)
+	rZ  = 27 // Z operand (trip)
+	rBB = 7  // bootstrap register (trap)
+	rTT = 14 // dynamic trap address register
+	rWW = 28 // where-interrupted register (trap)
+	rXX = 29 // execution register (trap)
+	rYY = 30 // Y operand (trap)
+	rZZ = 31 // Z operand (trap)
 )
 
 @ @<표@>=
@@ -1029,26 +1029,26 @@ var specialName = [32]string{"rB", "rD", "rE", "rH", "rJ", "rM", "rR", "rBB",
 
 @<상수@>=
 const (
-	pBit       = 1 << 0  // 특권 위치에 있는 명령
-	sBit       = 1 << 1  // 보안 위반
-	bBit       = 1 << 2  // 규칙을 어기는 명령
-	kBit       = 1 << 3  // 커널 전용 명령
-	nBit       = 1 << 4  // 가상 주소 변환을 건너뜀
-	pxBit      = 1 << 5  // 페이지에서 실행할 권한이 없음
-	pwBit      = 1 << 6  // 페이지에 쓸 권한이 없음
-	prBit      = 1 << 7  // 페이지에서 읽을 권한이 없음
-	protOffset = 5       // |prBit|에서 보호 코드 자리까지의 거리
-	xBit       = 1 << 8  // 부동소수점 부정확
-	zBit       = 1 << 9  // 부동소수점 0으로 나눔
-	uBit       = 1 << 10 // 부동소수점 아래넘침
-	oBit       = 1 << 11 // 부동소수점 넘침
-	iBit       = 1 << 12 // 부동소수점 잘못된 연산
-	wBit       = 1 << 13 // 부동소수점에서 고정소수점으로 바꿀 때 넘침
-	vBit       = 1 << 14 // 정수 넘침
-	dBit       = 1 << 15 // 정수 나눗셈 검사
-	hBit       = 1 << 16 // 트립 처리기 비트
-	fBit       = 1 << 17 // 강제 트랩 비트
-	eBit       = 1 << 18 // 외부(동적) 트랩 비트
+	pBit       = 1 << 0  // instruction in privileged location
+	sBit       = 1 << 1  // security violation
+	bBit       = 1 << 2  // instruction breaks the rules
+	kBit       = 1 << 3  // instruction for kernel only
+	nBit       = 1 << 4  // virtual translation bypassed
+	pxBit      = 1 << 5  // permission lacking to execute from page
+	pwBit      = 1 << 6  // permission lacking to write on page
+	prBit      = 1 << 7  // permission lacking to read from page
+	protOffset = 5       // distance from |prBit| to protection code position
+	xBit       = 1 << 8  // floating inexact
+	zBit       = 1 << 9  // floating division by zero
+	uBit       = 1 << 10 // floating underflow
+	oBit       = 1 << 11 // floating overflow
+	iBit       = 1 << 12 // floating invalid operation
+	wBit       = 1 << 13 // float-to-fix overflow
+	vBit       = 1 << 14 // integer overflow
+	dBit       = 1 << 15 // integer divide check
+	hBit       = 1 << 16 // trip handler bit
+	fBit       = 1 << 17 // forced trap bit
+	eBit       = 1 << 18 // external (dynamic) trap bit
 )
 
 @ @<표@>=
@@ -1068,12 +1068,12 @@ func (mx *machine) printBits(x int) {
 
 @<상수@>=
 const (
-	powerFailure      = 1 << 0 // 침착하고 재빨리 끄려고 한다
-	parityError       = 1 << 1 // 파일 시스템을 지키려고 한다
-	nonexistentMemory = 1 << 2 // 쓸 수 없는 메모리 주소
-	rebootSignal      = 1 << 4 // 처음부터 다시 할 때다
-	intervalTimeout   = 1 << 6 // 타이머 레지스터 rI가 0이 되었다
-	stackOverflow     = 1 << 7 // rC 페이지에 데이터를 저장했다
+	powerFailure      = 1 << 0 // try to shut down calmly and quickly
+	parityError       = 1 << 1 // try to save the file systems
+	nonexistentMemory = 1 << 2 // a memory address can't be used
+	rebootSignal      = 1 << 4 // it's time to start over
+	intervalTimeout   = 1 << 6 // the timer register, rI, has reached zero
+	stackOverflow     = 1 << 7 // data has been stored on the rC page
 )
 
 @* 동적 투기.
@@ -1190,7 +1190,7 @@ V~허용 비트에 달려 있는데, 그 비트는 제어 블록의 필드 |b.o|
 비트를 |arithExc|로 고치고, \.{ADD} 명령은 뜨거운 자리를 지나 재정렬 버퍼를 떠날 수 있다.
 
 @<기계의 상태@>=
-fetchMax, dispatchMax, peekahead, commitMax int // 한 클럭 사이클에 다룰 수 있는 명령의 한계
+fetchMax, dispatchMax, peekahead, commitMax int // limits on instructions that can be handled per clock cycle
 
 @ 뜨거운 자리를 차지한 명령은, 발행되었지만 아직 확정되지 않은 명령 가운데 기계의 계산에
 정말로 필요하다고 보장되는 유일한 명령이다. 재정렬 버퍼의 다른 명령은 모두 투기로 실행되고
@@ -1212,11 +1212,11 @@ fetchMax, dispatchMax, peekahead, commitMax int // 한 클럭 사이클에 다�
 |idx| 필드로 이웃을 찾는 메서드 |prevCtl|과 |nextCtl|을 쓴다.
 
 @<기계의 상태@>=
-reorder                  []control // 재정렬 버퍼가 든 원
-reorderBot, reorderTop   *control  // 그 원의 가장 작은 원소와 가장 큰 원소
-hot, cool                *control  // 재정렬 버퍼의 앞과 뒤
-oldHot                   *control  // 사이클이 시작할 때의 |hot|
-deissues                 int       // 발행을 취소해야 할 명령의 개수
+reorder                  []control // the ring containing the reorder buffer
+reorderBot, reorderTop   *control  // least and greatest elements of that ring
+hot, cool                *control  // front and rear of the reorder buffer
+oldHot                   *control  // value of |hot| at beginning of cycle
+deissues                 int       // the number of instructions that need to be deissued
 
 @ @<함수들@>=
 func (mx *machine) prevCtl(c *control) *control {
@@ -1280,8 +1280,8 @@ func (mx *machine) cycle() {
 	var i, j, m int
 	@<바깥 인터럽트를 검사한다@>
 	mx.dispatchCount = 0
-	mx.oldHot = mx.hot   // 사이클이 시작할 때 뜨거운 자리의 위치를 기억한다
-	mx.oldTail = mx.tail // 사이클이 시작할 때 가져오기 버퍼의 내용을 기억한다
+	mx.oldHot = mx.hot   // remember the hot seat position at beginning of cycle
+	mx.oldTail = mx.tail // remember the fetch buffer contents at beginning of cycle
 	mx.suppressDispatch = mx.deissues != 0 || mx.dispatchLock != nil
 	if mx.doingInterrupt != 0 {
 		@<인터럽트 준비의 한 사이클을 수행한다@>
@@ -1292,17 +1292,17 @@ func (mx *machine) cycle() {
 	if !mx.suppressDispatch {
 		@<한 사이클 분량의 명령을 배정한다@>
 	}
-	mx.ticks++ // 그리고 박자가 넘어간다
+	mx.ticks++ // and the beat moves on
 	mx.dispatchStat[mx.dispatchCount]++
 }
 
 @ @<기계의 상태@>=
-dispatchCount    int     // 이 사이클에 몇 개를 배정했는가
-suppressDispatch bool    // 배정을 건너뛰어야 하는가?
-doingInterrupt   int     // 인터럽트 준비가 몇 사이클 남았는가
-dispatchLock     lockvar // 명령 발행을 막는 잠금
-dispatchStat     []int32 // 명령을 0, 1, \dots개 배정한 것이 몇 번인가?
-securityDisabled bool    // 시험을 위해 보안 검사를 생략하는가?
+dispatchCount    int     // how many dispatched on this cycle
+suppressDispatch bool    // should dispatching be bypassed?
+doingInterrupt   int     // how many cycles of interrupt preparations remain
+dispatchLock     lockvar // lock to prevent instruction issues
+dispatchStat     []int32 // how often did we dispatch 0, 1, \dots\ instructions?
+securityDisabled bool    // omit security checks for testing purposes?
 
 @ 보충: 원본의 루프 안에서 |break|는 모두 이 루프를 빠져나온다. 확정 부분에 들어 있는 다른
 루프 안에서 이 루프를 빠져나와야 하는 곳이 있어서, 루프에 |commit|이라는 이름표를 붙였다.
@@ -1314,19 +1314,19 @@ for m = mx.commitMax; m > 0 && mx.deissues > 0; m-- {
 commit:
 for ; m > 0; m-- {
 	if mx.hot == mx.cool {
-		break // 재정렬 버퍼가 비어 있다
+		break // reorder buffer is empty
 	}
 	if !mx.securityDisabled {
 		@<보안 위반을 검사하고, 위반이면 |break|한다@>
 	}
 	if mx.hot.owner != nil {
-		break // 뜨거운 자리의 명령이 끝나지 않았다
+		break // hot seat instruction isn't finished
 	}
 	@<가장 뜨거운 명령을 확정하고, 준비가 안 되었으면 |break|한다@>
 	i = mx.hot.i
 	mx.hot = mx.prevCtl(mx.hot)
 	if i == resum {
-		break // 다시 시작한 명령이 새 rK를 보게 한다
+		break // allow the resumed instruction to see the new rK
 	}
 }
 
@@ -1348,12 +1348,12 @@ for ; m > 0; m-- {
 
 @<타입 정의@>=
 type fetch struct {
-	loc       Octa  // 명령의 가상 주소
-	inst      Tetra // 명령 자체
-	interrupt Tetra // 인터럽트를 일으킬지 모르는 비트 코드들
-	noted     bool  // 이 명령을 엿보았는가?
-	hist      Tetra // 엿보았다면, 그때의 |peekHist|
-	idx       int   // 가져오기 버퍼 안의 위치
+	loc       Octa  // virtual address of instruction
+	inst      Tetra // the instruction itself
+	interrupt Tetra // bit codes that might cause interruption
+	noted     bool  // have we peeked at this instruction?
+	hist      Tetra // if we peeked, this was the |peekHist|
+	idx       int   // position in the fetch buffer
 }
 
 @ 가져오기 버퍼에서 가장 오래된 항목과 가장 젊은 항목은 |head|와 |tail|이 가리킨다. 재정렬
@@ -1364,10 +1364,10 @@ type fetch struct {
 가져오기 버퍼에 있겠지만 말이다.
 
 @<기계의 상태@>=
-fetchBuf           []fetch // 가져오기 버퍼가 든 원
-fetchBot, fetchTop *fetch  // 그 원의 가장 작은 원소와 가장 큰 원소
-head, tail         *fetch  // 가져오기 버퍼의 앞과 뒤
-oldTail            *fetch  // 현재 사이클에 볼 수 있는 가져오기 버퍼의 뒤
+fetchBuf           []fetch // the ring containing the fetch buffer
+fetchBot, fetchTop *fetch  // least and greatest elements of that ring
+head, tail         *fetch  // front and rear of the fetch buffer
+oldTail            *fetch  // rear of the fetch buffer available on the current cycle
 
 @ @<함수들@>=
 func (mx *machine) prevFetch(p *fetch) *fetch {
@@ -1385,7 +1385,7 @@ mx.head, mx.tail = mx.fetchTop, mx.fetchTop
 mx.instPtr.p = &mx.unknownSpec
 
 @ @<기계의 상태@>=
-unknownSpec specnode // 원본의 \.{UNKNOWN\_SPEC}이 가리키는 곳
+unknownSpec specnode // where the original's \.{UNKNOWN\_SPEC} points
 
 @ 보충: 원본은 |go| 필드의 |up|에 제어 블록의 주소를 넣어 두었다가 여기서 되찾았다. 여기서는
 \KW{specnode}의 |ctl| 필드가 그 제어 블록이다.
@@ -1462,7 +1462,7 @@ mx.head = trueHead
 
 @<|head| 명령을 보고...@>=
 if mx.head == mx.oldTail {
-	break // 가져오기 버퍼가 비어 있다
+	break // fetch buffer empty
 }
 newHead := mx.prevFetch(mx.head)
 op := int(mx.head.inst >> 24)
@@ -1474,7 +1474,7 @@ cool := mx.cool
 @<|head| 명령을 해독하고, 제어가 바뀌는지 엿본다@>
 if j >= mx.dispatchMax || mx.dispatchLock != nil || mx.nullifying {
 	mx.head = newHead
-	continue // 배정할 수는 없지만, 앞을 엿볼 수는 있다
+	continue // can't dispatch, but can peek ahead
 }
 @<|cool| 블록에 |head| 명령을 발행해 본다@>
 
@@ -1521,23 +1521,23 @@ mx.coolHist = mx.peekHist
 
 @<타입 정의@>=
 type funcUnit struct {
-	name string      // 기호 이름
-	ops  [8]Tetra    // 지원하는 연산 코드의 큰 쪽 먼저 비트맵
-	k    int         // 파이프라인 단계의 수
-	co   []coroutine // 차례로 늘어선 코루틴 $k$개
+	name string      // symbolic designation
+	ops  [8]Tetra    // big-endian bitmap for the opcodes supported
+	k    int         // number of pipeline stages
+	co   []coroutine // $k$ consecutive coroutines
 }
 
 @ @<기계의 상태@>=
-funit      []funcUnit // 기능 장치들의 배열
-funitCount int        // 기능 장치의 개수
+funit      []funcUnit // array of functional units
+funitCount int        // the number of functional units
 
 @ 지원하는 연산 코드를 모두 모은 256비트 벡터가 있으면 편리하다. 어떤 연산 코드가 지원되지
 않을 때는 많은 특별한 동작을 꺼야 하기 때문이다.
 
 @<기계의 상태@>=
-newCool  *control  // |cool| 다음의 재정렬 버퍼 자리
-resuming int       // 중단된 명령을 다시 시작하고 있으면 0이 아니다
-support  [8]Tetra  // 지원하는 모든 연산 코드의 큰 쪽 먼저 비트맵
+newCool  *control  // the reorder position following |cool|
+resuming int       // nonzero if resuming an interrupted instruction
+support  [8]Tetra  // big-endian bitmap for all opcodes supported
 
 @ @<모든 것을 초기화한다@>=
 for k := 0; k <= mx.funitCount; k++ {
@@ -1548,7 +1548,7 @@ for k := 0; k <= mx.funitCount; k++ {
 
 @ @<플래그 |f|와...@>=
 if mx.support[op>>5]&(sign32>>(op&31)) == 0 {
-	// 아이고, 이 연산 코드는 어떤 기능 장치도 지원하지 않는다
+	// oops, this opcode isn't supported by any functional unit
 	f, i = int(flags[TRAP]), trap
 } else {
 	f, i = int(flags[op]), internalOp[op]
@@ -1573,10 +1573,10 @@ if cool.interim {
 	if flags[cool.op]&ctlChangeBit != 0 || cool.i == pbr {
 		if mx.instPtr.p == nil && mx.instPtr.o&signBit != 0 && cool.loc&signBit == 0 &&
 			cool.i != trap {
-			cool.interrupt |= pBit // 음이 아닌 곳에서 음인 곳으로 점프한다
+			cool.interrupt |= pBit // jumping from nonnegative to negative
 		}
 	}
-	trueHead, mx.head = newHead, newHead // 가져오기 버퍼에서 명령을 지운다
+	trueHead, mx.head = newHead, newHead // delete instruction from fetch buffer
 	mx.resuming = 0
 }
 if freezeDispatch {
@@ -1584,7 +1584,7 @@ if freezeDispatch {
 }
 cool.owner = &u.co[0]
 u.co[0].ctl = cool
-mx.startup(&u.co[0], 1) // 새 명령의 실행을 스케줄한다
+mx.startup(&u.co[0], 1) // schedule execution of the new inst
 if mx.verbose&issueBit != 0 {
 	mx.printf("Issuing ")
 	mx.printControlBlock(cool)
@@ -1605,8 +1605,8 @@ mx.dispatchCount++
 {
 	t, b := op>>5, Tetra(sign32)>>(op&31)
 	found := false
-	if cool.i == trap && op != TRAP { // 연산 코드를 에뮬레이트해야 한다
-		u = &mx.funit[mx.funitCount] // 이 장치는 \.{TRIP}과 \.{TRAP}만 지원한다
+	if cool.i == trap && op != TRAP { // opcode needs to be emulated
+		u = &mx.funit[mx.funitCount] // this unit supports just \.{TRIP} and \.{TRAP}
 		found = true
 	}
 units:
@@ -1628,7 +1628,7 @@ units:
 		}
 	}
 	if !found {
-		break stall // 이 |op|를 다루는 장치가 모두 바쁘다
+		break stall // all units for this |op| are busy
 	}
 }
 
@@ -1708,7 +1708,7 @@ cool.z = spec{o: mx.head.loc + Octa(yz<<2)}
 	mx.head.noted = true
 	mx.head.hist = mx.peekHist
 	if predicted != 0 || f&ctlChangeBit != 0 || (i == syncid && cool.loc&signBit == 0) {
-		mx.oldTail, mx.tail = newHead, newHead // 남은 가져오기를 모두 버린다
+		mx.oldTail, mx.tail = newHead, newHead // discard all remaining fetches
 		@<가져오기 코루틴을 다시 시작한다@>
 		switch i {
 		case jmp, br, pbr, pushj:
@@ -1719,7 +1719,7 @@ cool.z = spec{o: mx.head.loc + Octa(yz<<2)}
 				mx.instPtr = spec{o: mx.g[rJ].up.o + Octa(yz<<2)}
 				break
 			}
-			fallthrough // 그렇지 않으면 |cool.goLoc|을 기다린다
+			fallthrough // otherwise fall through, will wait on |cool.goLoc|
 		case goOp, pushgo, trap, resume, syncid:
 			mx.instPtr.p = &mx.unknownSpec
 		case trip:
@@ -1750,18 +1750,18 @@ l[101]이나 g[250] 같은 기계 레지스터는 \KW{specnode}로 나타내는�
 이를테면 |rB=0|이므로 rB는 안에서 g[0]과 같다.
 
 @<기계의 상태@>=
-g                           [256]specnode // 전역 레지스터와 특수 레지스터
-l                           []specnode    // 지역 레지스터의 고리
-lringSize                   int           // 칩에 있는 지역 레지스터의 수(2의 거듭제곱이어야 한다)
-maxRenameRegs, maxMemSlots  int           // 재정렬 버퍼의 용량
-renameRegs, memSlots        int           // 지금 쓰지 않는 용량
+g                           [256]specnode // global registers and special registers
+l                           []specnode    // the ring of local registers
+lringSize                   int           // number of local registers on the chip (must be a power of 2)
+maxRenameRegs, maxMemSlots  int           // capacity of reorder buffer
+renameRegs, memSlots        int           // currently unused capacity
 
 @ 특수 레지스터 rC는 \MMIX의 원래 정의에서 시계였다. 그러나 이제 시계는 |ticks|라는 바깥
 변수일 뿐이다.
 
 @<기계의 상태@>=
-ticks     Octa // 내부 시계
-lringMask int  // |lringSize|를 법으로 하는 계산을 위해
+ticks     Octa // the internal clock
+lringMask int  // for calculations modulo |lringSize|
 
 @ 레지스터의 \KW{specnode} 리스트에 있는 |addr| 필드는 진단 메시지에서 그 레지스터를
 식별하는 데 쓰인다. 이런 주소는 음수이고, 메모리 주소는 양수다.
@@ -1779,9 +1779,9 @@ lringMask int  // |lringSize|를 법으로 하는 계산을 위해
 
 @<상수@>=
 const (
-	version       = 1 // 우리가 지원하는 \MMIX\ 아키텍처의 판
-	subversion    = 0 // 판 번호의 둘째 바이트
-	subsubversion = 0 // 판 번호를 더 한정하는 번호
+	version       = 1 // version of the \MMIX\ architecture that we support
+	subversion    = 0 // secondary byte of version number
+	subsubversion = 0 // further qualification to version number
 )
 
 @ @<모든 것을 초기화한다@>=
@@ -1795,7 +1795,7 @@ for j = 0; j < 256; j++ {
 }
 mx.g[rG].o = 255
 mx.g[rN].o = (version<<24+subversion<<16+subsubversion<<8)<<32 |
-	Octa(Tetra(ABSTIME)) // 위의 설명과 경고를 보라
+	Octa(Tetra(ABSTIME)) // see comment and warning above
 for j = 0; j < mx.lringSize; j++ {
 	mx.l[j].addr = sign32<<32 | Octa(256+j)
 	mx.l[j].known = true
@@ -1837,7 +1837,7 @@ func (mx *machine) specval(r *specnode) spec {
 @ 서브루틴 |specInstall|은 주어진 이중 연결 리스트의 차가운 끝에 새 투기적 값을 넣는다.
 
 @<함수들@>=
-func (mx *machine) specInstall(r, t *specnode) { // |t|를 리스트 |r|에 넣는다
+func (mx *machine) specInstall(r, t *specnode) { // insert |t| into list |r|
 	t.up = r.up
 	t.up.down = t
 	r.up = t
@@ -1848,7 +1848,7 @@ func (mx *machine) specInstall(r, t *specnode) { // |t|를 리스트 |r|에 넣�
 @ 반대로 |specRem|은 그런 값을 뺀다.
 
 @<함수들@>=
-func specRem(t *specnode) { // |t|를 그 리스트에서 뺀다
+func specRem(t *specnode) { // remove |t| from its list
 	u, d := t.up, t.down
 	u.down = d
 	d.up = u
@@ -1868,10 +1868,10 @@ func specRem(t *specnode) { // |t|를 그 리스트에서 뺀다
 걸러서 얻었다. 그 계산을 하는 메서드 |lr|을 둔다.
 
 @<기계의 상태@>=
-coolO, coolS       Octa  // |cool| 명령 전의 rO와 rS
-coolL, coolG       int   // |cool| 명령 전의 rL과 rG
-coolHist, peekHist Tetra // 분기 예측을 위한 이력 비트
-newO, newS         Octa  // |cool| 다음의 rO와 rS
+coolO, coolS       Octa  // values of rO, rS before the |cool| instruction
+coolL, coolG       int   // values of rL and rG before the |cool| instruction
+coolHist, peekHist Tetra // history bits for branch prediction
+newO, newS         Octa  // values of rO, rS after |cool|
 
 @ @<함수들@>=
 func (mx *machine) lr(t Tetra) *specnode {
@@ -1913,7 +1913,7 @@ cool.interim, cool.stackAlert = false, false
 
 @<|cool| 블록에 명령을 배정해 본다...@>=
 if mx.newCool == mx.hot {
-	break stall // 재정렬 버퍼가 차 있다
+	break stall // reorder buffer is full
 }
 @<|coolL|과 |coolG|가 최신인지 확인한다@>
 @<|cool| 블록의 피연산자 필드를 설치한다@>
@@ -2046,7 +2046,7 @@ if to := thirdOperand[op]; to != rA {
 
 @<|cool.z|를 즉시 와이드로...@>=
 cool.z.o = Octa(yz) << (48 - 16*(op&3))
-if i != set { // 레지스터 X가 Y 피연산자도 되어야 한다
+if i != set { // register X should also be the Y operand
 	cool.y = cool.b
 	cool.b = spec{}
 }
@@ -2068,7 +2068,7 @@ if int(cool.xx) >= mx.coolG {
 		cool.renX = true
 		mx.specInstall(mx.lr(Tetra(mx.coolO)+Tetra(cool.xx)), &cool.x)
 	}
-} else { // |head.inst|를 발행하기 전에 L을 늘려야 한다
+} else { // we need to increase L before issuing |head.inst|
 	@<L을 늘리는 내부 명령을 끼워 넣는다@>
 }
 
@@ -2114,7 +2114,7 @@ cool.x.known = true // |cool.x.o=0|
 mx.specInstall(&mx.g[rL], &cool.rl)
 cool.rl.o = Octa(Tetra(mx.coolL + 1))
 cool.renX, cool.setL = true, true
-op = SETH // 이 명령은 가장 단순한 장치가 다룬다
+op = SETH // this instruction to be handled by the simplest units
 cool.interim = true
 break dispatchDone
 
@@ -2130,7 +2130,7 @@ cool.y = spec{o: mx.coolS << 3}
 cool.z = spec{}
 cool.memX = true
 mx.specInstall(&mx.mem, &cool.x)
-op = STOU // 이 명령은 적재/저장 장치가 다루어야 한다
+op = STOU // this instruction needs to be handled by load/store unit
 cool.interim = true
 cool.stackAlert = cool.y.o&signBit == 0
 break dispatchDone
@@ -2140,14 +2140,14 @@ break dispatchDone
 
 @<$\gamma$를 줄이는 명령을 끼워 넣는다@>=
 if Tetra(mx.coolO)+Tetra(mx.coolL) == Tetra(mx.coolS)+Tetra(mx.lringSize) {
-	// $\gamma$가 $\beta$를 지나가지 못하게 한다
+	// don't let $\gamma$ pass $\beta$
 	if cool.i == pop && int(cool.xx) == mx.coolL && mx.coolL > 1 {
-		cool.i = or // 주된 결과를 아래로 옮겨서 보존한다
-		mx.head.inst -= 0x10000 // 가져오기 버퍼에 있는 \.{POP}의 X 필드를 줄인다
+		cool.i = or // we'll preserve the main result by moving it down
+		mx.head.inst -= 0x10000 // decrease X field of \.{POP} in fetch buffer
 		op = OR
 		cool.y = mx.specval(mx.lr(Tetra(mx.coolO) + Tetra(cool.xx) - 1))
 		mx.specInstall(mx.lr(Tetra(mx.coolO)+Tetra(cool.xx)-2), &cool.x)
-	} else { // rL을 1 줄인다
+	} else { // decrease rL by 1
 		mx.specInstall(&mx.g[rL], &cool.rl)
 		cool.rl.o = Octa(Tetra(mx.coolL - 1))
 		cool.setL = true
@@ -2158,7 +2158,7 @@ if cool.i != or {
 	mx.newS = mx.coolS - 1
 	cool.y = spec{o: mx.newS << 3}
 	mx.specInstall(mx.lr(Tetra(mx.newS)), &cool.x)
-	op = LDOU // 이 명령은 적재/저장 장치가 다루어야 한다
+	op = LDOU // this instruction needs to be handled by load/store unit
 	cool.ptrA = mx.mem.up
 }
 cool.z, cool.b = spec{}, spec{}
@@ -2448,7 +2448,7 @@ func (mx *machine) passAfter(self *coroutine, t int) {
 	mx.schedule(self.succ, t, self.ctl.state)
 }
 @#
-func (mx *machine) sleep(self *coroutine) bool { // 영원히 기다린다
+func (mx *machine) sleep(self *coroutine) bool { // wait forever
 	self.next = self
 	return false
 }
@@ -2464,7 +2464,7 @@ if mx.curTime == mx.ringSize {
 }
 for self := mx.queuelist(mx.curTime); self != &mx.sentinel; self = mx.sentinel.next {
 	mx.sentinel.next = self.next
-	self.next = nil // 이 코루틴의 스케줄을 푼다
+	self.next = nil // unschedule this coroutine
 	if mx.verbose&coroutineBit != 0 {
 		mx.printf(" running ")
 		mx.printCoroutineID(self)
@@ -2472,7 +2472,7 @@ for self := mx.queuelist(mx.curTime); self != &mx.sentinel; self = mx.sentinel.n
 		mx.printControlBlock(self.ctl)
 		mx.printf("\n")
 	}
-	if mx.step(self) { // 원본의 |terminate|
+	if mx.step(self) { // the original's |terminate|
 		if self.lockloc != nil {
 			*self.lockloc = nil
 			self.lockloc = nil
@@ -2529,23 +2529,23 @@ type label int
 
 @ @<상수@>=
 const (
-	lSwitch0 label = iota // 가져오기 코루틴의 상태 스위치
-	lSwitch1              // 첫 단계의 상태 스위치
-	lSwitch2              // 뒤 단계들의 상태 스위치
+	lSwitch0 label = iota // state switch of the fetch coroutine
+	lSwitch1              // state switch of the first stage
+	lSwitch2              // state switch of the later stages
 	@<지점 이름@>
 )
 @#
 const (
-	fetchSt    label = 1000  // 가져오기 코루틴의 상태 |case|
-	stage1St   label = 2000  // 첫 단계의 상태 |case|
-	stage2St   label = 3000  // 뒤 단계들의 상태 |case|
-	flushMemSt label = 4000  // |flushToMem|의 상태 |case|
-	flushSSt   label = 5000  // |flushToS|의 상태 |case|
-	fillMemSt  label = 6000  // |fillFromMem|의 상태 |case|
-	fillSSt    label = 7000  // |fillFromS|의 상태 |case|
-	cleanupSt  label = 8000  // |cleanup|의 상태 |case|
-	fillVirtSt label = 9000  // |fillFromVirt|의 상태 |case|
-	writeSt    label = 10000 // |writeFromWbuf|의 상태 |case|
+	fetchSt    label = 1000  // state |case| of the fetch coroutine
+	stage1St   label = 2000  // state |case| of the first stage
+	stage2St   label = 3000  // state |case| of the later stages
+	flushMemSt label = 4000  // state |case| of |flushToMem|
+	flushSSt   label = 5000  // state |case| of |flushToS|
+	fillMemSt  label = 6000  // state |case| of |fillFromMem|
+	fillSSt    label = 7000  // state |case| of |fillFromS|
+	cleanupSt  label = 8000  // state |case| of |cleanup|
+	fillVirtSt label = 9000  // state |case| of |fillFromVirt|
+	writeSt    label = 10000 // state |case| of |writeFromWbuf|
 )
 
 @ 원본에서 가져오기 코루틴의 상태 스위치는 |stage=0|인 |case| 안에 있고, 그 뒤에 |stage=1|인
@@ -2574,9 +2574,9 @@ case vanish:
 	return true
 
 @ @<기계의 상태@>=
-memLocker coroutine // 사라지는 하찮은 코루틴
-dLocker   coroutine // 또 하나
-vanishCtl control   // 그런 코루틴들이 함께 쓰는 제어 블록
+memLocker coroutine // trivial coroutine that vanishes
+dLocker   coroutine // another
+vanishCtl control   // such coroutines share a common control block
 
 @ @<모든 것을 초기화한다@>=
 mx.memLocker.name = "Locker"
@@ -2607,15 +2607,15 @@ if mx.Icache != nil {
 
 @<상수@>=
 const (
-	maxStage      = 99 // 모든 |stage| 번호보다 크다
-	vanish        = 98 // 그냥 사라지는 특별한 코루틴
-	flushToMem    = 97 // 캐시에서 메모리로 쏟아 내는 코루틴
-	flushToS      = 96 // 캐시에서 S-캐시로 쏟아 내는 코루틴
-	fillFromMem   = 95 // 메모리에서 캐시를 채우는 코루틴
-	fillFromS     = 94 // S-캐시에서 캐시를 채우는 코루틴
-	fillFromVirt  = 93 // 변환 캐시를 채우는 코루틴
-	writeFromWbuf = 92 // 쓰기 버퍼를 비우는 코루틴
-	cleanup       = 91 // 캐시를 청소하는 코루틴
+	maxStage      = 99 // exceeds all |stage| numbers
+	vanish        = 98 // special coroutine that just goes away
+	flushToMem    = 97 // coroutine for flushing from a cache to memory
+	flushToS      = 96 // coroutine for flushing from a cache to the S-cache
+	fillFromMem   = 95 // coroutine for filling a cache from memory
+	fillFromS     = 94 // coroutine for filling a cache from the S-cache
+	fillFromVirt  = 93 // coroutine for filling a translation cache
+	writeFromWbuf = 92 // coroutine for emptying the write buffer
+	cleanup       = 91 // coroutine for cleaning the caches
 )
 
 @ 1단계를 시작하자마자 기능 장치는 필요하면 피연산자를 쓸 수 있을 때까지 멈춘다. 피연산자가
@@ -2662,7 +2662,7 @@ if j < 10 {
 	data.state = 1
 }
 if j != 0 {
-	return mx.wait(self, 1) // 그렇지 않으면 |case 1|로 흘러내린다
+	return mx.wait(self, 1) // otherwise we fall through to |case 1|
 }
 
 @ @<|b|와 |ra| 입력을...@>=
@@ -2718,7 +2718,7 @@ if data.i <= maxPipeOp {
 	s := &mx.pipeSeq[data.i]
 	j = int(s[0]) + data.denin
 	if s[1] != 0 {
-		data.state = 2 // 단계가 하나보다 많다
+		data.state = 2 // more than one stage
 	} else {
 		j += data.denout
 	}
@@ -2732,18 +2732,18 @@ continue
 @ 코루틴이 $j$단계에 있을 때, 같은 기능 장치의 $j+1$단계 코루틴은 |self.succ|다.
 
 @<지점 이름@>=
-lPassit // 원본의 |passit|
+lPassit // the original's |passit|
 
 @ @<|data|를 파이프라인의...@>=
 if self.succ.next != nil {
-	return mx.wait(self, 1) // 다음 단계가 차 있으면 멈춘다
+	return mx.wait(self, 1) // stall if the next stage is occupied
 }
 {
 	s := &mx.pipeSeq[data.i]
 	j = int(s[self.stage])
 	if s[self.stage+1] == 0 {
 		j += data.denout
-		data.state = 3 // 다음 단계가 마지막이다
+		data.state = 3 // the next stage is the last
 	}
 	mx.passAfter(self, j)
 }
@@ -2755,8 +2755,8 @@ case lPassit:
 
 @ @<상수@>=
 const (
-	lPassData = stage1St + 2 // 원본의 |pass_data|
-	lFinEx    = stage1St + 3 // 원본의 |fin_ex|
+	lPassData = stage1St + 2 // the original's |pass_data|
+	lFinEx    = stage1St + 3 // the original's |fin_ex|
 )
 
 @ @<실행 파이프라인의 뒤 단계들...@>=
@@ -2915,7 +2915,7 @@ case cmpu:
 알려 준다.
 
 @<지점 이름@>=
-lDie // 원본의 |die|
+lDie // the original's |die|
 
 @ @<연산의 실행을 마친다@>=
 if data.renX {
@@ -2930,7 +2930,7 @@ if data.renA {
 	data.a.known = true
 }
 if data.loc&signBit != 0 {
-	data.ra.o &^= 0xffffffff // 운영체제에서는 트립을 허용하지 않는다
+	data.ra.o &^= 0xffffffff // no trips enabled for the operating system
 }
 if data.interrupt&0xffff != 0 {
 	@<실행 단계 끝에서 인터럽트를 다룬다@>
@@ -2938,7 +2938,7 @@ if data.interrupt&0xffff != 0 {
 fallthrough
 case lDie:
 	data.owner = nil
-	return true // 이 코루틴은 이제 사라진다
+	return true // this coroutine now fades away
 
 @* 확정과 발행 취소 단계. 제어 블록은 뜨거운 끝에서(확정될 때) 또는 차가운 끝에서(발행이
 취소될 때) 재정렬 버퍼를 떠난다. 대부분이 확정되기를 바라지만, 이따금 투기가 틀려서 쓸모없는
@@ -3089,8 +3089,8 @@ mx.nullifying = false
 여기서는 |stackOverflowed|라고 부른다.
 
 @<기계의 상태@>=
-newQ            Octa // rQ의 어느 비트가 늘면 이것도 그래야 한다
-stackOverflowed bool // 아직 알리지 않은 스택 넘침
+newQ            Octa // when rQ increases in any bit position, so should this
+stackOverflowed bool // stack overflow not yet reported
 
 @ 명령이 \MMIX의 기본 보안 규칙을 어기면 곧바로 확정하지 않는다. 그 규칙은 이렇다. 음이
 아닌 위치에 있는 명령은, 인터럽트 마스크 레지스터~rK에서 여덟 가지 내부 인터럽트가 모두
@@ -3157,14 +3157,14 @@ $c$비트(배타적 논리합을 한 것)로 색인한다.
 있다. 비트 수가 $n=8$이면 부호가 결과에 영향을 주므로, 여기서도 부호 있는 바이트 |int8|을 쓴다.
 
 @<기계의 상태@>=
-bpA, bpB, bpC, bpN int    // 분기 예측의 매개변수
-bpTable            []int8 // |nil|이거나 항목이 $2^{\mkern1mua+b+c}$개인 배열
+bpA, bpB, bpC, bpN int    // parameters for branch prediction
+bpTable            []int8 // either |nil| or an array of $2^{\mkern1mua+b+c}$ items
 
 @ 분기 예측은 명령을 발행하려 할 때나 앞을 엿볼 때 한다. 표 |bpTable|을 보기는 하지만, 아직
 고치고 싶지는 않다.
 
 @<분기의 결과를 예측한다@>=
-predicted = op & 0x10 // 명령의 권고로 시작한다
+predicted = op & 0x10 // start with the instruction's recommendation
 if mx.bpTable != nil {
 	m = mx.bpIndex(mx.head.loc)
 	if int(mx.bpTable[m])&mx.bpNpower != 0 {
@@ -3208,11 +3208,11 @@ if mx.bpTable != nil {
 	if reversed != 0 {
 		mx.bpTable[m] = int8(hDown)
 		cool.x.o = Octa(Tetra(hUp))
-		cool.i = pbr + br - cool.i // 뜻을 뒤집는다
+		cool.i = pbr + br - cool.i // reverse the sense
 		mx.bpRevStat++
 	} else {
 		mx.bpTable[m] = int8(hUp)
-		cool.x.o = Octa(Tetra(hDown)) // 흐름을 따른다
+		cool.x.o = Octa(Tetra(hDown)) // go with the flow
 		mx.bpOkStat++
 	}
 	if mx.verbose&showPredBit != 0 {
@@ -3235,20 +3235,20 @@ if mx.bpTable != nil {
 계산을 건너뛴다.
 
 @<모든 것을 초기화한다@>=
-mx.bpAmask = ((1 << mx.bpA) - 1) << 2 // 명령 주소의 가장 아래 $a$비트
-mx.bpCmask = ((1 << mx.bpC) - 1) << (mx.bpA + 2) // 그다음 $c$개의 주소 비트
-mx.bpBcmask = (1 << (mx.bpB + mx.bpC)) - 1 // 이력 정보의 가장 아래 $b+c$비트
-mx.bpNmask = (1 << mx.bpN) - 1 // 가장 아래 $n$비트
+mx.bpAmask = ((1 << mx.bpA) - 1) << 2 // least $a$ bits of instruction address
+mx.bpCmask = ((1 << mx.bpC) - 1) << (mx.bpA + 2) // the next $c$ address bits
+mx.bpBcmask = (1 << (mx.bpB + mx.bpC)) - 1 // least $b+c$ bits of history info
+mx.bpNmask = (1 << mx.bpN) - 1 // least significant $n$ bits
 if mx.bpN > 0 {
-	mx.bpNpower = 1 << (mx.bpN - 1) // $2^{n-1}$, 곧 $n$비트 수의 부호 비트
+	mx.bpNpower = 1 << (mx.bpN - 1) // $2^{n-1}$, the sign bit of an $n$-bit number
 }
 
 @ 보충: 원본의 통계는 |int|였고 \.{\%d}로 찍었다. 여기서는 32비트로 둔다.
 
 @<기계의 상태@>=
 bpAmask, bpCmask, bpBcmask, bpNmask, bpNpower int
-bpRevStat, bpOkStat                           int32 // 몇 번 뒤집고 몇 번 따랐는가
-bpBadStat, bpGoodStat                         int32 // 몇 번 틀리고 몇 번 맞았는가
+bpRevStat, bpOkStat                           int32 // how often we overrode and agreed
+bpBadStat, bpGoodStat                         int32 // how often we failed and succeeded
 
 @ 분기나 그럴듯한 분기 명령을 발행했고 재정렬 버퍼에서 관련 레지스터의 값을 |data.b.o|로
 계산했다면, 예측이 맞았는지 가릴 준비가 된 것이다.
@@ -3263,7 +3263,7 @@ case br, pbr:
 	}
 	if (j != 0) == (data.i == pbr) {
 		mx.bpGoodStat++
-	} else { // 아이고, 잘못 예측했다
+	} else { // oops, misprediction
 		mx.bpBadStat++
 		@<잘못된 분기 예측에서 회복한다@>
 	}
@@ -3278,13 +3278,13 @@ func registerTruth(o Octa, op int) int {
 	var b int
 	switch (op >> 1) & 0x3 {
 	case 0:
-		b = int(o >> 63) // 음수인가?
+		b = int(o >> 63) // negative?
 	case 1:
-		b = b2i(o == 0) // 0인가?
+		b = b2i(o == 0) // zero?
 	case 2:
-		b = b2i(o < signBit && o != 0) // 양수인가?
+		b = b2i(o < signBit && o != 0) // positive?
 	case 3:
-		b = int(o & 0x1) // 홀수인가?
+		b = int(o & 0x1) // odd?
 	}
 	if op&0x8 != 0 {
 		return b ^ 1
@@ -3319,7 +3319,7 @@ if i < mx.deissues {
 	continue
 }
 mx.deissues = i
-mx.oldTail, mx.tail = mx.head, mx.head // 가져오기 버퍼를 비운다
+mx.oldTail, mx.tail = mx.head, mx.head // clear the fetch buffer
 mx.resuming = 0
 @<가져오기 코루틴을 다시 시작한다@>
 mx.instPtr = spec{o: data.goLoc.o}
@@ -3331,7 +3331,7 @@ if data.loc&signBit == 0 {
 	}
 }
 if mx.bpTable != nil {
-	mx.bpTable[data.x.o>>32] = int8(data.x.o) // 이것이 넣었어야 할 값이다
+	mx.bpTable[data.x.o>>32] = int8(data.x.o) // this is what we should have stored
 	if mx.verbose&showPredBit != 0 {
 		mx.printf(" mispredicted ")
 		mx.printOcta(data.loc)
@@ -3460,8 +3460,8 @@ I-캐시와 D-캐시는 새 데이터를 메모리가 아니라 S-캐시에 쓴�
 
 @<상수@>=
 const (
-	writeBack  = 1 // 즉시 쓰기가 아니면 이것을 쓴다
-	writeAlloc = 2 // 쓰기 우회가 아니면 이것을 쓴다
+	writeBack  = 1 // use this if not write-through
+	writeAlloc = 2 // use this if not write-around
 )
 
 @ 앞에서 보았듯이 여러 종류의 캐시를 흉내 낼 수 있다. 캐시는 \KW{cache} 구조체로 나타내는데,
@@ -3475,37 +3475,37 @@ const (
 
 @<타입 정의@>=
 type cacheblock struct {
-	tag   Octa   // 캐시 블록 주소에 들어가지 않는 열쇠의 비트들
-	dirty []bool // 알갱이마다 하나씩 있는 더러움 비트 $2^{g-b}$개의 배열
-	data  []Octa // 옥타바이트 $2^{b-3}$개의 배열, 곧 캐시 블록의 데이터
-	rank  int    // |random|이 아닌 방침을 위한 보조 정보
-	pos   int    // 집합 안의 위치
+	tag   Octa   // bits of key not included in the cache block address
+	dirty []bool // array of $2^{g-b}$ dirty bits, one per granule
+	data  []Octa // array of $2^{b-3}$ octabytes, the data in a cache block
+	rank  int    // auxiliary information for non-|random| policies
+	pos   int    // position within the set
 }
 @#
-type cacheset = []cacheblock // 블록 $2^a$개나 $2^v$개의 배열
+type cacheset = []cacheblock // array of $2^a$ or $2^v$ blocks
 @#
 type cache struct {
-	a, b, c, g, v            int           // 연관도, 블록 크기, 집합 수, 알갱이, 희생자 크기의 로그
-	aa, bb, cc, gg, vv       int           // 연관도, 블록 크기, 집합 수, 알갱이, 희생자 크기(모두 2의 거듭제곱)
+	a, b, c, g, v            int           // logs of associativity, blocksize, setsize, granularity, victimsize
+	aa, bb, cc, gg, vv       int           // associativity, blocksize, setsize, granularity, victimsize (all powers of 2)
 	tagmask                  int           // $-2^{b+c}$
-	repl, vrepl              replacePolicy // 희생자와 희생자의 희생자를 고르는 방법
-	mode                     int           // 선택 사항 |writeBack|과 |writeAlloc|
-	accessTime               int           // 적중인지 알기까지의 사이클
-	copyInTime               int           // 새 블록을 캐시에 복사해 넣는 사이클
-	copyOutTime              int           // 옛 블록을 캐시에서 복사해 내는 사이클
-	set                      []cacheset    // 캐시 블록 배열의 집합 $2^c$개의 배열
-	victim                   cacheset      // 있다면, 희생자 캐시
-	filler                   coroutine     // 새 블록을 캐시에 복사해 넣는 코루틴
-	fillerCtl                control       // 그 제어 블록
-	flusher                  coroutine     // 캐시의 더러운 옛 데이터를 쓰는 코루틴
-	flusherCtl               control       // 그 제어 블록
-	inbuf                    cacheblock    // 채우기는 여기서 온다
-	outbuf                   cacheblock    // 쏟아 내기는 여기로 간다
-	lock                     lockvar       // 캐시를 크게 바꾸는 동안 0이 아니다
-	fillLock                 lockvar       // 채우는 코루틴이 데이터를 돌려주어야 하면 0이 아니다
-	ports                    int           // 몇 개의 코루틴이 캐시를 읽을 수 있는가?
-	reader                   []coroutine   // 동시에 읽을지도 모르는 코루틴들의 배열
-	name                     string        // 이를테면 |"Icache"|
+	repl, vrepl              replacePolicy // how to choose victims and victim-victims
+	mode                     int           // optional |writeBack| and/or |writeAlloc|
+	accessTime               int           // cycles to know if there's a hit
+	copyInTime               int           // cycles to copy a new block into the cache
+	copyOutTime              int           // cycles to copy an old block from the cache
+	set                      []cacheset    // array of $2^c$ sets of arrays of cache blocks
+	victim                   cacheset      // the victim cache, if present
+	filler                   coroutine     // a coroutine for copying new blocks into the cache
+	fillerCtl                control       // its control block
+	flusher                  coroutine     // a coroutine for writing dirty old data from the cache
+	flusherCtl               control       // its control block
+	inbuf                    cacheblock    // filling comes from here
+	outbuf                   cacheblock    // flushing goes to here
+	lock                     lockvar       // nonzero when the cache is being changed significantly
+	fillLock                 lockvar       // nonzero when filler should pass data back
+	ports                    int           // how many coroutines can be reading the cache?
+	reader                   []coroutine   // array of coroutines that might be reading simultaneously
+	name                     string        // |"Icache"|, for example
 }
 
 @ @<기계의 상태@>=
@@ -3690,7 +3690,7 @@ func (mx *machine) chooseVictim(s cacheset, aa int, policy replacePolicy) *cache
 				return &s[k]
 			}
 		}
-		mx.panic(confusion("lru victim")) // 무슨 일인가? 순위가 0인 것이 없다
+		mx.panic(confusion("lru victim")) // what happened? nobody has rank zero
 	case pseudoLRU:
 		l := 1
 		for m := aa >> 1; m != 0; m >>= 1 {
@@ -3773,7 +3773,7 @@ func (c *cache) cacheAddr(alf Octa) cacheset {
 }
 @#
 func (mx *machine) cacheSearch(c *cache, alf Octa) *cacheblock {
-	s := c.cacheAddr(alf) // |alf|에 해당하는 집합
+	s := c.cacheAddr(alf) // the set corresponding to |alf|
 	for k := 0; k < c.aa; k++ {
 		if p := &s[k]; (Tetra(p.tag)^Tetra(alf))&Tetra(c.tagmask) == 0 && p.tag>>32 == alf>>32 {
 			mx.hitSet = s
@@ -3782,7 +3782,7 @@ func (mx *machine) cacheSearch(c *cache, alf Octa) *cacheblock {
 	}
 	s = c.victim
 	if s == nil {
-		return nil // 캐시를 놓쳤고, 희생자 영역도 없다
+		return nil // cache miss, and no victim area
 	}
 	for k := 0; k < c.vv; k++ {
 		if p := &s[k]; (Tetra(p.tag)^Tetra(alf))&Tetra(-c.bb) == 0 && p.tag>>32 == alf>>32 {
@@ -3790,7 +3790,7 @@ func (mx *machine) cacheSearch(c *cache, alf Octa) *cacheblock {
 			return p
 		}
 	}
-	return nil // 두 번 놓쳤다
+	return nil // double miss
 }
 
 @ 보충: 원본은 |hit_set|과 희생자 캐시를 포인터로 견주었다. 슬라이스는 첫 원소의 주소로
@@ -3813,7 +3813,7 @@ func (mx *machine) useAndFix(c *cache, p *cacheblock) *cacheblock {
 	if !sameSet(mx.hitSet, c.victim) {
 		noteUsage(p, mx.hitSet, c.aa, c.repl)
 	} else {
-		noteUsage(p, mx.hitSet, c.vv, c.vrepl) // 희생자 캐시에서 찾았다
+		noteUsage(p, mx.hitSet, c.vv, c.vrepl) // found in victim cache
 		if c.filler.next == nil {
 			s := c.cacheAddr(p.tag)
 			q := mx.chooseVictim(s, c.aa, c.repl)
@@ -3859,7 +3859,7 @@ func (mx *machine) loadCache(c *cache, p *cacheblock) {
 	p.data, c.inbuf.data = c.inbuf.data, p.data
 	p.tag = c.inbuf.tag
 	mx.hitSet = c.cacheAddr(p.tag)
-	mx.useAndFix(c, p) // |p|는 옮겨지지 않는다
+	mx.useAndFix(c, p) // |p| not moved
 }
 
 @ 서브루틴 |flushCache(c,p,keep)|는 |c.flusher.next=nil|인 ``조용한'' 순간에 부른다. 이것은
@@ -3869,7 +3869,7 @@ func (mx *machine) loadCache(c *cache, p *cacheblock) {
 @<함수들@>=
 func (mx *machine) flushCache(c *cache, p *cacheblock, keep bool) {
 	c.outbuf.tag = p.tag
-	if keep { // |p|의 데이터를 보존해야 하는가?
+	if keep { // should we preserve the data in |p|?
 		copy(c.outbuf.data[:c.bb>>3], p.data)
 	} else {
 		c.outbuf.data, p.data = p.data, c.outbuf.data
@@ -3878,8 +3878,8 @@ func (mx *machine) flushCache(c *cache, p *cacheblock, keep bool) {
 	for j := 0; j < c.bb>>c.g; j++ {
 		p.dirty[j] = false
 	}
-	c.outbuf.rank = c.bb // 유효한 바이트가 이만큼 있다
-	mx.startup(&c.flusher, c.copyOutTime) // 중단되지 않는다
+	c.outbuf.rank = c.bb // this many valid bytes
+	mx.startup(&c.flusher, c.copyOutTime) // will not be aborted
 }
 
 @ 루틴 |allocSlot|은 캐시를 놓친 뒤 새 정보를 캐시에 넣고 싶을 때 부른다. 이것은 새 정보를 넣을
@@ -3908,7 +3908,7 @@ func (mx *machine) allocSlot(c *cache, alf Octa) *cacheblock {
 		(Tetra(c.outbuf.tag)^Tetra(alf))&Tetra(-c.bb) == 0 {
 		return nil
 	}
-	s := c.cacheAddr(alf) // |alf|에 해당하는 집합
+	s := c.cacheAddr(alf) // the set corresponding to |alf|
 	var p *cacheblock
 	if c.victim != nil {
 		p = mx.chooseVictim(c.victim, c.vv, c.vrepl)
@@ -3924,7 +3924,7 @@ func (mx *machine) allocSlot(c *cache, alf Octa) *cacheblock {
 	if c.victim != nil {
 		q := mx.chooseVictim(s, c.aa, c.repl)
 		swapBlocks(p, q)
-		q.tag |= sign32 << 32 // 태그를 무효로 만든다
+		q.tag |= sign32 << 32 // invalidate the tag
 		return q
 	}
 	p.tag |= sign32 << 32
@@ -3952,8 +3952,8 @@ $a$의 값이 너무 커서 |cacheSearch| 루틴의 순차 찾기가 너무 느�
 
 @<타입 정의@>=
 type chunknode struct {
-	tag   Tetra  // 32비트 덩이 주소
-	chunk []Octa // |nil|이거나 옥타바이트 $2^{13}$개의 배열
+	tag   Tetra  // 32-bit chunk address
+	chunk []Octa // either |nil| or an array of $2^{13}$ octabytes
 }
 
 @ 매개변수 |hashPrime|은 매개변수 |memChunksMax|보다 큰 소수여야 한다. 두 배보다 넉넉히
@@ -3961,10 +3961,10 @@ type chunknode struct {
 |memChunksMax=1000|과 |hashPrime=2003|으로 정한다.
 
 @<기계의 상태@>=
-memChunks    int         // 지금까지 할당한 덩이의 수
-memChunksMax int         // 한 번 돌 때 서로 다른 덩이를 이만큼까지
-hashPrime    int         // |memChunksMax|보다 크되, 엄청나지는 않다
-memHash      []chunknode // 모의 주 메모리
+memChunks    int         // this many chunks are allocated so far
+memChunksMax int         // up to this many different chunks per run
+hashPrime    int         // larger than |memChunksMax|, but not enormous
+memHash      []chunknode // the simulated main memory
 
 @ 따로 컴파일하는 프로시저 |spec_read()|와 |spec_write()|는 일반 프로시저 |mem_read()|와
 |mem_write()|와 같은 호출 관례를 따르되, |size| 매개변수가 더 있다. 이것은 |1<<size|바이트를
@@ -3995,7 +3995,7 @@ func (mx *machine) memRead(addr Octa) Octa {
 @.uninitialized memory...@>
 			}
 			h = mx.hashPrime
-			break // 0을 돌려줄 것이다
+			break // zero will be returned
 		}
 		if h == 0 {
 			h = mx.hashPrime
@@ -4006,7 +4006,7 @@ func (mx *machine) memRead(addr Octa) Octa {
 }
 
 @ @<기계의 상태@>=
-lastH int // 가장 최근에 맞은 해시 색인
+lastH int // the hash index that was most recently correct
 
 @ @<함수들@>=
 func (mx *machine) memWrite(addr, val Octa) {
@@ -4038,11 +4038,11 @@ func (mx *machine) memWrite(addr, val Octa) {
 사이클 수는 각각 |memAddrTime+c*memReadTime|이나 |memAddrTime+c*memWriteTime|이라고 가정한다.
 
 @<기계의 상태@>=
-memAddrTime  int     // 메모리 버스로 주소를 보내는 사이클
-busWords     int     // 메모리 버스의 폭, 옥타바이트 단위
-memReadTime  int     // 주 메모리에서 읽는 사이클
-memWriteTime int     // 주 메모리에 쓰는 사이클
-memLock      lockvar // 버스가 바쁘면 |nil|이 아니다
+memAddrTime  int     // cycles to transmit an address on memory bus
+busWords     int     // width of memory bus, in octabytes
+memReadTime  int     // cycles to read from main memory
+memWriteTime int     // cycles to write to main memory
+memLock      lockvar // is non-|nil| when the bus is busy
 
 @ 메모리에 쓰는 주된 방법 하나는 |flushToMem| 코루틴을 부르는 것이다. S-캐시가 있으면
 |Scache.flusher|가, S-캐시는 없고 D-캐시가 있으면 |Dcache.flusher|가 그 코루틴이다.
@@ -4067,11 +4067,11 @@ case flushMemSt + 1:
 	data.state = 2
 	@<|c.outbuf|의 더러운 데이터를 쓰고 버스를 기다린다@>
 case flushMemSt + 2:
-	return true // 이것이 |memLock|과 |c.outbuf|를 풀어 준다
+	return true // this frees |memLock| and |c.outbuf|
 
 @ @<|c.outbuf|의 더러운 데이터를...@>=
 {
-	del := c.gg >> 3 // 알갱이 하나의 옥타바이트 수
+	del := c.gg >> 3 // octabytes per granule
 	addr := c.outbuf.tag
 	off := int(Tetra(addr)&0xffff) >> 3
 	count, first, lastOff := 0, true, 0
@@ -4123,7 +4123,7 @@ case flushToS:
 	pc = flushSSt + label(data.state)
 
 @ @<|step|의 다른 지역 변수@>=
-blockDiff int // |flushToS|에서 더 읽어야 할 바이트 수
+blockDiff int // bytes still to be read in |flushToS|
 
 @ @<특별한 코루틴을 제어하는 경우들@>=
 case flushSSt + 0:
@@ -4168,11 +4168,11 @@ case flushSSt + 3:
 case flushSSt + 4:
 	mx.copyBlock(c, &c.outbuf, mx.Scache, p)
 	mx.hitSet = mx.Scache.cacheAddr(c.outbuf.tag)
-	mx.useAndFix(mx.Scache, p) // |p|는 옮겨지지 않는다
+	mx.useAndFix(mx.Scache, p) // |p| not moved
 	data.state = 5
 	return mx.wait(self, mx.Scache.copyInTime)
 case flushSSt + 5:
-	if mx.Scache.mode&writeBack == 0 { // 즉시 쓰기
+	if mx.Scache.mode&writeBack == 0 { // write-through
 		if mx.Scache.flusher.next != nil {
 			return mx.wait(self, 1)
 		}
@@ -4184,7 +4184,7 @@ case flushSSt + 6:
 
 @ @<S-캐시에 자리 |p|를...@>=
 if mx.Scache.filler.next != nil {
-	return mx.wait(self, 1) // 어쩌면 불필요한 조심일지도?
+	return mx.wait(self, 1) // perhaps an unnecessary precaution?
 }
 p = mx.allocSlot(mx.Scache, c.outbuf.tag)
 if p == nil {
@@ -4275,7 +4275,7 @@ case fillMemSt + 2:
 		setLock(self, &c.lock)
 	}
 	if cc != nil {
-		mx.awaken(cc, c.copyInTime) // 두 번째로 깨운다
+		mx.awaken(cc, c.copyInTime) // the second wakeup call
 	}
 	mx.loadCache(c, data.ptrB.(*cacheblock))
 	data.state = 3
@@ -4312,7 +4312,7 @@ case fillFromS:
 	pc = fillSSt + label(data.state)
 
 @ @<지점 이름@>=
-lSNonMiss // 원본의 |S_non_miss|
+lSNonMiss // the original's |S_non_miss|
 
 @ @<특별한 코루틴을 제어하는 경우들@>=
 case fillSSt + 0:
@@ -4329,11 +4329,11 @@ case fillSSt + 1:
 	return mx.sleep(self)
 case fillSSt + 2:
 	if cc != nil {
-		cc.ctl.x.o = data.x.o // 이 데이터는 |Scache.filler|가 공급했다
-		mx.awaken(cc, mx.Scache.accessTime) // 우리는 그것을 되돌려 전한다
+		cc.ctl.x.o = data.x.o // this data has been supplied by |Scache.filler|
+		mx.awaken(cc, mx.Scache.accessTime) // we propagate it back
 	}
 	data.state = 3
-	return mx.sleep(self) // 깨어나면 S-캐시에 우리 데이터가 있을 것이다
+	return mx.sleep(self) // when we awake, the S-cache will have our data
 
 @ @<특별한 코루틴을 제어하는 경우들@>=
 case lSNonMiss:
@@ -4347,7 +4347,7 @@ case fillSSt + 3:
 	data.state = 4
 	return mx.wait(self, mx.Scache.accessTime)
 case fillSSt + 4:
-	mx.Scache.lock = nil // 우리가 그 잠금을 쥐고 있었다
+	mx.Scache.lock = nil // we had been holding that lock
 	data.state = 5
 	fallthrough
 case fillSSt + 5:
@@ -4360,7 +4360,7 @@ case fillSSt + 5:
 	return mx.wait(self, c.copyInTime)
 case fillSSt + 6:
 	if cc != nil {
-		mx.awaken(cc, 1) // 두 번째로 깨운다
+		mx.awaken(cc, 1) // second wakeup call
 	}
 	return true
 
@@ -4471,15 +4471,15 @@ case cleanup:
 	pc = cleanupSt + label(data.state)
 
 @ @<지점 이름@>=
-lDcleanLoop // 원본의 |Dclean_loop|
-lDclean     // 원본의 |Dclean|
-lDcleanInc  // 원본의 |Dclean_inc|
-lScleanLoop // 원본의 |Sclean_loop|
-lSclean     // 원본의 |Sclean|
-lScleanInc  // 원본의 |Sclean_inc|
+lDcleanLoop // the original's |Dclean_loop|
+lDclean     // the original's |Dclean|
+lDcleanInc  // the original's |Dclean_inc|
+lScleanLoop // the original's |Sclean_loop|
+lSclean     // the original's |Sclean|
+lScleanInc  // the original's |Sclean_inc|
 
 @ @<상수@>=
-const lSprep = cleanupSt + 9 // 원본의 |Sprep|
+const lSprep = cleanupSt + 9 // the original's |Sprep|
 
 @ @<특별한 코루틴을 제어하는 경우들@>=
 @<D-캐시를 위한 상태 0부터 4까지@>
@@ -4533,7 +4533,7 @@ case cleanupSt + 1:
 	return mx.wait(self, mx.Dcache.copyOutTime)
 case cleanupSt + 2:
 	if mx.cleanLock == nil {
-		return false // 일찍 끝난다
+		return false // premature termination
 	}
 	if mx.Dcache.flusher.next != nil {
 		return mx.wait(self, 1)
@@ -4637,7 +4637,7 @@ case cleanupSt + 6:
 	return mx.wait(self, mx.Scache.copyOutTime)
 case cleanupSt + 7:
 	if mx.cleanLock == nil {
-		return false // 일찍 끝난다
+		return false // premature termination
 	}
 	if mx.Scache.flusher.next != nil {
 		return mx.wait(self, 1)
@@ -4718,13 +4718,13 @@ LDPTE $x$,$x$,$8a_0$\cr}}$$
 
 @<상수@>=
 const (
-	LDPTP = PREGO // 안에서는 헷갈릴 일이 없다
+	LDPTP = PREGO // internally this won't cause confusion
 	LDPTE = GO
 )
 
 @ @<기계의 상태@>=
-IPTctl, DPTctl [5]control    // I와 D 페이지 변환을 위한 제어 블록
-IPTco, DPTco   [10]coroutine // 코루틴마다 두 단계짜리 파이프라인이다
+IPTctl, DPTctl [5]control    // control blocks for I and D page translation
+IPTco, DPTco   [10]coroutine // each coroutine is a two-stage pipeline
 
 @ 보충: 원본은 |co[2*j]|의 다음 단계를 |self+1|로 얻었다. 여기서는 |succ| 필드를 정한다. 제어
 블록의 \KW{specnode}들이 자기 블록을 가리키게 하는 일도 여기서 한다.
@@ -4740,7 +4740,7 @@ for j = 0; j < 5; j++ {
 			c.op, c.i = LDPTE, ldpte
 		}
 		c.loc = negOne
-		c.goLoc.o = 3 // 원본의 |incr(neg_one,4)|
+		c.goLoc.o = 3 // the original's |incr(neg_one,4)|
 		c.ptrA = &mx.mem
 		c.renX = true
 		c.x.addr = c.x.addr&0xffffffff | 0xffffffff<<32
@@ -4773,7 +4773,7 @@ mx.DTcache.fillerCtl.ptrC = mx.DPTco[:]
 case fillFromVirt:
 	c = data.ptrA.(*cache)
 	cc = c.fillLock
-	co = data.ptrC.([]coroutine) // |IPTco|나 |DPTco|
+	co = data.ptrC.([]coroutine) // |IPTco| or |DPTco|
 	pc = fillVirtSt + label(data.state)
 
 @ @<특별한 코루틴을 제어하는 경우들@>=
@@ -4808,13 +4808,13 @@ case fillVirtSt + 3:
 둔다. rV가 바뀔 때마다 이 필드들을 모두 다시 계산한다.
 
 @<기계의 상태@>=
-pageN    int    // rV의 10비트 |n| 필드에 8을 곱한 것
-pageR    int    // rV의 27비트 |r| 필드
-pageS    int    // rV의 8비트 |s| 필드
-pageF    int    // rV의 3비트 |f| 필드
-pageB    [5]int // rV의 4비트 |b| 필드들. |pageB[0]=0|
-pageMask Octa   // 가장 아래 |s|비트
-pageBad  bool   // rV가 규칙을 어기는가?
+pageN    int    // the 10-bit |n| field of rV, times 8
+pageR    int    // the 27-bit |r| field of rV
+pageS    int    // the 8-bit |s| field of rV
+pageF    int    // the 3-bit |f| field of rV
+pageB    [5]int // the 4-bit |b| fields of rV; |pageB[0]=0|
+pageMask Octa   // the least significant |s| bits
+pageBad  bool   // does rV violate the rules?
 
 @ 보충: 원본에서 |page_bad|는 처음에 참이었다.
 
@@ -4851,7 +4851,7 @@ func (mx *machine) transKey(addr Octa) Octa {
 }
 @#
 func (mx *machine) physAddr(virt, trans Octa) Octa {
-	t := trans &^ mx.pageMask // PTE의 \\{ynp} 필드들을 지운다
+	t := trans &^ mx.pageMask // zero out the \\{ynp} fields of a PTE
 	return t + virt&mx.pageMask
 }
 
@@ -4872,15 +4872,15 @@ noHardwarePT bool
 
 @<보조 코루틴들을 띄워...@>=
 aaaaa := data.y.o
-i = int(aaaaa >> 61) // 세그먼트 번호
-aaaaa &= 1<<61 - 1 // 세그먼트~$i$ 안의 주소
-aaaaa >>= mx.pageS // 페이지 주소
+i = int(aaaaa >> 61) // the segment number
+aaaaa &= 1<<61 - 1 // the address within segment~$i$
+aaaaa >>= mx.pageS // the page address
 for j = 0; aaaaa != 0; j++ {
 	co[2*j].ctl.z.o = (aaaaa & 0x3ff) << 3
 	aaaaa >>= 10
 }
-if mx.pageB[i+1] < mx.pageB[i]+j { // 주소가 너무 크다
-	// |data.b.o|가 0이므로 할 일이 없다
+if mx.pageB[i+1] < mx.pageB[i]+j { // address too large
+	// nothing needs to be done, since |data.b.o| is zero
 } else {
 	if j == 0 {
 		j = 1
@@ -4934,12 +4934,12 @@ if cc != nil {
 
 @<타입 정의@>=
 type writeNode struct {
-	o     Octa  // 저장할 데이터
-	addr  Octa  // 그 물리 주소
-	stamp Tetra // 마지막으로 확정된 때($2^{32}$을 법으로)
-	i     int   // 이 쓰기는 특별한가?
-	size  int   // |specWrite|의 매개변수
-	idx   int   // 쓰기 버퍼 안의 위치
+	o     Octa  // data to be stored
+	addr  Octa  // its physical address
+	stamp Tetra // when last committed (mod $2^{32}$)
+	i     int   // is this write special?
+	size  int   // parameter for |specWrite|
+	idx   int   // position in the write buffer
 }
 
 @ 이 버퍼는 늘 하던 대로 원형 리스트로 나타내는데, 원소는 |writeTail+1|, |writeTail+2|,
@@ -4949,12 +4949,12 @@ type writeNode struct {
 옥타바이트의 여러 필드를 여러 명령이 저장할 때 일이 빨라진다.
 
 @<기계의 상태@>=
-wbuf                 []writeNode // 쓰기 버퍼가 든 원
-wbufBot, wbufTop     *writeNode  // 가장 작은 쓰기 버퍼 노드와 가장 큰 노드
-writeHead, writeTail *writeNode  // 쓰기 버퍼의 앞과 뒤
-wbufLock             lockvar     // |writeHead|의 데이터를 쓰고 있는가?
-holdingTime          int         // 최소 머무는 시간
-speedLock            lockvar     // |holdingTime|을 무시해야 하는가?
+wbuf                 []writeNode // the ring containing the write buffer
+wbufBot, wbufTop     *writeNode  // least and greatest write buffer nodes
+writeHead, writeTail *writeNode  // front and rear of the write buffer
+wbufLock             lockvar     // is the data in |writeHead| being written?
+holdingTime          int         // minimum holding time
+speedLock            lockvar     // should we ignore |holdingTime|?
 
 @ 보충: 원형 리스트를 도는 두 메서드를 둔다. 메서드 |prevWrite|는 원본의 |p-1|이고, |nextWrite|는
 원본의 |q+1|이다. 둘 다 원의 끝에서 반대쪽 끝으로 돌아간다.
@@ -4975,8 +4975,8 @@ func (mx *machine) nextWrite(q *writeNode) *writeNode {
 }
 
 @ @<기계의 상태@>=
-writeCo  coroutine // 쓰기 버퍼를 비우는 코루틴
-writeCtl control   // 그 제어 블록
+writeCo  coroutine // coroutine that empties the write buffer
+writeCtl control   // its control block
 
 @ @<모든 것을 초기화한다@>=
 mx.writeCo.ctl = &mx.writeCtl
@@ -5038,7 +5038,7 @@ func (mx *machine) printPipe() {
 |dunno|의 주소를 쓴다.
 
 @<기계의 상태@>=
-dunno Octa // 원본의 \.{DUNNO}가 가리키는 곳
+dunno Octa // where the original's \.{DUNNO} points
 
 @ 원본은 |p|와 |\&hot->x|, |ctl|과 |hot|의 주소를 견주어 |p|가 이미 확정된 명령에 속하는지
 가렸다. 리스트 |mem|에서 머리 |mem| 말고는 모두 재정렬 버퍼 안 제어 블록의 |x| 필드이므로, 보충:
@@ -5071,7 +5071,7 @@ func (mx *machine) writeSearch(ctl *control, addr Octa) *Octa {
 			}
 		}
 	}
-	for { // 원본의 |qloop|
+	for { // the original's |qloop|
 		if q == mx.writeHead {
 			return nil
 		}
@@ -5109,7 +5109,7 @@ if hot.interrupt&(fBit+0xff) == 0 {
 	if !found {
 		p := mx.prevWrite(mx.writeTail)
 		if p == mx.writeHead {
-			break commit // 쓰기 버퍼가 차 있다
+			break commit // the write buffer is full
 		}
 		q = mx.writeTail
 		mx.writeTail = p
@@ -5156,10 +5156,10 @@ case writeFromWbuf:
 	pc = writeSt + label(data.state)
 
 @ @<지점 이름@>=
-lMemDirect // 원본의 |mem_direct|
+lMemDirect // the original's |mem_direct|
 
 @ @<상수@>=
-const lWriteRestart = writeSt + 0 // 원본의 |write_restart|
+const lWriteRestart = writeSt + 0 // the original's |write_restart|
 
 @ @<특별한 코루틴을 제어하는 경우들@>=
 case writeSt + 4:
@@ -5178,7 +5178,7 @@ case writeSt + 1:
 	return mx.sleep(self)
 case writeSt + 2:
 	data.state = 0
-	return mx.sleep(self) // D-캐시에 블록이 들어오면 깨어난다
+	return mx.sleep(self) // wake up when the D-cache has the block
 case writeSt + 3:
 	@<D-캐시에 쓸 때 쓰기 우회를 다룬다@>
 case lMemDirect:
@@ -5192,7 +5192,7 @@ if self.lockloc != nil {
 	self.lockloc = nil
 }
 if mx.writeHead == mx.writeTail {
-	return mx.wait(self, 1) // 쓰기 버퍼가 비어 있다
+	return mx.wait(self, 1) // write buffer is empty
 }
 if mx.writeHead.i == sync {
 	@<|writeHead|의 항목을 무시한다@>
@@ -5202,14 +5202,14 @@ if mx.writeHead.addr>>32&0xffff0000 != 0 {
 	continue
 }
 if Tetra(mx.ticks)-mx.writeHead.stamp < Tetra(mx.holdingTime) && mx.speedLock == nil {
-	return mx.wait(self, 1) // 데이터가 아직 설익었다
+	return mx.wait(self, 1) // data too raw
 }
 if mx.Dcache == nil {
-	pc = lMemDirect // 캐시하지 않는다
+	pc = lMemDirect // not cached
 	continue
 }
 if mx.Dcache.lock != nil {
-	return mx.wait(self, 1) // D-캐시가 바쁘다
+	return mx.wait(self, 1) // D-cache busy
 }
 if j = getReader(mx.Dcache); j < 0 {
 	return mx.wait(self, 1)
@@ -5244,7 +5244,7 @@ if mx.Dcache.flusher.next != nil {
 	}
 	c.outbuf.data[(a&Tetra(c.bb-1))>>3] = mx.writeHead.o
 	c.outbuf.dirty[(a&Tetra(c.bb-1))>>c.g] = true
-	c.outbuf.rank = c.gg // 유효한 바이트가 이만큼 있다
+	c.outbuf.rank = c.gg // this many valid bytes
 }
 setLock(self, &mx.wbufLock)
 mx.startup(&mx.Dcache.flusher, mx.Dcache.copyOutTime)
@@ -5256,7 +5256,7 @@ if mx.memLock != nil {
 	return mx.wait(self, 1)
 }
 setLock(self, &mx.wbufLock)
-setLock(&mx.memLocker, &mx.memLock) // |vanish| 타입의 코루틴
+setLock(&mx.memLocker, &mx.memLock) // a coroutine of type |vanish|
 mx.startup(&mx.memLocker, mx.memAddrTime+mx.memWriteTime)
 if mx.writeHead.addr>>32&0xffff0000 != 0 {
 	mx.specWrite(mx.writeHead.addr, mx.writeHead.o, mx.writeHead.size)
@@ -5313,7 +5313,7 @@ if p != nil {
 }
 
 @ @<즉시 쓰기이면 새 데이터를...@>=
-if mx.Dcache.mode&writeBack == 0 { // 즉시 쓰기
+if mx.Dcache.mode&writeBack == 0 { // write-through
 	if mx.Dcache.flusher.next != nil {
 		return mx.wait(self, 1)
 	}
@@ -5349,7 +5349,7 @@ return mx.wait(self, 1)
 여기서는 그 뒷부분을 절로 만들어 두 곳에서 쓴다.
 
 @<상수@>=
-const ldStLaunch = 7 // 적재/저장 명령이 메모리 주소를 가졌을 때의 |state|
+const ldStLaunch = 7 // |state| when load/store command has its memory address
 
 @ @<메모리 연산의 가상 주소를...@>=
 case preld, prest, prego:
@@ -5358,7 +5358,7 @@ case preld, prest, prego:
 		if data.i == prego {
 			bb = mx.Icache.bb
 		}
-		data.z.o += Octa(int(data.xx) & -bb) // (덧셈기가 넉넉히 빠르기를 바란다)
+		data.z.o += Octa(int(data.xx) & -bb) // (I hope the adder is fast enough)
 	}
 	fallthrough
 case ld, ldunc, ldvts, st, pst, syncd, syncid:
@@ -5368,7 +5368,7 @@ case ldptp, ldpte:
 		@<적재나 저장을 시작한다@>
 	}
 	data.x.o, data.x.known = 0, true
-	pc = lDie // 페이지 테이블 실패
+	pc = lDie // page table fault
 	continue
 
 @ @<적재나 저장을 시작한다@>=
@@ -5397,12 +5397,12 @@ func prwBits(data *control) Tetra {
 지점이 된다. 원본에서 이름표 |sync_check|와 |emulate_virt|는 뒤에서 나온다.
 
 @<지점 이름@>=
-lMakeLdReady // 원본의 |make_ld_ready|
+lMakeLdReady // the original's |make_ld_ready|
 
 @ @<첫 단계의 특별한 상태들@>=
 case stage1St + ldStLaunch:
 	if self.succ.next != nil {
-		return mx.wait(self, 1) // 둘째 단계가 비어 있어야 한다
+		return mx.wait(self, 1) // second stage must be clear
 	}
 	@<|prego|나 |ldvts| 같은 연산의 특별한 경우를 다룬다@>
 	if data.y.o&signBit != 0 {
@@ -5444,12 +5444,12 @@ DT-캐시는 적중하고 D-캐시는 놓치면 |data.state|는 |hitAndMiss|다.
 
 @<상수@>=
 const (
-	dtMiss     = 10 // DT-캐시에 열쇠가 없을 때의 둘째 단계 |state|
-	dtHit      = 11 // 물리 주소를 알 때의 둘째 단계 |state|
-	hitAndMiss = 12 // D-캐시를 놓쳤을 때의 둘째 단계 |state|
-	ldReady    = 13 // 데이터를 읽었을 때의 둘째 단계 |state|
-	stReady    = 14 // 데이터를 읽을 필요가 없을 때의 둘째 단계 |state|
-	prestWin   = 15 // 블록을 0으로 채울 수 있을 때의 둘째 단계 |state|
+	dtMiss     = 10 // second stage |state| when DT-cache doesn't hold the key
+	dtHit      = 11 // second stage |state| when physical address is known
+	hitAndMiss = 12 // second stage |state| when D-cache misses
+	ldReady    = 13 // second stage |state| when data has been read
+	stReady    = 14 // second stage |state| when data needn't be read
+	prestWin   = 15 // second stage |state| when we can fill a block with zeroes
 )
 
 @ @<DT-캐시에서 주소를 찾고...@>=
@@ -5487,7 +5487,7 @@ if m := mx.writeSearch(data, data.z.o); m == &mx.dunno {
 	data.x.o, data.state = *m, ldReady
 } else if mx.Dcache.b+mx.Dcache.c > mx.pageS &&
 	(Tetra(data.y.o)^Tetra(data.z.o))&Tetra((mx.Dcache.bb<<mx.Dcache.c)-(1<<mx.pageS)) != 0 {
-	data.state = dtHit // 가짜 D-캐시 찾기
+	data.state = dtHit // spurious D-cache lookup
 } else {
 	@<D-캐시에서 |data.z.o|를 찾아 적중하면 |x|를 읽는다@>
 }
@@ -5518,7 +5518,7 @@ if data.stackAlert {
 	if Tetra(data.z.o)&(pwBit>>protOffset) != 0 {
 		data.stackAlert = false
 	} else {
-		data.z.o = mx.g[rC].o // 스택 넘침에는 계속 페이지를 쓴다
+		data.z.o = mx.g[rC].o // use the continuation page for stack overflow
 	}
 }
 j = int(prwBits(data))
@@ -5664,19 +5664,19 @@ continue
 
 @<상수@>=
 const (
-	dtRetry = 8 // DT-캐시를 다시 찾아야 할 때의 둘째 단계 |state|
-	gotDT   = 9 // DT-캐시 항목을 계산했을 때의 둘째 단계 |state|
+	dtRetry = 8 // second stage |state| when DT-cache should be searched again
+	gotDT   = 9 // second stage |state| when DT-cache entry has been computed
 )
 @#
 const (
-	lSquareOne   = stage2St + dtRetry  // 원본의 |square_one|
-	lLdRetry     = stage2St + dtHit    // 원본의 |ld_retry|
-	lPrestSpan   = stage2St + prestWin // 원본의 |prest_span|
-	lFinishStore = stage2St + stReady  // 원본의 |finish_store|
+	lSquareOne   = stage2St + dtRetry  // the original's |square_one|
+	lLdRetry     = stage2St + dtHit    // the original's |ld_retry|
+	lPrestSpan   = stage2St + prestWin // the original's |prest_span|
+	lFinishStore = stage2St + stReady  // the original's |finish_store|
 )
 
 @ @<지점 이름@>=
-lAvoidD // 원본의 |avoid_D|
+lAvoidD // the original's |avoid_D|
 
 @ @<뒤 단계들의 특별한 상태들@>=
 case lSquareOne:
@@ -5711,7 +5711,7 @@ case stage2St + gotDT:
 		pc = lFinishStore
 		continue
 	}
-	fallthrough // 그렇지 않으면 아래의 |ld_retry|로 흘러내린다
+	fallthrough // otherwise we fall through to |ld_retry| below
 
 @ @<DT-캐시를 채우는 코루틴을...@>=
 if mx.DTcache.filler.next != nil {
@@ -5840,7 +5840,7 @@ case lPrestSpan:
 		pc = lFinEx
 		continue
 	}
-	q = mx.allocSlot(mx.Dcache, data.z.o) // |Dcache.filler|가 바빠도 괜찮다
+	q = mx.allocSlot(mx.Dcache, data.z.o) // OK if |Dcache.filler| is busy
 	if q != nil {
 		cleanBlock(mx.Dcache, q)
 		q.tag = data.z.o&^0xffffffff | Octa(Tetra(data.z.o)&Tetra(-mx.Dcache.bb))
@@ -5967,7 +5967,7 @@ case lFinishStore:
 		pc = lDoSyncid
 		continue
 	}
-	return true // 원본에서는 |switch|를 빠져나가 |terminate|에 이른다
+	return true // the original breaks out of the |switch| and reaches |terminate|
 
 @ 저장 명령에는 복잡한 점이 하나 더 있다. 어떤 것들은 넘침을 검사해야 하기 때문이다.
 
@@ -6046,17 +6046,17 @@ if data != mx.oldHot {
 	return mx.wait(self, 1)
 }
 if data.x.o == mx.g[rP].o {
-	data.a.o = 1 // |data.a.o|의 윗 테트라는 0이다
+	data.a.o = 1 // the upper tetra of |data.a.o| is zero
 	data.x.o = data.b.o
 } else {
-	mx.g[rP].o = data.x.o // |data.a.o|는 0이다
+	mx.g[rP].o = data.x.o // |data.a.o| is zero
 	if mx.verbose&issueBit != 0 {
 		mx.printf(" setting rP=")
 		mx.printOcta(mx.g[rP].o)
 		mx.printf("\n")
 	}
 }
-data.i = cswap // 겉모습만 바꾼다. 추적 출력에만 영향을 준다
+data.i = cswap // cosmetic change, affects the trace output only
 
 @* 가져오기 단계. 가장 어려운 메모리 연산들을 익혔으니, 이제 긴장을 풀고 그 지식을 조금 더
 단순한 일, 곧 가져오기 버퍼를 채우는 일에 쓸 수 있다. 가져오기는 적재/저장과 비슷하지만, D-캐시
@@ -6074,8 +6074,8 @@ IT-캐시를 동시에 읽는 복잡함을 여기에도 넣는다.
 @^program counter@>
 
 @<기계의 상태@>=
-instPtr spec   // 명령 포인터(프로그램 계수기라고도 한다)
-fetched []Octa // 들어오는 명령을 담는 버퍼
+instPtr spec   // the instruction pointer (aka program counter)
+fetched []Octa // buffer for incoming instructions
 
 @ 가져오기 코루틴은 대개 |fetchReady| 상태에서 사이클을 시작하는데, 이때 가장 최근에 가져온
 옥타바이트들이 |fetched|라는 버퍼의 자리 |fetchLo|, |fetchLo+1|, \dots, |fetchHi-1|에 있다.
@@ -6083,7 +6083,7 @@ fetched []Octa // 들어오는 명령을 담는 버퍼
 데이터가 더 있을지도 모른다.
 
 @<기계의 상태@>=
-fetchLo, fetchHi int // 그 버퍼의 활성 영역
+fetchLo, fetchHi int // the active region of that buffer
 fetchCo          coroutine
 fetchCtl         control
 
@@ -6125,15 +6125,15 @@ func (mx *machine) waitOrPass(self *coroutine, t int) bool {
 
 @<상수@>=
 const (
-	lNewFetch   = fetchSt + 0 // 원본의 |new_fetch|
-	lStartFetch = fetchSt + 1 // 원본의 |start_fetch|
+	lNewFetch   = fetchSt + 0 // the original's |new_fetch|
+	lStartFetch = fetchSt + 1 // the original's |start_fetch|
 )
 
 @ @<지점 이름@>=
-lKnownPhys // 원본의 |known_phys|
-lBadFetch  // 원본의 |bad_fetch|
-lSwymOne   // 원본의 |swym_one|
-lFetchOne  // 원본의 |fetch_one|
+lKnownPhys // the original's |known_phys|
+lBadFetch  // the original's |bad_fetch|
+lSwymOne   // the original's |swym_one|
+lFetchOne  // the original's |fetch_one|
 
 @ @<가져오기 코루틴의 동작을...@>=
 case lSwitch0:
@@ -6186,12 +6186,12 @@ if mx.instPtr.p != nil {
 
 @ @<상수@>=
 const (
-	gotIT       = 19 // IT-캐시 항목을 계산했을 때의 |state|
-	itMiss      = 20 // IT-캐시에 열쇠가 없을 때의 |state|
-	itHit       = 21 // 명령의 물리 주소를 알 때의 |state|
-	iHitAndMiss = 22 // I-캐시를 놓쳤을 때의 |state|
-	fetchReady  = 23 // 명령들을 읽었을 때의 |state|
-	gotOne      = 24 // ``미리 보기'' 옥타바이트가 준비되었을 때의 |state|
+	gotIT       = 19 // |state| when IT-cache entry has been computed
+	itMiss      = 20 // |state| when IT-cache doesn't hold the key
+	itHit       = 21 // |state| when physical instruction address is known
+	iHitAndMiss = 22 // |state| when I-cache misses
+	fetchReady  = 23 // |state| when instructions have been read
+	gotOne      = 24 // |state| when a ``preview'' octabyte is ready
 )
 
 @ @<IT-캐시에서 주소를 찾고...@>=
@@ -6219,7 +6219,7 @@ if p != nil {
 data.z.o = mx.physAddr(data.y.o, p.data[0])
 if mx.Icache.b+mx.Icache.c > mx.pageS &&
 	(Tetra(data.y.o)^Tetra(data.z.o))&Tetra((mx.Icache.bb<<mx.Icache.c)-(1<<mx.pageS)) != 0 {
-	data.state = itHit // 가짜 I-캐시 찾기
+	data.state = itHit // spurious I-cache lookup
 } else {
 	@<I-캐시에서 |data.z.o|를 찾아 적중하면 |fetched|로 복사한다@>
 }
@@ -6338,7 +6338,7 @@ return mx.wait(self, mx.memAddrTime+mx.memReadTime)
 그 |case|와 합친다.
 
 @<상수@>=
-const lFetchRetry = fetchSt + itHit // 원본의 |fetch_retry|
+const lFetchRetry = fetchSt + itHit // the original's |fetch_retry|
 
 @ @<가져오기 코루틴의 다른 경우들@>=
 case fetchSt + itMiss:
@@ -6353,7 +6353,7 @@ case fetchSt + itMiss:
 		@<페이지 테이블 에뮬레이션을 위한 가짜 명령을 끼워 넣는다@>
 	}
 	p = mx.allocSlot(mx.ITcache, mx.transKey(data.y.o))
-	if p == nil { // 이런, 결국 있었다
+	if p == nil { // hey, it was present after all
 		if data.i == prego {
 			pc = lFinEx
 		} else {
@@ -6447,7 +6447,7 @@ case lSwymOne:
 	pc = lFetchOne
 	continue
 case fetchSt + gotOne:
-	mx.fetched[0] = data.x.o // 새 캐시 데이터의 ``미리 보기''
+	mx.fetched[0] = data.x.o // a ``preview'' of the new cache data
 	fallthrough
 case lFetchOne:
 	mx.fetchLo, mx.fetchHi = 0, 1
@@ -6470,7 +6470,7 @@ newFetch := false
 for j = 0; j < mx.fetchMax; j++ {
 	newTail := mx.prevFetch(mx.tail)
 	if newTail == mx.head {
-		break // 가져오기 버퍼가 차 있다
+		break // fetch buffer is full
 	}
 	@<|tail| 자리에 새 명령을 넣는다@>
 	mx.tail = newTail
@@ -6500,7 +6500,7 @@ pc = lSwymOne
 continue
 
 @ @<기계의 상태@>=
-sleepy bool // 페이지 테이블 에뮬레이션 호출을 막 내보냈는가?
+sleepy bool // have we just emitted the page table emulation call?
 
 @ 이 시점에서 터무니없이 잘못된 명령을 검사한다. (배정기가 안에서 만든 명령을 위해 그런
 명령이 가져오기 버퍼를 차지하도록 실제로 허락할 때도 있다.)
@@ -6564,12 +6564,12 @@ func isLoadStore(i int) bool {
 }
 
 @ @<지점 이름@>=
-lEmulateVirt // 원본의 |emulate_virt|
+lEmulateVirt // the original's |emulate_virt|
 
 @ @<상수@>=
 const (
-	lState4 = stage1St + 4 // 원본의 |state_4|
-	lState5 = stage1St + 5 // 원본의 |state_5|
+	lState4 = stage1St + 4 // the original's |state_4|
+	lState5 = stage1St + 5 // the original's |state_5|
 )
 
 @ @<실행 단계 끝에서 인터럽트를...@>=
@@ -6603,7 +6603,7 @@ if i < mx.deissues {
 	continue
 }
 mx.deissues = i
-mx.oldTail, mx.tail = mx.head, mx.head // 가져오기 버퍼를 비운다
+mx.oldTail, mx.tail = mx.head, mx.head // clear the fetch buffer
 mx.resuming = 0
 @<가져오기 코루틴을 다시 시작한다@>
 mx.coolHist = data.hist
@@ -6611,7 +6611,7 @@ m := 16
 for i = j & int(Tetra(data.ra.o)); i&dBit == 0; i <<= 1 {
 	m += 16
 }
-data.arithExc |= Tetra(j&^(0x10000>>(m>>4))) >> 8 // 일어난 트립은 사건으로 기록하지 않는다
+data.arithExc |= Tetra(j&^(0x10000>>(m>>4))) >> 8 // trips taken are not logged as events
 data.goLoc.o = Octa(m)
 mx.instPtr = spec{o: data.goLoc.o}
 data.interrupt |= hBit
@@ -6625,7 +6625,7 @@ if i < mx.deissues {
 	continue
 }
 mx.deissues = i
-mx.oldTail, mx.tail = mx.head, mx.head // 가져오기 버퍼를 비운다
+mx.oldTail, mx.tail = mx.head, mx.head // clear the fetch buffer
 mx.resuming = 0
 @<가져오기 코루틴을 다시 시작한다@>
 mx.coolHist = data.hist
@@ -6690,7 +6690,7 @@ case trap:
 	if !mx.g[rT].up.known || !mx.g[rJ].up.known {
 		break stall
 	}
-	mx.instPtr = mx.specval(&mx.g[rT]) // 트랩과 에뮬레이트하는 연산
+	mx.instPtr = mx.specval(&mx.g[rT]) // traps and emulated ops
 	cool.needB, cool.b = true, mx.specval(&mx.g[255])
 	fallthrough
 case trip:
@@ -6737,7 +6737,7 @@ if mx.g[rI].o == 0 {
 	}
 }
 if mx.blk != nil {
-	mx.blk.tick() // 보충: \.{mmixmem.w}의 블록 장치가 시간을 보낸다
+	mx.blk.tick() // supplement: the block device of \.{mmixmem.w} spends time
 }
 mx.tryingToInterrupt = false
 if mx.g[rQ].o&mx.g[rK].o != 0 && mx.cool != mx.hot &&
@@ -6753,8 +6753,8 @@ if mx.g[rQ].o&mx.g[rK].o != 0 && mx.cool != mx.hot &&
 }
 
 @ @<기계의 상태@>=
-tryingToInterrupt bool // 가로막을 수 있는 연산들에게 멈추기를 권하는가?
-nullifying        bool // 적재/저장 명령을 무효로 만들려고 배정을 멈추는가?
+tryingToInterrupt bool // encouraging interruptible operations to pause
+nullifying        bool // stopping dispatch to nullify a load/store command
 
 @ 뜨거운 자리의 명령이 발행 취소되었을 수도 있지만, 시뮬레이터가 사용자의 요청으로 그렇게 했을
 때뿐이다. 그렇지 않으면 여기서 `|i>=deissues|' 검사는 늘 성공한다.
@@ -6767,7 +6767,7 @@ nullifying        bool // 적재/저장 명령을 무효로 만들려고 배정�
 i = mx.issuedBetween(mx.hot, mx.cool)
 if i >= mx.deissues {
 	mx.deissues = i
-	mx.tail = mx.head // 가져오기 버퍼를 비운다
+	mx.tail = mx.head // clear the fetch buffer
 	mx.resuming = 0
 	@<가져오기 코루틴을 다시 시작한다@>
 	if isLoadStore(mx.hot.i) {
@@ -6780,14 +6780,14 @@ if i >= mx.deissues {
 
 @<인터럽트를 시작하고 |break|한다@>=
 if hot.interrupt&hBit == 0 {
-	mx.g[rK].o = 0 // 트랩
+	mx.g[rK].o = 0 // trap
 }
 if (hot.interrupt&hBit != 0 && hot.i != trip) ||
 	(hot.interrupt&fBit != 0 && hot.i != trap) || hot.interrupt&eBit != 0 {
 	mx.doingInterrupt = 3
 	mx.suppressDispatch = true
 } else {
-	mx.doingInterrupt = 2 // 배정기가 시작한 트립이나 트랩
+	mx.doingInterrupt = 2 // trip or trap started by dispatcher
 }
 break
 
@@ -6832,10 +6832,10 @@ if mx.verbose&issueBit != 0 {
 
 @<상수@>=
 const (
-	resumeAgain = 0 // rX의 명령을 위치 $\rm rW-4$에 있는 것처럼 되풀이한다
-	resumeCont  = 1 // 같지만, 피연산자 대신 rY와 rZ를 쓴다
-	resumeSet   = 2 // 레지스터 \$X를 rZ로 정한다
-	resumeTrans = 3 // $\rm(rY,rZ)$를 IT-캐시나 DT-캐시에 넣고 |resumeAgain|을 한다
+	resumeAgain = 0 // repeat the command in rX as if in location $\rm rW-4$
+	resumeCont  = 1 // same, but substitute rY and rZ for operands
+	resumeSet   = 2 // set register \$X to rZ
+	resumeTrans = 3 // put $\rm(rY,rZ)$ into the IT-cache or DT-cache, then do |resumeAgain|
 )
 
 @ @<함수들@>=
@@ -6847,7 +6847,7 @@ func packBytes(a, b, c, d int) Tetra {
 {
 	hot := mx.hot
 	j = int(packBytes(hot.op, int(hot.xx), int(hot.yy), int(hot.zz)))
-	if hot.interrupt&hBit != 0 { // 트립
+	if hot.interrupt&hBit != 0 { // trip
 		mx.g[rW].o = hot.loc + 4
 		mx.g[rX].o = sign32<<32 | Octa(Tetra(j))
 		if mx.verbose&issueBit != 0 {
@@ -6857,7 +6857,7 @@ func packBytes(a, b, c, d int) Tetra {
 			mx.printOcta(mx.g[rX].o)
 			mx.printf("\n")
 		}
-	} else { // 트랩
+	} else { // trap
 		mx.g[rWW].o = hot.goLoc.o
 		mx.g[rXX].o = mx.g[rXX].o&^0xffffffff | Octa(Tetra(j))
 		@<트랩의 ropcode |j|를 정한다@>
@@ -6873,17 +6873,17 @@ func packBytes(a, b, c, d int) Tetra {
 }
 
 @ @<트랩의 ropcode...@>=
-if hot.interrupt&fBit != 0 { // 강제
+if hot.interrupt&fBit != 0 { // forced
 	if hot.i != trap {
-		j = resumeTrans // 페이지 변환을 에뮬레이트한다
+		j = resumeTrans // emulate page translation
 	} else if hot.op == TRAP {
 		j = 0x80 // |TRAP|
 	} else if flags[hot.op]&xIsDestBit != 0 {
-		j = resumeSet // 에뮬레이션
+		j = resumeSet // emulation
 	} else {
-		j = 0x80 // r[X]가 목적지가 아닐 때의 에뮬레이션
+		j = 0x80 // emulation when r[X] is not a destination
 	}
-} else { // 동적
+} else { // dynamic
 	if hot.interim {
 		if hot.i == frem || hot.i == syncd || hot.i == syncid {
 			j = resumeCont
@@ -6893,7 +6893,7 @@ if hot.interrupt&fBit != 0 { // 강제
 	} else if isLoadStore(hot.i) {
 		j = resumeAgain
 	} else {
-		j = 0x80 // 보통의 바깥 인터럽트
+		j = 0x80 // normal external interruption
 	}
 }
 
@@ -7005,7 +7005,7 @@ mx.head.loc = mx.instPtr.o - 4
 		fallthrough
 	case resumeCont:
 		mx.resuming += 1 + int(cool.zz)
-		if (Tetra(cool.b.o)>>24)&0xfa != 0xb8 { // |syncd|나 |syncid|가 아니다
+		if (Tetra(cool.b.o)>>24)&0xfa != 0xb8 { // not |syncd| or |syncid|
 			@<rX의 명령이 |resumeCont|로 되풀이할 수 있는 것인지 검사하고, 아니면 |break|한다@>
 		}
 		again = true
@@ -7039,7 +7039,7 @@ if cool.zz != 0 {
 		again = true
 		break
 	}
-	cool.i = resume // 위의 ``미묘한 점''을 보라
+	cool.i = resume // see ``subtle point'' above
 	break
 }
 bad = true
@@ -7060,7 +7060,7 @@ if m >= mx.coolL && m < mx.coolG {
 mx.head.inst = Tetra(cool.b.o)
 m = int(mx.head.inst >> 24)
 if m == RESUME {
-	bad = true // 가로막을 수 없는 루프를 피한다
+	bad = true // avoid uninterruptible loop
 } else {
 	if cool.zz == 0 && m > RESUME && m <= SYNC && mx.head.inst&badInstMask[m-RESUME] != 0 {
 		mx.head.interrupt |= bBit
@@ -7085,8 +7085,8 @@ cool.usage = false
 
 @<상수@>=
 const (
-	doResumeTrans = 17                      // |resumeTrans| 동작을 하는 |state|
-	lResumeTrans  = stage1St + doResumeTrans // 원본의 |resume_trans|
+	doResumeTrans = 17                      // |state| for performing |resumeTrans| actions
+	lResumeTrans  = stage1St + doResumeTrans // the original's |resume_trans|
 )
 
 @ @<1단계 실행의 경우들@>=
@@ -7221,7 +7221,7 @@ if data.z.o>>32 != 0 || Tetra(data.z.o) >= 256 ||
 	data.interrupt |= bBit
 	data.z.o = mx.g[rG].o
 } else if Tetra(data.z.o) < Tetra(mx.g[rG].o) {
-	data.interim = true // 가로막힐 수 있다
+	data.interim = true // potentially interruptible
 	for j = 0; j < mx.commitMax; j++ {
 		mx.g[rG].o--
 		mx.g[Tetra(mx.g[rG].o)].o = 0
@@ -7249,7 +7249,7 @@ case goOp:
 	@<점프할 주소를 계산한다@>
 case pop:
 	data.x.o = data.y.o
-	data.y.o = data.b.o // rJ를 |y| 필드로 옮긴다
+	data.y.o = data.b.o // move rJ to |y| field
 	fallthrough
 case pushgo:
 	@<점프할 주소를 계산한다@>
@@ -7284,7 +7284,7 @@ case unsave:
 		cool.i = noop
 	} else {
 		cool.interim = true
-		op = LDOU // 이 명령은 적재/저장 장치가 다루어야 한다
+		op = LDOU // this instruction needs to be handled by load/store unit
 		cool.i = unsav
 		switch cool.xx {
 		case 0:
@@ -7301,7 +7301,7 @@ case unsave:
 			cool.interim, cool.i = false, noop
 			cool.interrupt |= bBit
 		}
-	} // 이것이 우리를 |dispatchDone|으로 데려간다
+	} // this takes us to |dispatchDone|
 
 @ @<|g[yy]|를 되살리는...@>=
 cool.renX = true
@@ -7344,8 +7344,8 @@ case 2:
 
 @ @<적재할 때가 된 내부 \.{UNSAVE}를...@>=
 if data.xx == 0 {
-	data.a.o = data.x.o & (0xffffff<<32 | 0xffffffff) // 되살린 rA
-	data.x.o >>= 56 // 되살린 rG
+	data.a.o = data.x.o & (0xffffff<<32 | 0xffffffff) // unsaved rA
+	data.x.o >>= 56 // unsaved rG
 	if data.a.o>>32 != 0 || Tetra(data.a.o)&0xfffc0000 != 0 {
 		data.a.o &= 0x3ffff
 		data.interrupt |= bBit
@@ -7402,7 +7402,7 @@ mx.specInstall(&mx.g[rL], &cool.rl)
 mx.newO = mx.coolO + Octa(mx.coolL+1)
 
 @ @<|g[yy]|를 저장하는...@>=
-op = STOU // 이 명령은 적재/저장 장치가 다루어야 한다
+op = STOU // this instruction needs to be handled by load/store unit
 cool.memX = true
 mx.specInstall(&mx.mem, &cool.x)
 cool.z.o = mx.coolO << 3
@@ -7445,7 +7445,7 @@ if data.interim {
 	data.x.o = data.b.o
 } else {
 	if data != mx.oldHot {
-		return mx.wait(self, 1) // rA의 가장 뜨거운 값이 필요하다
+		return mx.wait(self, 1) // we need the hottest value of rA
 	}
 	data.x.o = Octa(Tetra(mx.g[rG].o)<<24)<<32 | Octa(Tetra(mx.g[rA].o))
 	data.a.o = data.y.o
@@ -7479,7 +7479,7 @@ case div:
 	if data.z.o == 0 {
 		data.interrupt |= dBit
 		data.a.o = data.y.o
-		data.i = set // 0으로 나누기는 파이프라인에서 기다릴 필요가 없다
+		data.i = set // divide by zero needn't wait in the pipeline
 	} else {
 		q, r, overflow := mmixarith.SignedDiv(data.y.o, data.z.o)
 		data.x.o = q
@@ -7495,7 +7495,7 @@ case div:
 	for j = mul0; aux != 0; j++ {
 		aux >>= 8
 	}
-	data.i = j // |j|는 |mul0|이나 |mul1|이나 \dots~|mul8|이다
+	data.i = j // |j| is |mul0| or |mul1| or \dots~or |mul8|
 }
 
 @ 다음으로 비트 단위와 바이트 단위 연산들을 마무리하자.
@@ -7539,7 +7539,7 @@ $$\advance\abovedisplayskip-.5\baselineskip
 case zset:
 	if registerTruth(data.y.o, data.op) != 0 {
 		data.x.o = data.z.o
-	} // 그렇지 않으면 |data.x.o|는 이미 0이다
+	} // otherwise |data.x.o| is already zero
 	pc = lFinEx
 	continue
 case cset:
@@ -7593,7 +7593,7 @@ func (mx *machine) roundMode(y Octa) mmixarith.Round {
 
 @<레지스터 대 레지스터 연산의 결과를...@>=
 case fadd, fsub, fmul, fdiv, fsqrt, fint, fix:
-	entry := 0 // |fin_bflot|이면 0, |fin_uflot|이면 1, |fin_flot|이면 2
+	entry := 0 // 0 for |fin_bflot|, 1 for |fin_uflot|, 2 for |fin_flot|
 	mx.setRound(data)
 	switch data.i {
 	@<부동소수점 연산의 결과를 계산하는 경우들@>
@@ -7631,7 +7631,7 @@ case fsub:
 		data.a.o ^= signBit
 	}
 	data.x.o, mx.exceptions = mmixarith.FPlus(data.y.o, data.a.o, mx.curRound)
-	data.i = fadd // 덧셈의 파이프라인 시간을 쓴다
+	data.i = fadd // use pipeline times for addition
 case fmul:
 	data.x.o, mx.exceptions = mmixarith.FMult(data.y.o, data.z.o, mx.curRound)
 case fdiv:
@@ -7645,7 +7645,7 @@ case fint:
 case fix:
 	data.x.o, mx.exceptions = mmixarith.FixIt(data.z.o, mx.roundMode(data.y.o))
 	if data.op&0x2 != 0 {
-		mx.exceptions &^= wBit // 부호 없는 경우는 넘치지 않는다
+		mx.exceptions &^= wBit // unsigned case doesn't overflow
 	}
 	entry = 2
 
@@ -7781,7 +7781,7 @@ if j = getReader(mx.DTcache); j < 0 {
 }
 mx.startup(&mx.DTcache.reader[j], mx.DTcache.accessTime)
 data.z.o = data.y.o & 0x7
-p = mx.cacheSearch(mx.DTcache, data.y.o) // 주의: |transKey(data.y.o)|가 아니다
+p = mx.cacheSearch(mx.DTcache, data.y.o) // N.B.: Not |transKey(data.y.o)|
 if p != nil {
 	data.x.o = data.x.o&^0xffffffff | 2
 	c = mx.DTcache
@@ -7800,7 +7800,7 @@ if Tetra(data.z.o) != 0 {
 	p.data[0] = p.data[0]&^0xffffffff | Octa(Tetra(p.data[0])&^7+Tetra(data.z.o))
 } else {
 	p = mx.demoteAndFix(c, p)
-	p.tag |= signBit // 태그를 무효로 만든다
+	p.tag |= signBit // invalidate the tag
 }
 
 @ @<뒤 단계들의 특별한 상태들@>=
@@ -7812,7 +7812,7 @@ case stage2St + ldStLaunch:
 		return mx.wait(self, 1)
 	}
 	mx.startup(&mx.ITcache.reader[j], mx.ITcache.accessTime)
-	p = mx.cacheSearch(mx.ITcache, data.y.o) // 주의: |transKey(data.y.o)|가 아니다
+	p = mx.cacheSearch(mx.ITcache, data.y.o) // N.B.: Not |transKey(data.y.o)|
 	if p != nil {
 		data.x.o |= 1
 		c = mx.ITcache
@@ -7950,7 +7950,7 @@ case stage1St + 11:
 	if mx.wbufLock != nil {
 		return mx.wait(self, 1)
 	}
-	mx.writeHead, mx.writeCtl.state = mx.writeTail, 0 // 쓰기 버퍼를 지운다
+	mx.writeHead, mx.writeCtl.state = mx.writeTail, 0 // zap the write buffer
 	if mx.Dcache == nil {
 		data.state = 12
 		pc = lSwitch1
@@ -8019,11 +8019,11 @@ if mx.writeHead != mx.writeTail {
 case stage1St + 13:
 	if mx.cleanCo.next == nil {
 		data.interim = false
-		pc = lFinEx // 끝났다!
+		pc = lFinEx // it's done!
 		continue
 	}
 	if mx.tryingToInterrupt {
-		pc = lFinEx // 가로막기를 받아들인다
+		pc = lFinEx // accept an interruption
 		continue
 	}
 	return mx.wait(self, 1)
@@ -8045,9 +8045,9 @@ case stage1St + 13:
 
 @<상수@>=
 const (
-	lDoSyncid = stage2St + 30 // 원본의 |do_syncid|
-	lDoSyncd  = stage2St + 33 // 원본의 |do_syncd|
-	lNextSync = stage2St + 35 // 원본의 |next_sync|
+	lDoSyncid = stage2St + 30 // the original's |do_syncid|
+	lDoSyncd  = stage2St + 33 // the original's |do_syncd|
+	lNextSync = stage2St + 35 // the original's |next_sync|
 )
 
 @ @<뒤 단계들의 특별한 상태들@>=
@@ -8136,8 +8136,8 @@ case stage2St + 34:
 		continue
 	}
 	if mx.tryingToInterrupt && data.interim && data == mx.oldHot {
-		data.z.o = 0 // |resumeCont|를 내다본다
-		pc = lFinEx  // 가로막기를 받아들인다
+		data.z.o = 0 // anticipate |resumeCont|
+		pc = lFinEx  // accept an interruption
 		continue
 	}
 	return mx.wait(self, 1)
@@ -8219,7 +8219,7 @@ mx.schedule(&mx.cleanCo, 1, 4)
 	data.y.o = data.y.o&^0xffffffff | Octa(Tetra(data.y.o)&-bl)
 	data.z.o = data.z.o&^0xffffffff | Octa(Tetra(data.z.o)&^8191+Tetra(data.y.o)&8191)
 	if Tetra(data.y.o)&8191 == 0 {
-		pc = lSquareOne // 페이지 경계를 넘었을지도 모른다
+		pc = lSquareOne // maybe crossed a page boundary
 		continue
 	}
 	if data.i == syncd {
@@ -8234,7 +8234,7 @@ mx.schedule(&mx.cleanCo, 1, 4)
 한다.
 
 @<지점 이름@>=
-lSyncCheck // 원본의 |sync_check|
+lSyncCheck // the original's |sync_check|
 
 @ @<뒤 단계들의 특별한 상태들@>=
 case lSyncCheck:
@@ -8306,7 +8306,7 @@ if cool.loc == mx.g[rT].o {
 			mx.g[rBB].o = mx.io.Ftell(zz)
 		}
 	}
-	mx.g[255].o = negOne // 이것이 인터럽트를 허용한다
+	mx.g[255].o = negOne // this will enable interrupts
 }
 
 @ @<멈추거나 경고를...@>=
@@ -8584,9 +8584,9 @@ func (mx *machine) StdinChr() byte {
 }
 
 @ @<기계의 상태@>=
-stdinBuf      [256]byte // 모의 프로그램의 표준 입력
-stdinBufStart int       // 그 버퍼에서의 현재 위치
-stdinBufEnd   int       // 그 버퍼의 현재 끝
+stdinBuf      [256]byte // standard input to the simulated program
+stdinBufStart int       // current position in that buffer
+stdinBufEnd   int       // current end of that buffer
 
 @* 기계. 보충: 이 장은 옮긴이가 덧붙인 것이다. 원본의 전역 변수들은 모두 앞에서 조금씩 정의한
 절 ``기계의 상태''에 모였다. 그것들을 필드로 가진 구조체가 |machine|이다. 여기에 입출력을 위한
@@ -8598,13 +8598,13 @@ stdinBufEnd   int       // 그 버퍼의 현재 끝
 @<타입 정의@>=
 type machine struct {
 	@<기계의 상태@>
-	out    *bufio.Writer // 표준 출력
-	stderr io.Writer     // 표준 오류
-	io     *mmixio.IO    // 모의 프로그램의 파일들
-	stdin  *cfile        // 표준 입력
-	specBuf [20]byte     // \.{mmixmem.w}의 |specRead|가 쓰는 버퍼
-	hio     *hio         // \.{mmixmem.w}의 호스트 입출력 장치(\.{-k}를 주었을 때만)
-	blk     *blk         // \.{mmixmem.w}의 블록 장치(\.{-d}를 주었을 때만)
+	out    *bufio.Writer // standard output
+	stderr io.Writer     // standard error
+	io     *mmixio.IO    // files of the simulated program
+	stdin  *cfile        // standard input
+	specBuf [20]byte     // buffer used by |specRead| of \.{mmixmem.w}
+	hio     *hio         // host I/O device of \.{mmixmem.w} (only when \.{-k} is given)
+	blk     *blk         // block device of \.{mmixmem.w} (only when \.{-d} is given)
 }
 
 @ 원본의 |exit(n)|은 종료 코드를 담은 |exitSignal|을 던지는 공황이 된다. 주 프로그램이 그것을

@@ -78,7 +78,7 @@ func TestReadWrite(t *testing.T) {
 	}
 	check("Fgets", x.Fgets(3, 0x300, 100), 6)
 	check("Fgets", x.Fgets(3, 0x300, 100), NegOne)
-	check("Fseek", x.Fseek(3, NegOne-1), 0)          // $-2$: 마지막 바이트 앞
+	check("Fseek", x.Fseek(3, NegOne-1), 0)          // $-2$: before the last byte
 	check("Fread", x.Fread(3, 0x400, 20), NegOne-18) // $1-20=-19$
 	check("Fclose", x.Fclose(3), 0)
 	check("Fclose", x.Fclose(3), NegOne)

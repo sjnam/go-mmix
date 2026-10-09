@@ -315,16 +315,16 @@ func (cf *configReader) configPanic(format string, a ...any) {
 필드다. 설정 파일은 \.{mmmix.w}에서 정의하는 타입 \KW{cfile}로 읽는데, \CEE/의 |fgets|를 흉내 낸다.
 
 @<상수@>=
-const configBufSize = 100 // 긴 줄은 필요 없다
+const configBufSize = 100 // we don't need long lines
 
 @ @<타입 정의@>=
 type configReader struct {
-	mx               *machine            // 설정하는 기계
-	configFile       *cfile              // 입력은 여기서 온다
-	token            string              // 그리고 토큰은 여기로 복사된다
-	tokenPrescanned  bool                // |token|에 이미 다음 토큰이 들어 있는가?
-	buffer           [configBufSize]byte // 입력 줄은 여기로 간다
-	bufPointer       int                 // 이것이 지금 위치다
+	mx               *machine            // the machine being configured
+	configFile       *cfile              // input comes from here
+	token            string              // and tokens are copied to here
+	tokenPrescanned  bool                // does |token| contain the next token already?
+	buffer           [configBufSize]byte // input lines go here
+	bufPointer       int                 // this is our current position
 	@<설정하는 동안의 다른 상태@>
 }
 
@@ -337,13 +337,13 @@ type configReader struct {
 흉내 낸다. 다만 버퍼 끝을 넘어서는 읽지 않고, 버퍼 끝을 널 문자처럼 다룬다.
 
 @<함수들@>=
-func (cf *configReader) getToken() { // |token|을 설정 파일의 다음 토큰으로 정한다
+func (cf *configReader) getToken() { // set |token| to the next token of the configuration file
 	if cf.tokenPrescanned {
 		cf.tokenPrescanned = false
 		return
 	}
-	for { // 공백을 지나친다
-		c := byte(0) // 버퍼 끝은 널 문자로 친다
+	for { // scan past white space
+		c := byte(0) // treat the end of the buffer as a null character
 		if cf.bufPointer < configBufSize {
 			c = cf.buffer[cf.bufPointer]
 		}
@@ -395,11 +395,11 @@ func (cf *configReader) getInt() int {
 
 @<타입 정의@>=
 type pvSpec struct {
-	name           string // 기호 이름
-	v              *int   // 안에서 쓰는 이름
-	defval         int    // 기본값
-	minval, maxval int    // 허용되는 가장 작은 값과 가장 큰 값
-	powerOfTwo     bool   // 2의 거듭제곱이어야 하는가?
+	name           string // symbolic name
+	v              *int   // internal name
+	defval         int    // default value
+	minval, maxval int    // minimum and maximum legal values
+	powerOfTwo     bool   // must it be a power of two?
 }
 
 @ 캐시 매개변수는 조금 더 어렵지만, 그래도 나쁘지 않다.
@@ -422,20 +422,20 @@ const (
 )
 @#
 type cpvSpec struct {
-	name           string // 기호 이름
-	v              cParam // 안에서 쓰는 코드
-	defval         int    // 기본값
-	minval, maxval int    // 허용되는 가장 작은 값과 가장 큰 값
-	powerOfTwo     bool   // 2의 거듭제곱이어야 하는가?
+	name           string // symbolic name
+	v              cParam // internal code
+	defval         int    // default value
+	minval, maxval int    // minimum and maximum legal values
+	powerOfTwo     bool   // must it be a power of two?
 }
 
 @ 연산 코드가 가장 쉽다.
 
 @<타입 정의@>=
 type opSpec struct {
-	name   string // 기호 이름
-	v      int    // 안에서 쓰는 코드
-	defval int    // 기본값
+	name   string // symbolic name
+	v      int    // internal code
+	defval int    // default value
 }
 
 @ 매개변수 대부분은 \.{mmixpipe}의 |machine| 필드다. 그러나 몇 개는 이 모듈만 쓴다. 여기서
@@ -520,14 +520,14 @@ var opTable = []opSpec{
 @<함수들@>=
 func newCache(name string) *cache {
 	c := new(cache)
-	c.aa = 1 // 기본 연관도. |cpv[0].defval|과 같아야 한다
-	c.bb = 8 // 기본 블록 크기
-	c.cc = 1 // 기본 집합 수
-	c.gg = 8 // 기본 알갱이
-	c.vv = 0 // 기본 희생자 크기
-	c.repl = random // 기본 교체 방침
-	c.vrepl = random // 기본 희생자 교체 방침
-	c.mode = 0 // 기본 방식은 즉시 쓰기와 쓰기 우회다
+	c.aa = 1 // default associativity, should equal |cpv[0].defval|
+	c.bb = 8 // default blocksize
+	c.cc = 1 // default setsize
+	c.gg = 8 // default granularity
+	c.vv = 0 // default victimsize
+	c.repl = random // default replacement policy
+	c.vrepl = random // default victim replacement policy
+	c.mode = 0 // default mode is write-through and write-around
 	c.accessTime, c.copyInTime, c.copyOutTime = 1, 1, 1
 	c.filler.ctl = &c.fillerCtl
 	c.fillerCtl.ptrA = c
@@ -549,7 +549,7 @@ for j = 0; j < len(pv); j++ {
 }
 for j = 0; j < len(opTable); j++ {
 	mx.pipeSeq[opTable[j].v][0] = byte(opTable[j].defval)
-	mx.pipeSeq[opTable[j].v][1] = 0 // 한 단계
+	mx.pipeSeq[opTable[j].v][1] = 0 // one stage
 }
 
 @* 명세 읽기. 설정 파일을 처리할 준비를 하기 전에, 기능 장치의 수를 세어서 공간을 얼마나 할당할지
@@ -563,7 +563,7 @@ for cf.token != "end" {
 	cf.getToken()
 	if cf.token == "unit" {
 		mx.funitCount++
-		cf.getToken() // 장치 이름이 \.{unit}이나 \.{end}일 수도 있다
+		cf.getToken() // a unit might be named \.{unit} or \.{end}
 		cf.getToken()
 	}
 }
@@ -660,7 +660,7 @@ case "Scache":
 }
 
 @ @<함수들@>=
-func (cf *configReader) ppol(rr *replacePolicy) { // 교체 방침을 찾는 서브루틴
+func (cf *configReader) ppol(rr *replacePolicy) { // subroutine to scan for a replacement policy
 	cf.getToken()
 	switch cf.token {
 	case "random":
@@ -672,12 +672,12 @@ func (cf *configReader) ppol(rr *replacePolicy) { // 교체 방침을 찾는 서
 	case "lru":
 		*rr = lru
 	default:
-		cf.tokenPrescanned = true // 이런, 그 토큰을 다시 읽어야 한다
+		cf.tokenPrescanned = true // oops, we should rescan that token
 	}
 }
 
 @ @<함수들@>=
-func (cf *configReader) pcs(c *cache) { // 캐시 명세를 처리하는 서브루틴
+func (cf *configReader) pcs(c *cache) { // subroutine to process a cache spec
 	var j, n int
 	cf.getToken()
 	for j = 0; j < len(cpv); j++ {
@@ -899,7 +899,7 @@ if n == 0 {
 자체도 만들어야 한다.
 
 @<함수들@>=
-func lg(n int) int { // 이진 로그를 계산한다
+func lg(n int) int { // compute binary logarithm
 	l := 0
 	for j := n; j != 0; j >>= 1 {
 		l++
@@ -956,7 +956,7 @@ for j := 0; j < c.cc; j++ {
 	c.set[j] = make(cacheset, c.aa)
 	for k := 0; k < c.aa; k++ {
 		c.set[j][k] = newBlock(c, k)
-		c.set[j][k].tag = sign32 << 32 // 무효인 태그
+		c.set[j][k].tag = sign32 << 32 // invalid tag
 	}
 }
 
@@ -964,7 +964,7 @@ for j := 0; j < c.cc; j++ {
 c.victim = make(cacheset, c.vv)
 for k := 0; k < c.vv; k++ {
 	c.victim[k] = newBlock(c, k)
-	c.victim[k].tag = sign32 << 32 // 무효인 태그
+	c.victim[k].tag = sign32 << 32 // invalid tag
 }
 
 @ @<캐시 |c|의 읽기 코루틴들을...@>=
@@ -1036,11 +1036,11 @@ if mx.Dcache != nil && mx.Dcache.bb > n {
 	n = mx.Dcache.bb
 }
 n = mx.memAddrTime + (n+cf.memBusBytes-1)/cf.memBusBytes*j
-cf.maxCycs = max(cf.maxCycs, n) // 이제 |maxCycs|가 기다림 시간의 상한이다
+cf.maxCycs = max(cf.maxCycs, n) // now |maxCycs| bounds the waiting time
 mx.ringSize = cf.maxCycs + 1
 mx.ring = make([]coroutine, mx.ringSize)
 for k := range mx.ring {
-	mx.ring[k].name = "" // 머리 노드는 이름이 없다
+	mx.ring[k].name = "" // header nodes are nameless
 	mx.ring[k].stage = maxStage
 }
 
@@ -1086,7 +1086,7 @@ mx.securityDisabled = cf.disableSecurity != 0
 @ @<분기 예측 표를...@>=
 if mx.bpN == 0 {
 	mx.bpTable = nil
-} else { // 분기 예측 표가 필요하다
+} else { // a branch prediction table is desired
 	if mx.bpA+mx.bpB+mx.bpC >= 31 {
 		cf.configPanic("Configuration error: Branch table has >= 2 gigabytes of data")
 	}
@@ -1098,8 +1098,8 @@ if mx.bpN == 0 {
 @<함수들@>=
 func (mx *machine) MMIXConfig(filename string) {
 	var i, j, n int
-	var intStages [maxRealCommand + 1]int // |internalOp|에 따른 단계 수
-	var stages [256]int                   // 연산 코드에 따른 단계 수
+	var intStages [maxRealCommand + 1]int // stages as function of |internalOp|
+	var stages [256]int                   // stages as function of opcode
 	cf := &configReader{mx: mx, maxCycs: 60}
 	cf.configFile = openCfile(filename)
 	if cf.configFile == nil {

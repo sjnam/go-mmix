@@ -565,7 +565,7 @@ lopcode}다. 셋째와 넷째 바이트 Y와~Z는 피연산자다. 때로는 둘
 @^lopcodes@>
 
 @<상수@>=
-const mm = 0x98 // 적재기 명령의 탈출 코드
+const mm = 0x98 // the escape code of loader commands
 
 @ 작고 억지로 꾸민 예 하나가 \.{mmo} 형식의 기본 발상을 설명하는 데 도움이 될 것이다.
 \.{test.mms}라는 다음 입력 파일을 생각해 보자.
@@ -748,19 +748,19 @@ $\rm(256-G)*2$개의 테트라바이트 바로 뒤에 나와야 한다. 그 뒤�
 
 @<상수@>=
 const (
-	lopQuote = 0x0 // 인용 lopcode
-	lopLoc   = 0x1 // 위치 lopcode
-	lopSkip  = 0x2 // 건너뛰기 lopcode
-	lopFixo  = 0x3 // 옥타바이트 고치기 lopcode
-	lopFixr  = 0x4 // 상대 주소 고치기 lopcode
-	lopFixrx = 0x5 // 확장된 상대 주소 고치기 lopcode
-	lopFile  = 0x6 // 파일 이름 lopcode
-	lopLine  = 0x7 // 파일 위치 lopcode
-	lopSpec  = 0x8 // 특수 고리(hook) lopcode
-	lopPre   = 0x9 // 서문 lopcode
-	lopPost  = 0xa // 후기 lopcode
-	lopStab  = 0xb // 기호표 lopcode
-	lopEnd   = 0xc // 모든 것을 끝내는 lopcode
+	lopQuote = 0x0 // the quotation lopcode
+	lopLoc   = 0x1 // the location lopcode
+	lopSkip  = 0x2 // the skip lopcode
+	lopFixo  = 0x3 // the octabyte-fix lopcode
+	lopFixr  = 0x4 // the relative-fix lopcode
+	lopFixrx = 0x5 // extended relative-fix lopcode
+	lopFile  = 0x6 // the file name lopcode
+	lopLine  = 0x7 // the file position lopcode
+	lopSpec  = 0x8 // the special hook lopcode
+	lopPre   = 0x9 // the preamble lopcode
+	lopPost  = 0xa // the postamble lopcode
+	lopStab  = 0xb // the symbol table lopcode
+	lopEnd   = 0xc // the end-it-all lopcode
 )
 
 @ 많은 독자가 \MMIXAL에 재배치 가능한(relocatable) 출력을 위한 기능이 없고, \.{mmo}
@@ -836,11 +836,11 @@ type assembler struct {
 }
 
 @ @<어셈블러의 상태@>=
-buffer      []byte // 현재 줄의 날 입력
-bufPtr      int    // |buffer| 안의 현재 위치
-labField    []byte // 현재 명령의 레이블 필드 사본
-opField     []byte // 현재 명령의 연산 코드 필드 사본
-operandList []byte // 현재 명령의 피연산자 필드 사본(널 문자로 끝난다)
+buffer      []byte // raw input of the current line
+bufPtr      int    // current position within |buffer|
+labField    []byte // copy of the label field of the current instruction
+opField     []byte // copy of the opcode field of the current instruction
+operandList []byte // copy of the operand field of the current instruction (null-terminated)
 
 @ 원본은 |fgets|로 한 줄을 읽었다. 함수 |fgets|는 줄바꿈 문자를 만나거나 |bufSize|개의 문자를
 읽을 때까지 읽고, 끝에 널 문자를 붙인다. 여기서는 그 동작을 한 바이트씩 그대로 흉내 낸다.
@@ -867,7 +867,7 @@ a.lineNo++
 a.lineListed = false
 j = cstrlen(a.buffer)
 if j > 0 && a.buffer[j-1] == '\n' {
-	a.buffer[j-1] = 0 // 줄바꿈 문자를 없앤다
+	a.buffer[j-1] = 0 // remove the newline
 } else if c, err := a.srcFile.ReadByte(); err == nil {
 	@<너무 긴 줄의 남는 부분을 버린다@>
 }
@@ -911,16 +911,16 @@ if !a.longWarningGiven {
 }
 
 @ @<어셈블러의 상태@>=
-curFile          int  // |filename|에서 현재 파일의 색인
-lineNo           int  // 파일 안의 현재 위치
-lineListed       bool // 버퍼 내용을 목록에 적었는가?
-longWarningGiven bool // \.{-b}에 대한 힌트를 주었는가?
+curFile          int  // index of the current file in |filename|
+lineNo           int  // current position in the file
+lineListed       bool // have we listed the buffer contents?
+longWarningGiven bool // have we given the hint about \.{-b}?
 
 @ 우리는 오류 보고를 위해, 그리고 목적 파일의 동기화 데이터를 위해 소스 파일 이름과
 줄 번호를 늘 기억해 둔다. 서로 다른 소스 파일 이름을 256개까지 기억할 수 있다.
 
 @<어셈블러의 상태@>=
-filename []string // 줄 지시문에 나온 것까지 포함한 소스 파일 이름들
+filename []string // source file names, including those in line directives
 
 @ 현재 줄이 줄 지시문이면, 어셈블러는 그것을 주석으로도 취급한다.
 
@@ -945,7 +945,7 @@ if a.buffer[p] == '"' {
 		a.fatal("Capacity exceeded: File name too long")
 @.Capacity exceeded...@>
 	}
-	if a.buffer[p] == '"' && a.buffer[p-1] != '"' { // 그렇다, 줄 지시문이다
+	if a.buffer[p] == '"' && a.buffer[p-1] != '"' { // yes, it's a line directive
 		@<이름 |name|을 찾거나 새로 등록해 현재 파일로 삼는다@>
 	}
 }
@@ -975,7 +975,7 @@ const filenameMax = 1024
 |append|로 덧붙이는 이 한글판에서는 필요 없다.
 
 @<지역 변수@>=
-var p int // 지금 훑고 있는 곳
+var p int // the place where we're currently scanning
 
 @ 문자 분류에는 \CEE/ 라이브러리의 |isspace|, |isdigit|, |isxdigit|를 흉내 낸 함수를
 쓴다. 모두 {\mc ASCII} 문자만 알아본다.
@@ -1008,13 +1008,13 @@ func (a *assembler) flushListingLine(s string) {
 }
 
 @ @<어셈블러의 상태@>=
-curLoc      Octa    // 어셈블된 출력의 현재 위치
-listingLoc  Octa    // 목록의 현재 위치
-holdBuf     [4]byte // 어셈블된 바이트들
-heldBits    byte    // |holdBuf|의 어느 바이트가 살아 있는가?
-listingBits byte    // 그 가운데 어느 것을 아직 목록에 적지 않았는가?
-specMode    bool    // \.{BSPEC}과 \.{ESPEC} 사이에 있는가?
-specModeLoc Tetra   // 현재 특수 출력의 바이트 수
+curLoc      Octa    // current location of assembled output
+listingLoc  Octa    // current location on the listing
+holdBuf     [4]byte // assembled bytes
+heldBits    byte    // which bytes of |holdBuf| are active?
+listingBits byte    // which of them haven't been listed yet?
+specMode    bool    // are we between \.{BSPEC} and \.{ESPEC}?
+specModeLoc Tetra   // number of bytes in the current special output
 
 @ 바이트가 어셈블되면 |holdBuf|에 놓인다. 더 정확히 말하면, |j|에 4의 배수를 더한 위치에
 어셈블되는 바이트는 |holdBuf[j]|에 놓이고, 보조 변수 |heldBits|와 |listingBits|에 |1<<j|가
@@ -1100,8 +1100,8 @@ func (a *assembler) fatal(format string, args ...any) {
 func ch(c byte) string { return string([]byte{c}) }
 
 @ @<타입 정의@>=
-type bypassSignal struct{} // 현재 명령의 나머지를 건너뛰라는 신호
-type fatalSignal struct{}  // 어셈블을 끝내라는 신호
+type bypassSignal struct{} // a signal to skip the rest of the current instruction
+type fatalSignal struct{}  // a signal to end the assembly
 
 @ 파일 이름이 아직 정해지지 않았을 때(예컨대 소스 파일을 열지 못했을 때) 원본은
 ``\.{(nofile)}''이라고 찍었다.
@@ -1143,7 +1143,7 @@ default:
 }
 
 @ @<어셈블러의 상태@>=
-errCount int // 찾아낸 오류의 수
+errCount int // this many errors were found
 
 @ 이진 목적 파일 |objFile|로의 출력은 한 번에 네 바이트씩 일어난다. 바이트들은 테트라바이트
 하나로 출력하지 않고 작은 버퍼에 모아서 출력한다. 어셈블러가 작은 끝(little-endian)
@@ -1190,8 +1190,8 @@ func (a *assembler) mmoOut() {
 }
 
 @ @<어셈블러의 상태@>=
-mmoBuf [4]byte // 출력을 기다리는 테트라바이트
-mmoPtr int     // 기호표를 출력하면서 센 바이트 수
+mmoBuf [4]byte // tetrabyte waiting to be output
+mmoPtr int     // bytes counted while outputting the symbol table
 
 @ 테트라바이트 하나, 바이트 하나, 적재기 연산 하나를 내보내는 서브루틴들이다.
 
@@ -1209,12 +1209,12 @@ func (a *assembler) mmoByte(b byte) {
 	}
 }
 
-func (a *assembler) mmoLop(x, y, z byte) { // 적재기 연산을 출력한다
+func (a *assembler) mmoLop(x, y, z byte) { // output a loader operation
 	a.mmoBuf = [4]byte{mm, x, y, z}
 	a.mmoOut()
 }
 
-func (a *assembler) mmoLopp(x byte, yz uint16) { // 두 바이트 피연산자를 가진 적재기 연산
+func (a *assembler) mmoLopp(x byte, yz uint16) { // output a loader operation with two-byte operand
 	a.mmoBuf = [4]byte{mm, x, byte(yz >> 8), byte(yz)}
 	a.mmoOut()
 }
@@ -1289,10 +1289,10 @@ if j != 0 {
 }
 
 @ @<어셈블러의 상태@>=
-mmoCurLoc      Octa      // 목적 파일의 현재 위치
-mmoLineNo      int       // 지금까지 \.{mmo} 출력의 현재 줄 번호
-mmoCurFile     int       // 지금까지 \.{mmo} 출력의 현재 파일 색인
-filenamePassed [256]bool // 파일 이름을 출력에 기록했는가?
+mmoCurLoc      Octa      // current location in the object file
+mmoLineNo      int       // current line number in the \.{mmo} output so far
+mmoCurFile     int       // index of the current file in the \.{mmo} output so far
+filenamePassed [256]bool // has a filename been recorded in the output?
 
 @ 다음은 |curLoc|에서부터 |k|바이트를 어셈블하는 기본 서브루틴이다. 크기 |k|의 값은 1, 2, 4
 가운데 하나여야 하고, |curLoc|은 |k|의 배수여야 한다. 매개변수 |xBits|는 어느 바이트가
@@ -1361,9 +1361,9 @@ Addison--Wesley, 1998), \S15.4를 보라.) 트라이의 마디마다 문자 하�
 
 @<타입 정의@>=
 type trieNode struct {
-	ch               uint16    // 여기 저장된 (와이드일 수도 있는) 문자
-	left, mid, right *trieNode // 삼진 트라이의 아래쪽으로
-	sym              *symNode  // 기호의 등가
+	ch               uint16    // the (possibly wyde) character stored here
+	left, mid, right *trieNode // downward in a ternary trie
+	sym              *symNode  // equivalents of symbols
 }
 
 @ 원본은 트라이 마디를 한 번에 1000개씩 덩어리로 할당하고, 다 쓰면 ``Capacity exceeded:
@@ -1371,9 +1371,9 @@ Out of trie memory''라며 멈추었다. \GO/에서는 마디가 필요할 때�
 된다. 쓰레기 수집기가 알아서 치운다.
 
 @<어셈블러의 상태@>=
-trieRoot  *trieNode // 트라이의 뿌리
-opRoot    *trieNode // 연산 코드들의 부분 트라이의 뿌리
-curPrefix *trieNode // 한정되지 않은 기호들의 부분 트라이의 뿌리
+trieRoot  *trieNode // root of the trie
+opRoot    *trieNode // root of subtrie for opcodes
+curPrefix *trieNode // root of subtrie for unqualified symbols
 
 @ 서브루틴 |trieSearch|는 트라이의 주어진 마디에서 출발해서 그 가운데 부분 트라이에서
 주어진 문자열을 찾는다. 필요하면 새 마디를 끼워 넣는다. 문자열은 글자도 숫자도 아닌 첫
@@ -1436,23 +1436,23 @@ XYZ 필드의 상대 주소를 고쳐라''를 뜻한다.
 
 @<타입 정의@>=
 type symNode struct {
-	serial int      // 기호의 일련번호; 고침 마디에서는 종류 번호
-	link   *symNode // |defined| 따위의 상태, 또는 고침 마디로의 연결
-	equiv  Octa     // 등가
+	serial int      // serial number of symbol; type number for fixups
+	link   *symNode // |defined| status or link to fixup
+	equiv  Octa     // the equivalent value
 }
 
 @ @<표@>=
 var (
-	defined    = new(symNode) // 옥타바이트 등가를 뜻하는 코드
-	register   = new(symNode) // 레지스터 번호 등가를 뜻하는 코드
-	predefined = new(symNode) // 아직 쓰이지 않은 미리 정의된 등가를 뜻하는 코드
+	defined    = new(symNode) // code value for octabyte equivalents
+	register   = new(symNode) // code value for register-number equivalents
+	predefined = new(symNode) // code value for not-yet-used predefined equivalents
 )
 
 @ @<상수@>=
 const (
-	fixO   = 0 // 옥타바이트 고침의 |serial| 코드
-	fixYZ  = 1 // 상대 주소 고침의 |serial| 코드
-	fixXYZ = 2 // \.{JMP} 고침의 |serial| 코드
+	fixO   = 0 // |serial| code for octabyte fixup
+	fixYZ  = 1 // |serial| code for relative fixup
+	fixXYZ = 2 // |serial| code for \.{JMP} fixup
 )
 
 @ 원본은 기호표 마디도 트라이 마디처럼 덩어리로 할당하고, 더 이상 필요 없어진 고침 마디를
@@ -1493,26 +1493,26 @@ a.trieRoot.mid = a.opRoot
 
 @<상수@>=
 const (
-	relAddrBit  = 0x1      // YZ나 XYZ가 상대 주소인가?
-	immedBit    = 0x2      // Z나 YZ가 레지스터가 아니면 즉치 연산 코드로 할까?
-	zarBit      = 0x4      // Z의 레지스터 상태를 무시할까?
-	zrBit       = 0x8      // Z는 레지스터여야 하는가?
-	yarBit      = 0x10     // Y의 레지스터 상태를 무시할까?
-	yrBit       = 0x20     // Y는 레지스터여야 하는가?
-	xarBit      = 0x40     // X의 레지스터 상태를 무시할까?
-	xrBit       = 0x80     // X는 레지스터여야 하는가?
-	yzarBit     = 0x100    // YZ의 레지스터 상태를 무시할까?
-	yzrBit      = 0x200    // YZ는 레지스터여야 하는가?
-	xyzarBit    = 0x400    // XYZ의 레지스터 상태를 무시할까?
-	xyzrBit     = 0x800    // XYZ는 레지스터여야 하는가?
-	oneArgBit   = 0x1000   // 피연산자가 없거나 하나여도 되는가?
-	twoArgBit   = 0x2000   // 피연산자가 정확히 둘이어도 되는가?
-	threeArgBit = 0x4000   // 피연산자가 정확히 셋이어도 되는가?
-	manyArgBit  = 0x8000   // 피연산자가 셋보다 많아도 되는가?
-	alignBits   = 0x30000  // 얼마나 맞출까: 바이트, 와이드, 테트라, 옥타?
-	noLabelBit  = 0x40000  // 레이블이 비어 있어야 하는가?
-	memBit      = 0x80000  // YZ는 메모리 참조여야 하는가?
-	specBit     = 0x100000 // 이 연산 코드를 \.{SPEC} 모드에서 쓸 수 있는가?
+	relAddrBit  = 0x1      // is YZ or XYZ relative?
+	immedBit    = 0x2      // should opcode be immediate if Z or YZ not register?
+	zarBit      = 0x4      // should register status of Z be ignored?
+	zrBit       = 0x8      // must Z be a register?
+	yarBit      = 0x10     // should register status of Y be ignored?
+	yrBit       = 0x20     // must Y be a register?
+	xarBit      = 0x40     // should register status of X be ignored?
+	xrBit       = 0x80     // must X be a register?
+	yzarBit     = 0x100    // should register status of YZ be ignored?
+	yzrBit      = 0x200    // must YZ be a register?
+	xyzarBit    = 0x400    // should register status of XYZ be ignored?
+	xyzrBit     = 0x800    // must XYZ be a register?
+	oneArgBit   = 0x1000   // is it OK to have zero or one operand?
+	twoArgBit   = 0x2000   // is it OK to have exactly two operands?
+	threeArgBit = 0x4000   // is it OK to have exactly three operands?
+	manyArgBit  = 0x8000   // is it OK to have more than three operands?
+	alignBits   = 0x30000  // how much alignment: byte, wyde, tetra, or octa?
+	noLabelBit  = 0x40000  // should the label be blank?
+	memBit      = 0x80000  // must YZ be a memory reference?
+	specBit     = 0x100000 // is this opcode allowed in \.{SPEC} mode?
 )
 
 @ 원본에서 유사 연산의 번호는 열거형 \KW{pseudo\_op}의 값이었다. 모두 \Hex{100} 이상이라서
@@ -1520,9 +1520,9 @@ const (
 
 @<타입 정의@>=
 type opSpec struct {
-	name string // 기호로 된 연산 코드
-	code Tetra  // 수로 된 연산 코드
-	bits Tetra  // 피연산자를 다루는 방법
+	name string // symbolic opcode
+	code Tetra  // numeric opcode
+	bits Tetra  // treatment of operands
 }
 
 @ @<상수@>=
@@ -1866,7 +1866,7 @@ if m&0x80 != 0 {
 }
 a.mmoByte(byte(t.ch))
 if m&0x80 != 0 {
-	a.symBuf = append(a.symBuf, '?') // 유니코드? 아직 아니다
+	a.symBuf = append(a.symBuf, '?') // Unicode? not yet
 } else {
 	a.symBuf = append(a.symBuf, byte(t.ch))
 }
@@ -1917,7 +1917,7 @@ h := Tetra(t.sym.equiv >> 32)
 x := h
 if h&0xffff0000 == 0x20000000 {
 	m += 8
-	x = h - 0x20000000 // 데이터 세그먼트
+	x = h - 0x20000000 // data segment
 }
 if x != 0 {
 	m += 4
@@ -1933,7 +1933,7 @@ for ; j < 4; j++ {
 m += j
 
 @ @<어셈블러의 상태@>=
-symBuf []byte // 가운데 가지를 따라 모은 기호의 문자들
+symBuf []byte // the characters of a symbol, gathered along middle branches
 
 @ 완전히 한정된 기호마다 맨 앞의 `\.:'은 여기서 생략한다. \MMIXAL\ 사용자들은 대부분
 \.{PREFIX} 기능이 필요 없을 것이기 때문이다. 이렇게 생략한 결과, \MMIXAL의 규칙이 허용하는
@@ -1957,7 +1957,7 @@ fmt.Fprintf(a.listingFile, " (%d)\n", t.sym.serial)
 @<정의되지 않은 기호를 보고한다@>=
 c := byte(t.ch)
 if m&0x80 != 0 {
-	c = '?' // 유니코드? 아직 아니다
+	c = '?' // Unicode? not yet
 }
 fmt.Fprintf(a.stderr, "undefined symbol: %s\n", string(append(a.symBuf, c))[1:])
 @.undefined symbol@>
@@ -1968,7 +1968,7 @@ m += 2
 마지막 테트라를 0으로 채우고, |lopEnd|에 기호표의 테트라 수를 적는다.
 
 @<트라이를 점검하고 출력한다@>=
-a.opRoot.mid = nil // 연산 코드들을 모두 없앤다
+a.opRoot.mid = nil // annihilate all the opcodes
 prune(a.trieRoot)
 a.symBuf = a.symBuf[:0]
 if a.listingFile != nil {
@@ -2000,8 +2000,8 @@ type stackOp int
 type prec int
 type stat int
 type valNode struct {
-	equiv  Octa      // 현재 값
-	link   *trieNode // 기호의 트라이 참조
+	equiv  Octa      // current value
+	link   *trieNode // trie reference for symbol
 	status stat      // |pure|, |regVal|, |undefined|
 }
 
@@ -2051,11 +2051,11 @@ func (a *assembler) topVal() *valNode  { return &a.valStack[a.valPtr-1] }
 func (a *assembler) nextVal() *valNode { return &a.valStack[a.valPtr-2] }
 
 @ @<어셈블러의 상태@>=
-opStack  []stackOp // 처리를 기다리는 연산자들의 스택
-opPtr    int       // |opStack|에 있는 항목의 수
-valStack []valNode // 처리를 기다리는 피연산자들의 스택
-valPtr   int       // |valStack|에 있는 항목의 수
-rtOp     stackOp   // 새로 읽은 연산자
+opStack  []stackOp // stack for pending operators
+opPtr    int       // number of items on |opStack|
+valStack []valNode // stack for pending operands
+valPtr   int       // number of items on |valStack|
+rtOp     stackOp   // newly scanned operator
 
 @ 각 |stackOp| 값의 우선순위다. 단항 연산자 넷이 가장 강하고, 곱셈 같은 강한 이항 연산자가
 그다음, 덧셈 같은 약한 이항 연산자가 그다음이다. 괄호들의 우선순위는 가장 낮다. 원본이
@@ -2067,7 +2067,7 @@ var precedence = [...]prec{unary, unary, unary, unary, zero,
 	zero, zero, zero}
 
 @ @<지역 변수@>=
-var acc Octa // 임시 누산기
+var acc Octa // temporary accumulator
 
 @ 원본은 두 스택을 |bufSize| 크기로 잡았다. 피연산자 필드가 입력 줄보다 길 수 없으므로
 이것으로 넉넉하다. 여기서는 바깥 괄호 하나 몫을 더 잡는다.
@@ -2093,8 +2093,8 @@ a.valStack = make([]valNode, a.bufSize+1)
 
 @<피연산자 필드를 훑는다@>=
 p = 0
-a.valPtr = 0 // |valStack|은 비었다
-a.opStack[0], a.opPtr = outerLP, 1 // |opStack|에는 ``바깥 왼쪽 괄호''가 있다
+a.valPtr = 0 // |valStack| is empty
+a.opStack[0], a.opPtr = outerLP, 1 // |opStack| contains an ``outer left parenthesis''
 scan:
 for {
 	@<|valStack|에 무언가를 올릴 때까지 여는 토큰들을 훑는다@>
@@ -2178,7 +2178,7 @@ case '(':
 	continue open
 
 @ @<빈 피연산자 목록으로...@>=
-if p == 1 { // 피연산자 목록을 빈 것으로 취급한다
+if p == 1 { // treat operand list as empty
 	a.operandList[0], a.operandList[1], p = '0', 0, 0
 	continue open
 }
@@ -2412,7 +2412,7 @@ if a.topVal().status == regVal && a.topVal().equiv > 0xff {
 if a.operandList[p-1] == 0 {
 	break scan
 }
-a.rtOp = outerLP // 반점
+a.rtOp = outerLP // comma
 break reduce
 
 @ 이제 식에서 찾은 단항 연산자나 이항 연산자가 등가를 바꾸는 부분에 이르렀다.
@@ -2579,7 +2579,7 @@ func() {
 		}
 	}()
 	p = a.bufPtr
-	a.bufPtr = len(a.buffer) - 1 // 빈 문자열
+	a.bufPtr = len(a.buffer) - 1 // empty string
 	@<레이블 필드를 훑는다; 없으면 |return|@>
 	@<연산 코드 필드를 훑는다; 없으면 |return|@>
 	@<피연산자 필드를 복사한다@>
@@ -2622,7 +2622,7 @@ if a.buffer[p] == 0 {
 a.labField = a.labField[:0]
 if !isSpace(a.buffer[p]) {
 	if !isDigit(a.buffer[p]) && !isLetter(a.buffer[p]) {
-		return // 주석
+		return // comment
 	}
 	for isDigit(a.buffer[p]) || isLetter(a.buffer[p]) {
 		a.labField = append(a.labField, a.buffer[p])
@@ -2673,8 +2673,8 @@ for isSpace(a.buffer[p]) {
 }
 
 @ @<어셈블러의 상태@>=
-opcode Tetra // \MMIX\ 연산이나 \MMIXAL\ 유사 연산의 수로 된 코드
-opBits Tetra // 연산자의 특별한 성질을 나타내는 플래그들
+opcode Tetra // numeric code for \MMIX\ operation or \MMIXAL\ pseudo-op
+opBits Tetra // flags describing an operator's special characteristics
 
 @ 피연산자 필드는 별도의 버퍼에 복사한다. 그래야 나중에 문자열 상수를 훑으면서 고칠 수
 있다. 문자 상수와 문자열 상수 안의 공백과 쌍반점은 필드를 끝내지 않는다. 필드 뒤에 쌍반점이
@@ -2726,10 +2726,10 @@ for isSpace(a.buffer[p]) {
 if a.buffer[p] == ';' {
 	p++
 } else {
-	p = len(a.buffer) - 1 // 쌍반점이 뒤따르지 않으면 줄의 나머지는 주석이다
+	p = len(a.buffer) - 1 // if not followed by semicolon, rest of the line is a comment
 }
 if len(a.operandList) == 0 {
-	a.operandList = append(a.operandList, '0') // 빈 피연산자 필드를 `\.0'으로 바꾼다
+	a.operandList = append(a.operandList, '0') // change empty operand field to `\.0'
 }
 a.operandList = append(a.operandList, 0)
 
@@ -3037,8 +3037,8 @@ if v.status == regVal {
 @ 명령의 각 필드는 필드 |z|, |y|, |x|, |yz|, |xyz|에 놓인다.
 
 @<어셈블러의 상태@>=
-z, y, x, yz, xyz Tetra // 어셈블할 조각들
-futureBits       int   // 앞선 참조가 있는 자리들
+z, y, x, yz, xyz Tetra // pieces for assembly
+futureBits       int   // places where there are future references
 
 @ Z 필드가 레지스터가 아니고 연산 코드가 즉치 꼴을 가지면, 연산 코드에 1을 더해 즉치 꼴로
 바꾼다. \MMIX의 연산 코드 표에서 즉치 꼴은 늘 바로 다음 번호이기 때문이다.
@@ -3054,7 +3054,7 @@ if a.valStack[2].status == regVal {
 @.Z field...register number@>
 	}
 } else if a.opBits&immedBit != 0 {
-	a.opcode++ // 즉치
+	a.opcode++ // immediate
 } else if a.opBits&zrBit != 0 {
 	a.derr("*Z field of `%s' should be a register number", a.opField)
 }
@@ -3147,17 +3147,17 @@ if a.opBits&(immedBit|yzrBit|yzarBit) == 0 {
 }
 if a.opcode == SET {
 	v.equiv <<= 8
-	a.opcode = 0xc1 // \.{OR}로 바꾼다
+	a.opcode = 0xc1 // change to \.{OR}
 } else if a.opBits&memBit != 0 {
 	v.equiv <<= 8
-	a.opcode++ // 조용히 \.{,0}을 덧붙인다
+	a.opcode++ // silently append \.{,0}
 }
 
 @ @<순수한 YZ에 맞게...@>=
 if a.opcode == SET {
-	a.opcode = 0xe3 // \.{SETL}로 바꾼다
+	a.opcode = 0xe3 // change to \.{SETL}
 } else if a.opBits&immedBit != 0 {
-	a.opcode++ // 즉치
+	a.opcode++ // immediate
 } else if a.opBits&yzrBit != 0 {
 	a.derr("*YZ field of `%s' should be a register number", a.opField)
 }
@@ -3233,11 +3233,11 @@ for j = SETH; j <= ORL; j++ {
 	case 0:
 		a.yz = Tetra(o>>48) & 0xffff // \.{SETH}
 	case 1:
-		a.yz = Tetra(o>>32) & 0xffff // \.{SETMH} 또는 \.{ORMH}
+		a.yz = Tetra(o>>32) & 0xffff // \.{SETMH} or \.{ORMH}
 	case 2:
-		a.yz = Tetra(o>>16) & 0xffff // \.{SETML} 또는 \.{ORML}
+		a.yz = Tetra(o>>16) & 0xffff // \.{SETML} or \.{ORML}
 	case 3:
-		a.yz = Tetra(o) & 0xffff // \.{SETL} 또는 \.{ORL}
+		a.yz = Tetra(o) & 0xffff // \.{SETL} or \.{ORL}
 	}
 	if a.yz != 0 || j == SETL {
 		a.assemble(4, Tetra(j<<24)+255<<16+a.yz, 0)
@@ -3383,7 +3383,7 @@ case ESPEC:
 return
 
 @ @<어셈블러의 상태@>=
-gregVal [256]Octa // 전역 레지스터의 처음 값들
+gregVal [256]Octa // initial values of global registers
 
 @ @<|GREG|의 목록을...@>=
 if v.equiv != 0 {
@@ -3425,7 +3425,7 @@ $$\.{mmixal [options] sourcefilename}$$
 @<|mmixal| 함수@>=
 func mmixal(args []string, stderr io.Writer, now int64) (code int) {
 	a := &assembler{stderr: stderr, greg: 255, lreg: 32}
-	var j, k int // 두루 쓰는 정수들
+	var j, k int // all-purpose integers
 	var files []*os.File
 	@<지역 변수@>
 	defer func() {
@@ -3582,15 +3582,15 @@ if a.listingName != "" {
 }
 
 @ @<어셈블러의 상태@>=
-stderr      io.Writer     // 오류 메시지를 쓰는 곳
-srcFileName string        // \MMIXAL\ 입력 파일의 이름
-objFileName string        // 이진 출력 파일의 이름
-listingName string        // 목록 파일의 이름(있다면)
-srcFile     *bufio.Reader // 입력 파일
-objFile     *bufio.Writer // 이진 출력 파일
-listingFile *bufio.Writer // 목록 파일; 없으면 |nil|
-expanding   bool          // 기준 주소가 모자랄 때 명령을 펼치는가?
-bufSize     int           // 입력 한 줄의 최대 문자 수
+stderr      io.Writer     // where error messages are written
+srcFileName string        // name of the \MMIXAL\ input file
+objFileName string        // name of the binary output file
+listingName string        // name of the optional listing file
+srcFile     *bufio.Reader // the input file
+objFile     *bufio.Writer // the binary output file
+listingFile *bufio.Writer // the listing file; |nil| if none
+expanding   bool          // are we expanding instructions when base address fail?
+bufSize     int           // maximum number of characters per line of input
 
 @ @<모든 것을 초기화한다@>=
 @<파일들을 연다@>
@@ -3625,9 +3625,9 @@ if a.objFile.Flush() != nil {
 }
 
 @ @<어셈블러의 상태@>=
-greg    int // 전역 레지스터 할당기
-curGreg int // 방금 할당한 전역 레지스터
-lreg    int // 지역 레지스터 할당기
+greg    int // global register allocator
+curGreg int // global register just allocated
+lreg    int // local register allocator
 
 @ 후기에는 \$G부터 \$255까지의 처음 값이 들어간다. \$255에는 \.{Main}의 주소가 들어가므로,
 프로그램은 그것을 보고 어디서 시작할지 안다.

@@ -13,25 +13,25 @@ import (
 
 //line nnixfs.w:107
 const (
-	bsize     = 1024       // 블록의 바이트 수
-	magic     = "NNIXFS01" // 슈퍼블록의 이름표
-	fatFree   = 0          // 빈 블록
-	fatEnd    = 0xffffffff // 파일의 마지막 블록
-	fatMeta   = 0xfffffffe // 슈퍼블록, FAT, 디렉터리
-	dirBlocks = 4          // 디렉터리의 블록 수
-	entSize   = 64         // 디렉터리 항목의 바이트 수
-	nameMax   = 47         // 이름의 최대 길이
-	maxBlocks = 4096       // 커널이 다룰 수 있는 블록 수
+	bsize     = 1024       // bytes per block
+	magic     = "NNIXFS01" // the superblock's label
+	fatFree   = 0          // a free block
+	fatEnd    = 0xffffffff // the last block of a file
+	fatMeta   = 0xfffffffe // superblock, FAT, directory
+	dirBlocks = 4          // number of directory blocks
+	entSize   = 64         // bytes per directory entry
+	nameMax   = 47         // maximum length of a name
+	maxBlocks = 4096       // number of blocks the kernel can handle
 )
 
 //line nnixfs.w:122
 type fsys struct {
-	b         []byte // 이미지 전체
-	nblocks   int    // 블록의 수
-	fatStart  int    // FAT가 시작하는 블록
-	fatBlocks int    // FAT의 블록 수
-	dirStart  int    // 디렉터리가 시작하는 블록
-	dataStart int    // 데이터가 시작하는 블록
+	b         []byte // the whole image
+	nblocks   int    // number of blocks
+	fatStart  int    // block where the FAT begins
+	fatBlocks int    // number of FAT blocks
+	dirStart  int    // block where the directory begins
+	dataStart int    // block where the data begins
 }
 
 //line nnixfs.w:162

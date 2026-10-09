@@ -20,135 +20,135 @@ import (
 type simulator struct {
 
 //line mmixsim.w:151
-	out    *bufio.Writer // 표준 출력
-	stderr io.Writer     // 표준 오류
-	stdin  *cfile        // 표준 입력
-	io     *mmixio.IO    // 입출력 기본 연산들
+	out    *bufio.Writer // standard output
+	stderr io.Writer     // standard error
+	stdin  *cfile        // standard input
+	io     *mmixio.IO    // input/output primitives
 
 //line mmixsim.w:721
-	priority Tetra    // 의사 난수 시간 도장 계수기
-	memRoot  *memNode // treap의 뿌리
-	lastMem  *memNode // 가장 최근에 읽거나 쓴 메모리 노드
-	sclock   Octa     // 모의 시계
+	priority Tetra    // pseudorandom time stamp counter
+	memRoot  *memNode // root of the treap
+	lastMem  *memNode // the memory node most recently read or written
+	sclock   Octa     // simulated clock
 
 //line mmixsim.w:851
-	mmoFile *bufio.Reader // 입력 파일
-	buf     [4]byte       // 가장 최근에 읽은 바이트들
-	yzbytes int           // 가장 아래의 두 바이트
-	tet     Tetra         // |buf|의 바이트들을 큰 쪽 먼저로 모은 것
+	mmoFile *bufio.Reader // the input file
+	buf     [4]byte       // the most recently read bytes
+	yzbytes int           // the two least significant bytes
+	tet     Tetra         // |buf| bytes packed big-endianwise
 
 //line mmixsim.w:965
-	curFile int   // 가장 최근에 고른 파일 번호
-	curLine int   // 0이 아니면, |curFile|에서의 현재 위치
-	objTime Tetra // 목적 파일을 만든 시각
+	curFile int   // the most recently selected file number
+	curLine int   // the current position in |curFile|, if nonzero
+	objTime Tetra // when the object file was created
 
 //line mmixsim.w:1153
-	fileInfo [256]fileNode // 원시 파일마다의 데이터
-	bufSize  int           // 원시 줄 버퍼의 크기
+	fileInfo [256]fileNode // data about each source file
+	bufSize  int           // size of buffer for source lines
 	buffer   []Char
 
 //line mmixsim.w:1289
-	srcFile              *cfile // 지금 열려 있는 원시 파일
-	shownFile            int    // 가장 최근에 나열한 파일의 번호
-	shownLine            int32  // |shownFile|에서 가장 최근에 나열한 줄
-	gap                  int32  // 잇달아 나열하는 원시 줄 사이의 최소 빈틈
-	lineShown            bool   // 최근에 무언가를 나열했는가?
-	showingSource        bool   // 원시 줄을 나열하고 있는가?
-	profileGap           int32  // 마지막 빈도수를 찍을 때의 |gap|
-	profileShowingSource bool   // 마지막 빈도수를 찍을 때의 |showingSource|
+	srcFile              *cfile // the currently open source file
+	shownFile            int    // index of the most recently listed file
+	shownLine            int32  // the line most recently listed in |shownFile|
+	gap                  int32  // minimum gap between consecutively listed source lines
+	lineShown            bool   // did we list anything recently?
+	showingSource        bool   // are we listing source lines?
+	profileGap           int32  // the |gap| when printing final frequencies
+	profileShowingSource bool   // |showingSource| within final frequencies
 
 //line mmixsim.w:1379
-	impliedLoc     Octa // 마지막으로 보인 빈도 데이터 다음의 위치
-	profileStarted bool // 빈도수를 하나라도 찍었는가?
+	impliedLoc     Octa // location following the last shown frequency data
+	profileStarted bool // have we printed at least one frequency count?
 
 //line mmixsim.w:1558
-	instPtr            Octa  // 다음 명령의 위치
-	tracingExceptions  int   // 추적하게 하는 예외 비트들
-	halted             bool  // 프로그램이 멈추었는가?
-	breakpoint         bool  // 현재 명령 다음에 쉬어야 하는가?
-	tracing            bool  // 현재 명령을 추적해야 하는가?
-	stackTracing       bool  // 레지스터 스택의 자세한 사정을 추적해야 하는가?
-	interacting        bool  // 대화 방식에 있는가?
-	interactAfterBreak bool  // 대화 방식으로 들어가야 하는가?
-	traceThreshold     Tetra // 명령마다 이만큼 추적한다
+	instPtr            Octa  // location of the next instruction
+	tracingExceptions  int   // exception bits that cause tracing
+	halted             bool  // did the program come to a halt?
+	breakpoint         bool  // should we pause after the current instruction?
+	tracing            bool  // should we trace the current instruction?
+	stackTracing       bool  // should we trace details of the register stack?
+	interacting        bool  // are we in interactive mode?
+	interactAfterBreak bool  // should we go into interactive mode?
+	traceThreshold     Tetra // each instruction should be traced this many times
 
 //line mmixsim.w:2019
-	g         [256]Octa // 전역 레지스터
-	l         []Octa    // 지역 레지스터
-	lringSize int       // 지역 레지스터의 개수(2의 거듭제곱)
-	lringMask int       // |lringSize|보다 하나 작은 수
-	S         int       // $\rm rS/8$과 |lringSize|를 법으로 합동
+	g         [256]Octa // global registers
+	l         []Octa    // local registers
+	lringSize int       // the number of local registers (a power of 2)
+	lringMask int       // one less than |lringSize|
+	S         int       // congruent to $\rm rS/8$ modulo |lringSize|
 
 //line mmixsim.w:3254
-	stdinBuf      [256]byte // 모의 프로그램의 표준 입력
-	stdinBufStart int       // 그 버퍼에서의 현재 위치
-	stdinBufEnd   int       // 그 버퍼의 현재 끝
+	stdinBuf      [256]byte // standard input to the simulated program
+	stdinBufStart int       // current position in that buffer
+	stdinBufEnd   int       // current end of that buffer
 
 //line mmixsim.w:3410
-	showingStats bool // 추적하는 명령마다 통계도 보여 주어야 하는가?
+	showingStats bool // should traced instructions also show the statistics?
 
 //line mmixsim.w:3645
-	goodGuesses, badGuesses int32 // 분기 예측 통계
+	goodGuesses, badGuesses int32 // branch prediction statistics
 
 //line mmixsim.w:3852
-	myself    string        // |args[0]|, 곧 이 시뮬레이터의 이름
-	interrupt atomic.Bool   // 사용자가 최근에 시뮬레이션을 가로막았는가?
-	profiling bool          // 끝날 때 프로파일을 찍어야 하는가?
-	fakeStdin *os.File      // 모의 \.{StdIn} 대신 쓰는 파일
-	dumpFile  *bufio.Writer // 이진 덤프에 쓰는 파일
-	dumpOS    *os.File      // |dumpFile| 밑의 파일
+	myself    string        // |args[0]|, the name of this simulator
+	interrupt atomic.Bool   // has the user interrupted the simulation recently?
+	profiling bool          // should we print the profile at the end?
+	fakeStdin *os.File      // file substituted for the simulated \.{StdIn}
+	dumpFile  *bufio.Writer // file used for binary dumps
+	dumpOS    *os.File      // the file underlying |dumpFile|
 
 //line mmixsim.w:4086
 	commandBuf [commandBufSize + 2]byte
 
 //line mmixsim.w:4183
-	val Octa // 대화 명령이 넣을 값
+	val Octa // the value to be stored by an interactive command
 
 //line mmixsim.w:141
 }
 
-type exitSignal int // 이 종료 코드로 프로그램을 끝내라는 신호
+type exitSignal int // a signal to end the program with this exit code
 
 //line mmixsim.w:589
 type (
-	Tetra = mmixarith.Tetra // 부호 없는 32비트 정수
-	Octa  = mmixarith.Octa  // 두 테트라바이트가 모여 옥타바이트를 이룬다
+	Tetra = mmixarith.Tetra // an unsigned 32-bit integer
+	Octa  = mmixarith.Octa  // two tetrabytes make one octabyte
 )
 
 //line mmixsim.w:682
 type memTetra struct {
-	tet    Tetra  // 모의 메모리의 테트라바이트
-	freq   Tetra  // 그것을 명령으로 실행한 횟수
-	bkpt   byte   // 이 테트라바이트의 멈춤점 정보
-	fileNo byte   // 알려져 있다면, 원시 파일 번호
-	lineNo uint16 // 알려져 있다면, 원시 줄 번호
+	tet    Tetra  // the tetrabyte of simulated memory
+	freq   Tetra  // the number of times it was obeyed as an instruction
+	bkpt   byte   // breakpoint information for this tetrabyte
+	fileNo byte   // source file number, if known
+	lineNo uint16 // source line number, if known
 }
 
 type memNode struct {
-	loc         Octa          // 모의 테트라바이트 512개 가운데 첫째의 위치
-	stamp       Tetra         // treap의 균형을 위한 시간 도장
-	left, right *memNode      // 부분 나무를 가리키는 포인터
-	dat         [512]memTetra // 모의 테트라바이트의 덩이
+	loc         Octa          // location of the first of 512 simulated tetrabytes
+	stamp       Tetra         // time stamp for treap balancing
+	left, right *memNode      // pointers to subtrees
+	dat         [512]memTetra // the chunk of simulated tetrabytes
 }
 
 //line mmixsim.w:1140
 type fileNode struct {
-	name      []byte  // 원시 파일의 이름
-	lineCount int     // 파일의 줄 수
-	lineMap   []int64 // 줄마다의 파일 위치를 적은 지도
+	name      []byte  // name of source file
+	lineCount int     // number of lines in the file
+	lineMap   []int64 // map of file positions, one per line
 }
 
 //line mmixsim.w:1150
-type Char = byte // 언젠가 와이드가 될 바이트들
+type Char = byte // bytes that will become wydes some day
 
 //line mmixsim.w:1593
 type opInfo struct {
-	name         string // 연산 코드의 기호 이름
-	flags        byte   // 명령의 형식
-	thirdOperand byte   // 입력으로 쓰는 특수 레지스터
-	mems         byte   // $\mu$를 몇 번 쓰는가
-	oops         byte   // $\upsilon$를 몇 번 쓰는가
-	traceFormat  string // 추적할 때 어떻게 보이는가
+	name         string // symbolic name of an opcode
+	flags        byte   // its instruction format
+	thirdOperand byte   // its special register input
+	mems         byte   // how many $\mu$ it costs
+	oops         byte   // how many $\upsilon$ it costs
+	traceFormat  string // how it appears when traced
 }
 
 //line mmixsim.w:3548
@@ -166,34 +166,34 @@ const (
 
 //line mmixsim.w:4617
 type cfile struct {
-	f   *os.File      // 읽는 파일; 표준 입력이면 |nil|
-	r   *bufio.Reader // 읽기 버퍼
-	pos int64         // |ftell|이 돌려줄 위치
-	eof bool          // 파일 끝 표시(|feof|)
+	f   *os.File      // the file being read; |nil| if standard input
+	r   *bufio.Reader // read buffer
+	pos int64         // position that |ftell| would return
+	eof bool          // end-of-file indicator (|feof|)
 }
 
 //line mmixsim.w:635
 const (
-	signBit = mmixarith.SignBit // 부호 비트
+	signBit = mmixarith.SignBit // the sign bit
 	negOne  = mmixarith.NegOne  // $-1$
 )
 
 //line mmixsim.w:807
 const (
-	mm       = 0x98 // \.{mmo} 형식의 탈출 코드
-	lopQuote = 0x0  // 인용 lopcode
-	lopLoc   = 0x1  // 위치 lopcode
-	lopSkip  = 0x2  // 건너뛰기 lopcode
-	lopFixo  = 0x3  // 옥타바이트 고치기 lopcode
-	lopFixr  = 0x4  // 상대 주소 고치기 lopcode
-	lopFixrx = 0x5  // 확장된 상대 주소 고치기 lopcode
-	lopFile  = 0x6  // 파일 이름 lopcode
-	lopLine  = 0x7  // 파일 위치 lopcode
-	lopSpec  = 0x8  // 특수 고리 lopcode
-	lopPre   = 0x9  // 서문 lopcode
-	lopPost  = 0xa  // 후기 lopcode
-	lopStab  = 0xb  // 기호표 lopcode
-	lopEnd   = 0xc  // 모든 것을 끝내는 lopcode
+	mm       = 0x98 // the escape code of \.{mmo} format
+	lopQuote = 0x0  // the quotation lopcode
+	lopLoc   = 0x1  // the location lopcode
+	lopSkip  = 0x2  // the skip lopcode
+	lopFixo  = 0x3  // the octabyte-fix lopcode
+	lopFixr  = 0x4  // the relative-fix lopcode
+	lopFixrx = 0x5  // extended relative-fix lopcode
+	lopFile  = 0x6  // the file name lopcode
+	lopLine  = 0x7  // the file position lopcode
+	lopSpec  = 0x8  // the special hook lopcode
+	lopPre   = 0x9  // the preamble lopcode
+	lopPost  = 0xa  // the postamble lopcode
+	lopStab  = 0xb  // the symbol table lopcode
+	lopEnd   = 0xc  // the end-it-all lopcode
 )
 
 //line mmixsim.w:1399
@@ -531,15 +531,15 @@ const (
 
 //line mmixsim.w:1452
 const (
-	xBit = mmixarith.XBit // 부동소수점 부정확
-	zBit = mmixarith.ZBit // 부동소수점 0으로 나눔
-	uBit = mmixarith.UBit // 부동소수점 아래넘침
-	oBit = mmixarith.OBit // 부동소수점 넘침
-	iBit = mmixarith.IBit // 부동소수점 잘못된 연산
-	wBit = mmixarith.WBit // 부동소수점에서 고정소수점으로 바꿀 때 넘침
-	vBit = mmixarith.VBit // 정수 넘침
-	dBit = mmixarith.DBit // 정수 나눗셈 검사
-	hBit = 1 << 16        // 트립
+	xBit = mmixarith.XBit // floating inexact
+	zBit = mmixarith.ZBit // floating division by zero
+	uBit = mmixarith.UBit // floating underflow
+	oBit = mmixarith.OBit // floating overflow
+	iBit = mmixarith.IBit // floating invalid operation
+	wBit = mmixarith.WBit // float-to-fix overflow
+	vBit = mmixarith.VBit // integer overflow
+	dBit = mmixarith.DBit // integer divide check
+	hBit = 1 << 16        // trip
 )
 
 //line mmixsim.w:1468
@@ -588,20 +588,20 @@ const (
 
 //line mmixsim.w:2041
 const (
-	version       = 1 // 우리가 지원하는 \MMIX\ 아키텍처의 판
-	subversion    = 0 // 판 번호의 둘째 바이트
-	subsubversion = 1 // 판 번호를 더 한정하는 번호
+	version       = 1 // version of the \MMIX\ architecture that we support
+	subversion    = 0 // secondary byte of version number
+	subsubversion = 1 // further qualification to version number
 )
 
 //line mmixsim.w:3323
 const (
-	resumeAgain = 0 // rX의 명령을 위치 $\rm rW-4$에 있는 것처럼 되풀이한다
-	resumeCont  = 1 // 같되, 피연산자 대신 rY와 rZ를 쓴다
-	resumeSet   = 2 // 레지스터 \$X를 rZ로 정한다
+	resumeAgain = 0 // repeat the command in rX as if in location $\rm rW-4$
+	resumeCont  = 1 // same, but substitute rY and rZ for operands
+	resumeSet   = 2 // set register \$X to rZ
 )
 
 //line mmixsim.w:4083
-const commandBufSize = 1024 // 넉넉하게 길게, 부동소수점 시험을 위해
+const commandBufSize = 1024 // make it plenty long, for floating point tests
 
 //line mmixsim.w:1444
 var specialName = [32]string{"rB", "rD", "rE", "rH", "rJ", "rM", "rR", "rBB",
@@ -928,8 +928,8 @@ var trapFormat = [...]string{
 var streamName = [3]string{"StdIn", "StdOut", "StdErr"}
 
 //line mmixsim.w:3641
-var leftParen = [5]byte{0, '[', '^', '_', '('}  // 반올림 방식을 나타낸다
-var rightParen = [5]byte{0, ']', '^', '_', ')'} // 반올림 방식을 나타낸다
+var leftParen = [5]byte{0, '[', '^', '_', '('}  // denotes the rounding mode
+var rightParen = [5]byte{0, ']', '^', '_', ')'} // denotes the rounding mode
 
 //line mmixsim.w:3860
 var usageHelp = [...]string{
@@ -1186,7 +1186,7 @@ func (m *simulator) showLine() {
 			}
 
 //line mmixsim.w:1183
-			lineMap := []int64{0} // 색인 0은 쓰지 않는다
+			lineMap := []int64{0} // index 0 is unused
 			l := 1
 		lines:
 			for ; l < 65536 && !m.srcFile.eof; l++ {
@@ -1209,15 +1209,15 @@ func (m *simulator) showLine() {
 
 //line mmixsim.w:1267
 	} else if m.shownLine == int32(m.curLine) {
-		return // 이미 보였다
+		return // already shown
 	}
 	cl := int32(m.curLine)
 	if cl > m.shownLine+m.gap+1 || cl < m.shownLine {
 		if m.shownLine > 0 {
 			if cl < m.shownLine {
-				m.printf("--------\n") // 위로 옮긴 것을 나타낸다
+				m.printf("--------\n") // indicate upward move
 			} else {
-				m.printf("     ...\n") // 빈틈을 나타낸다
+				m.printf("     ...\n") // indicate the gap
 			}
 		}
 		m.printLine(m.curLine)
@@ -1330,13 +1330,13 @@ func registerTruth(o Octa, op int) bool {
 	var b bool
 	switch (op >> 1) & 0x3 {
 	case 0:
-		b = o&signBit != 0 // 음수인가?
+		b = o&signBit != 0 // negative?
 	case 1:
-		b = o == 0 // 0인가?
+		b = o == 0 // zero?
 	case 2:
-		b = o < signBit && o != 0 // 양수인가?
+		b = o < signBit && o != 0 // positive?
 	case 3:
-		b = o&0x1 != 0 // 홀수인가?
+		b = o&0x1 != 0 // odd?
 	}
 	if op&0x8 != 0 {
 		return !b
@@ -1804,10 +1804,10 @@ func sscanf(s string, base16 bool) int32 {
 		return 0
 	}
 	if !base16 {
-		n, _ := strconv.ParseInt(sign+digits, 10, 64) // 넘치면 끝값에서 멈춘다
+		n, _ := strconv.ParseInt(sign+digits, 10, 64) // saturates on overflow
 		return int32(n)
 	}
-	n, _ := strconv.ParseUint(digits, 16, 64) // 넘치면 끝값에서 멈춘다
+	n, _ := strconv.ParseUint(digits, 16, 64) // saturates on overflow
 	if sign == "-" {
 		n = -n
 	}
@@ -1859,53 +1859,53 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	var (
 
 //line mmixsim.w:860
-		postamble bool // |lopPost|를 만났는가?
-		delta     int  // 상대 주소 고치기의 차이
+		postamble bool // have we encountered |lopPost|?
+		delta     int  // difference for relative fixup
 
 //line mmixsim.w:960
-		curLoc Octa // 현재 위치
+		curLoc Octa // the current location
 
 //line mmixsim.w:1543
-		w, x, y, z, a, b, ma, mb Octa            // 피연산자
-		xPtr                     *Octa           // 목적지
-		loc                      Octa            // 현재 명령의 위치
-		inst                     Tetra           // 현재 명령
-		oldL                     int             // 현재 명령을 실행하기 전의 |L|
-		exc                      int             // 현재 명령이 일으킨 예외
-		rop                      int             // 다시 시작한 명령의 ropcode
-		roundMode                mmixarith.Round // 방금 쓴 부동소수점 반올림 방식
-		curRound                 mmixarith.Round // 현재 반올림 방식
-		resuming                 bool            // 중단된 명령을 다시 시작하고 있는가?
-		tripping                 bool            // 트립 처리기로 가려는 참인가?
-		good                     bool            // 마지막 분기 명령이 옳게 짐작했는가?
-		lhs, rhs                 string          // 추적 출력의 왼쪽과 오른쪽
+		w, x, y, z, a, b, ma, mb Octa            // operands
+		xPtr                     *Octa           // destination
+		loc                      Octa            // location of the current instruction
+		inst                     Tetra           // the current instruction
+		oldL                     int             // value of |L| before the current instruction
+		exc                      int             // exceptions raised by the current instruction
+		rop                      int             // ropcode of a resumed instruction
+		roundMode                mmixarith.Round // the style of floating point rounding just used
+		curRound                 mmixarith.Round // the current rounding mode
+		resuming                 bool            // are we resuming an interrupted instruction?
+		tripping                 bool            // are we about to go to a trip handler?
+		good                     bool            // did the last branch instruction guess correctly?
+		lhs, rhs                 string          // left and right sides of the trace output
 
 //line mmixsim.w:1569
-		op             int        // 현재 명령의 연산 코드
-		xx, yy, zz, yz int        // 현재 명령의 피연산자 필드들
-		f              int        // 현재 |op|의 성질
-		i, j, k        int        // 이런저런 색인
-		ll             []memTetra // 모의 메모리의 현재 자리
-		p              int        // 문자열에서의 현재 자리
+		op             int        // operation code of the current instruction
+		xx, yy, zz, yz int        // operand fields of the current instruction
+		f              int        // properties of the current |op|
+		i, j, k        int        // miscellaneous indices
+		ll             []memTetra // current place in the simulated memory
+		p              int        // current place in a string
 
 //line mmixsim.w:2014
-		G, L, O int // 핵심 레지스터들의 손쉬운 사본
+		G, L, O int // accessible copies of key registers
 
 //line mmixsim.w:3413
-		justTraced bool // 앞 명령을 추적했는가?
+		justTraced bool // was the previous instruction traced?
 
 //line mmixsim.w:3742
-		curArg int // 인자 벡터에서의 현재 자리
-		argc   int // 사용자 프로그램의 인자 개수
+		curArg int // current place in the argument vector
+		argc   int // the number of arguments of the user program
 
 //line mmixsim.w:4089
 		cmd         = m.commandBuf[:]
-		inclFile    *cfile       // `\.i'가 끼워 넣는 명령들의 파일
-		curDispMode byte   = 'l' // |'l'|이나 |'g'|나 |'$'|나 |'M'|
-		curDispType byte   = '!' // |'!'|나 |'.'|나 |'#'|나 |'"'|
-		curDispSet  bool         // 마지막 \.{<t>}가 \.{=<val>} 꼴이었는가?
-		curDispAddr Octa         // 윗 테트라는 |'M'| 방식에서만 쓰인다
-		curSeg      Octa         // 현재 세그먼트 오프셋
+		inclFile    *cfile       // file of commands included by `\.i'
+		curDispMode byte   = 'l' // |'l'| or |'g'| or |'$'| or |'M'|
+		curDispType byte   = '!' // |'!'| or |'.'| or |'#'| or |'"'|
+		curDispSet  bool         // was the last \.{<t>} of the form \.{=<val>}?
+		curDispAddr Octa         // the upper tetra is relevant only in mode |'M'|
+		curSeg      Octa         // current segment offset
 
 //line mmixsim.w:3686
 	)
@@ -1916,9 +1916,9 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 		m.scanOption(args[curArg][1:], true)
 	}
 	if curArg == len(args) {
-		m.scanOption("?", true) // 사용법 알림과 함께 끝낸다
+		m.scanOption("?", true) // exit with usage note
 	}
-	argc = len(args) - curArg // 사용자 프로그램의 |argc|
+	argc = len(args) - curArg // this is the |argc| of the user program
 
 //line mmixsim.w:716
 	m.memRoot = m.newMem()
@@ -1945,7 +1945,7 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	m.curLine = 0
 
 //line mmixsim.w:888
-	m.readTet() // 입력의 첫 테트라바이트를 읽는다
+	m.readTet() // read the first tetrabyte of input
 	if m.buf[0] != mm || m.buf[1] != lopPre {
 		m.mmoErr()
 	}
@@ -1957,7 +1957,7 @@ func mmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	} else {
 		j = int(m.buf[3]) - 1
 		m.readTet()
-		m.objTime = m.tet // 파일을 만든 시각
+		m.objTime = m.tet // file creation time
 		for ; j > 0; j-- {
 			m.readTet()
 		}
@@ -2051,7 +2051,7 @@ items:
 					m.readTet()
 					if m.buf[0] == mm {
 						if m.buf[1] != lopQuote || m.yzbytes != 1 {
-							continue dispatch // 특수 데이터의 끝
+							continue dispatch // end of special data
 						}
 						m.readTet()
 					}
@@ -2083,10 +2083,10 @@ items:
 
 //line mmixsim.w:1119
 	ll = m.memFind(0x6000000000000000)
-	ll[5].tet = 2           // 이것이 결국 $\rm rL=2$로 만든다
-	ll[1].tet = Tetra(argc) // 그리고 $\$0=|argc|$로
+	ll[5].tet = 2           // this will ultimately set $\rm rL=2$
+	ll[1].tet = Tetra(argc) // and $\$0=|argc|$
 	ll[2].tet = 0x40000000
-	ll[3].tet = 0x8 // 그리고 $\$1=\.{Pool\_Segment}+8$로 만든다
+	ll[3].tet = 0x8 // and $\$1=\.{Pool\_Segment}+8$
 	G, L = int(m.buf[3]), 0
 	for j, k = G+G, 6; j < 256+256; j, k = j+1, k+1 {
 		m.readTet()
@@ -2094,7 +2094,7 @@ items:
 	}
 	m.instPtr = Octa(ll[k-2].tet)<<32 | Octa(ll[k-1].tet) // \.{Main}
 	ll[k+2*12].tet = Tetra(G) << 24
-	m.g[255] = 0x6000000000000000 + Octa(4*k) + 12*8 // 여기서부터 \.{UNSAVE}해서 출발한다
+	m.g[255] = 0x6000000000000000 + Octa(4*k) + 12*8 // we will \.{UNSAVE} from here, to get going
 
 //line mmixsim.w:985
 	mf.Close()
@@ -2109,7 +2109,7 @@ items:
 //line mmixsim.w:2048
 	m.g[rK] = negOne
 	m.g[rN] = (version<<24+subversion<<16+subsubversion<<8)<<32 |
-		Octa(Tetra(ABSTIME)) // 위의 설명과 경고를 보라
+		Octa(Tetra(ABSTIME)) // see comment and warning above
 	m.g[rT] = 0x8000000500000000
 	m.g[rTT] = 0x8000000600000000
 	m.g[rV] = 0x369c200400000000
@@ -2126,7 +2126,7 @@ items:
 
 //line mmixsim.w:3938
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt) // 이제 인터럽트를 받는다
+	signal.Notify(sig, os.Interrupt) // now we will catch interrupts
 	defer func() {
 		signal.Stop(sig)
 		close(sig)
@@ -2231,10 +2231,10 @@ run:
 
 //line mmixsim.w:3989
 					case '\n', 'n':
-						m.breakpoint, m.tracing = true, true // 명령 하나를 추적하고 멈춘다
+						m.breakpoint, m.tracing = true, true // trace one inst and break
 						break interact
 					case 'c':
-						break interact // 멈춤점까지 계속한다
+						break interact // continue until breakpoint
 					case 'q':
 						break run
 					case 's':
@@ -3049,7 +3049,7 @@ run:
 						m.goodGuesses++
 					} else {
 						m.badGuesses++
-						m.sclock = m.sclock&^0xffffffff | Octa(Tetra(m.sclock)+2) // 짐작이 틀리면 벌칙은 $2\upsilon$
+						m.sclock = m.sclock&^0xffffffff | Octa(Tetra(m.sclock)+2) // penalty is $2\upsilon$ for bad guess
 						if m.g[rI] <= 2 && m.g[rI] != 0 {
 							m.tracing, m.breakpoint = true, true
 						}
@@ -3132,7 +3132,7 @@ run:
 					m.testStoreBkpt(ll[0])
 					w &^= 7
 					ll = m.memFind(w)
-					a = octa(ll) // 추적 출력을 위해
+					a = octa(ll) // for trace output
 					if w&signBit != 0 {
 						trouble = "!privileged"
 					}
@@ -3146,7 +3146,7 @@ run:
 					m.testStoreBkpt(ll[0])
 					w &^= 7
 					ll = m.memFind(w)
-					a = octa(ll) // 추적 출력을 위해
+					a = octa(ll) // for trace output
 					if w&signBit != 0 {
 						trouble = "!privileged"
 					}
@@ -3160,7 +3160,7 @@ run:
 					m.testStoreBkpt(ll[0])
 					w &^= 7
 					ll = m.memFind(w)
-					a = octa(ll) // 추적 출력을 위해
+					a = octa(ll) // for trace output
 					if w&signBit != 0 {
 						trouble = "!privileged"
 					}
@@ -3221,7 +3221,7 @@ run:
 					rhs = "%z = %#z"
 					if xx >= 8 {
 						if xx <= 11 && xx != 8 {
-							trouble = "!illegal" // rN, rO, rS는 바꿀 수 없다
+							trouble = "!illegal" // can't change rN, rO, rS
 							break perform
 						}
 						if xx <= 18 {
@@ -3292,7 +3292,7 @@ run:
 						}
 					}
 					x = Octa(xx)
-					m.l[(O+xx)&m.lringMask] = x // ``구멍''은 밀어 넣은 양을 기록한다
+					m.l[(O+xx)&m.lringMask] = x // the ``hole'' records the amount pushed
 					lhs = fmt.Sprintf("l[%d]=%d, ", (O+xx)&m.lringMask, xx)
 					x = loc + 4
 					m.g[rJ] = x
@@ -3578,7 +3578,7 @@ run:
 					if b&signBit == 0 {
 
 //line mmixsim.w:3330
-						rop = int(b >> 56) // ropcode는 rX의 맨 윗 바이트다
+						rop = int(b >> 56) // the ropcode is the leading byte of rX
 						switch rop {
 						case resumeCont:
 							if 1<<(Tetra(b)>>28)&0x8f30 != 0 {
@@ -3630,14 +3630,14 @@ run:
 				if exc&m.tracingExceptions != 0 {
 					m.tracing = true
 				}
-				j = exc & (int(Tetra(m.g[rA])) | hBit) // 허용된 예외를 모두 찾는다
+				j = exc & (int(Tetra(m.g[rA])) | hBit) // find all exceptions that have been enabled
 				if j != 0 {
 
 //line mmixsim.w:3281
 					tripping = true
 					for k = 0; j&hBit == 0; j, k = j<<1, k+1 {
 					}
-					exc &^= hBit >> k // 취한 트립은 사건으로 기록하지 않는다
+					exc &^= hBit >> k // trips taken are not logged as events
 					m.g[rW] = m.instPtr
 					m.instPtr = Octa(k << 4)
 					m.g[rX] = signBit | Octa(inst)
@@ -3659,17 +3659,17 @@ run:
 
 //line mmixsim.w:3375
 			if m.sclock != 0 || !resuming {
-				m.sclock += Octa(info[op].mems) << 32 // $\mu$마다 시계가 $2^{32}$씩 올라간다
-				m.sclock += Octa(info[op].oops)       // $\upsilon$마다 시계가 1씩 올라간다
+				m.sclock += Octa(info[op].mems) << 32 // clock goes up by $2^{32}$ for each $\mu$
+				m.sclock += Octa(info[op].oops)       // clock goes up by 1 for each $\upsilon$
 				if (loc&signBit == 0 || m.g[rU]&(0x8000<<32) != 0) &&
 					Octa(op)&(m.g[rU]>>48) == m.g[rU]>>56 {
 					const count = 1<<47 - 1
 					m.g[rU] = m.g[rU]&^count | (m.g[rU]+1)&count
-				} // 사용 계수기는 흉내 낸 명령 가운데 조건에 맞는 것을 센다
+				} // usage counter counts matched instructions simulated
 				if m.g[rI] <= Octa(info[op].oops) && m.g[rI] != 0 {
 					m.tracing, m.breakpoint = true, true
 				}
-				m.g[rI] -= Octa(info[op].oops) // 구간 $\upsilon$ 타이머는 거꾸로 센다
+				m.g[rI] -= Octa(info[op].oops) // interval $\upsilon$ timer counts down
 			}
 
 //line mmixsim.w:3393
@@ -3697,7 +3697,7 @@ run:
 
 //line mmixsim.w:3438
 				if lhs != "" && lhs[0] == '!' {
-					m.printf("%s instruction!\n", lhs[1:]) // 특권 명령이거나 불법 명령
+					m.printf("%s instruction!\n", lhs[1:]) // privileged or illegal
 				} else {
 
 //line mmixsim.w:3463
@@ -3785,7 +3785,7 @@ run:
 
 //line mmixsim.w:3518
 								default:
-									m.printf("BUG!!") // 일어날 수 없다
+									m.printf("BUG!!") // can't happen
 								}
 								break
 							}
@@ -3811,7 +3811,7 @@ run:
 			} else if justTraced {
 				m.printf(" ...............................................\n")
 				justTraced = false
-				m.shownLine = -m.gap - 1 // 빈틈을 채우지 않는다
+				m.shownLine = -m.gap - 1 // gap will not be filled
 			}
 
 //line mmixsim.w:1529
@@ -3844,7 +3844,7 @@ run:
 	if m.interacting || m.profiling || m.showingStats {
 		m.showStats(true)
 	}
-	return int(int32(Tetra(m.g[255]))) // 비대화식 실행에 초보적인 되먹임을 준다
+	return int(int32(Tetra(m.g[255]))) // provide rudimentary feedback for non-interactive runs
 
 //line mmixsim.w:109
 }

@@ -33,7 +33,7 @@ func TestScanConstExamples(t *testing.T) {
 		{"-Inf", InfOcta | SignBit, 4, FloatConst},
 		{"x", 0, 0, NoConst},
 		{"18446744073709551617", 1, 20, DecimalConst}, // $2^{64}+1$
-		{".64352139e333", InfOcta, 13, FloatConst},    // 원본 \CEE/는 여기서 죽는다
+		{".64352139e333", InfOcta, 13, FloatConst},    // the original \CEE/ crashes here
 	} {
 		v, n, k := ScanConst(c.in)
 		if v != c.val || n != c.next || k != c.kind {
@@ -141,11 +141,11 @@ func randOcta(r *rand.Rand) Octa {
 	case 0:
 		return specials[r.IntN(len(specials))] | Octa(r.IntN(2))<<63
 	case 1:
-		return r.Uint64() & 0x800fffffffffffff // 비정규수
+		return r.Uint64() & 0x800fffffffffffff // subnormal
 	case 2:
 		return r.Uint64()&0x800fffffffffffff | Octa(0x3e0+r.IntN(64))<<52
 	case 3:
-		return r.Uint64()&0xfff0000000000000 | r.Uint64()&0xff // 정수 근처
+		return r.Uint64()&0xfff0000000000000 | r.Uint64()&0xff // near an integer
 	default:
 		return r.Uint64()
 	}
@@ -189,7 +189,7 @@ func TestAgainstHardware(t *testing.T) {
 		if x, _ := FRemStep(y, z, 2500); !same(x, math.Remainder(f(y), f(z))) {
 			t.Fatalf("FRemStep(%#x, %#x) = %#x", y, z, x)
 		}
-		want := 2 // 순서를 매길 수 없음
+		want := 2 // unordered
 		switch fy, fz := f(y), f(z); {
 		case fy < fz:
 			want = -1

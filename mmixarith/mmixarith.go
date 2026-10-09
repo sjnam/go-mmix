@@ -8,84 +8,84 @@ import (
 )
 
 //line mmixarith.w:76
-type Tetra = uint32 // 테트라바이트: 32비트
-type Octa = uint64  // 옥타바이트: 두 테트라바이트가 모여 이룬다
+type Tetra = uint32 // tetrabyte: 32 bits
+type Octa = uint64  // two tetrabytes make one octabyte
 
 //line mmixarith.w:403
-type Round int // 반올림 방식
+type Round int // rounding mode
 
 //line mmixarith.w:623
-type ftype int // 부동소수점 값의 종류
+type ftype int // kind of floating point value
 
 //line mmixarith.w:1342
 type bignum struct {
-	a   int               // 가장 높은 자리의 색인
-	b   int               // 가장 낮은 자리의 색인; $\ge a$여야 한다
-	dat [bignumPrec]Tetra // 자리들; |a|와 |b| 사이 말고는 정의되지 않는다
+	a   int               // index of the most significant digit
+	b   int               // index of the least significant digit; must be $\ge a$
+	dat [bignumPrec]Tetra // the digits; undefined except between |a| and |b|
 }
 
 //line mmixarith.w:1653
-type ConstKind int // |ScanConst|가 찾아낸 상수의 종류
+type ConstKind int // kind of constant found by |ScanConst|
 
 //line mmixarith.w:84
 const (
-	SignBit     Octa = 1 << 63            // 부호 비트
-	NegOne      Octa = ^Octa(0)           // $-1$, 곧 64비트가 모두 1
-	InfOcta     Octa = 0x7ff0000000000000 // 부동소수점 $+\infty$
-	StandardNaN Octa = 0x7ff8000000000000 // 부동소수점 NaN(.5)
+	SignBit     Octa = 1 << 63            // the sign bit
+	NegOne      Octa = ^Octa(0)           // $-1$, i.e., all 64 bits are 1
+	InfOcta     Octa = 0x7ff0000000000000 // floating point $+\infty$
+	StandardNaN Octa = 0x7ff8000000000000 // floating point NaN(.5)
 )
 
 //line mmixarith.w:406
 const (
-	RoundOff  Round = 1 // 0 쪽으로 버림
-	RoundUp   Round = 2 // $+\infty$ 쪽으로 올림
-	RoundDown Round = 3 // $-\infty$ 쪽으로 내림
-	RoundNear Round = 4 // 가장 가까운 쪽으로, 동률이면 짝수 쪽으로
+	RoundOff  Round = 1 // round toward zero
+	RoundUp   Round = 2 // round toward $+\infty$
+	RoundDown Round = 3 // round toward $-\infty$
+	RoundNear Round = 4 // round to nearest, ties to even
 )
 
 //line mmixarith.w:446
 const (
-	XBit = 1 << 8  // 부동소수점 부정확
-	ZBit = 1 << 9  // 부동소수점 0으로 나눔
-	UBit = 1 << 10 // 부동소수점 아래넘침
-	OBit = 1 << 11 // 부동소수점 넘침
-	IBit = 1 << 12 // 부동소수점 잘못된 연산
-	WBit = 1 << 13 // 부동소수점에서 고정소수점으로 바꿀 때 넘침
-	VBit = 1 << 14 // 정수 넘침
-	DBit = 1 << 15 // 정수 나눗셈 검사
-	EBit = 1 << 18 // 외부(동적) 트랩 비트
+	XBit = 1 << 8  // floating inexact
+	ZBit = 1 << 9  // floating division by zero
+	UBit = 1 << 10 // floating underflow
+	OBit = 1 << 11 // floating overflow
+	IBit = 1 << 12 // floating invalid operation
+	WBit = 1 << 13 // float-to-fix overflow
+	VBit = 1 << 14 // integer overflow
+	DBit = 1 << 15 // integer divide check
+	EBit = 1 << 18 // external (dynamic) trap bit
 )
 
 //line mmixarith.w:626
 const (
 	zro ftype = iota // 0
-	num              // 0이 아닌 유한한 수
-	inf              // 무한대
+	num              // a nonzero finite number
+	inf              // infinity
 	nan              // NaN
 )
 
-const zeroExponent = -1000 // 0은 이 지수를 가진다고 본다
+const zeroExponent = -1000 // zero is assumed to have this exponent
 
 //line mmixarith.w:1349
-const bignumPrec = 157 // |FloatString|만 신경 쓴다면 77이면 된다
+const bignumPrec = 157 // would be 77 if we cared only about |FloatString|
 
 //line mmixarith.w:1460
 const (
-	magicOffset = 2112 // 이 모든 것이 맞아떨어지게 하는 상수 $c$
-	origin      = 37   // 기수점은 |dat[37]| 뒤에 온다
+	magicOffset = 2112 // the constant $c$ that makes it work
+	origin      = 37   // the radix point follows |dat[37]|
 )
 
 //line mmixarith.w:1656
 const (
-	NoConst      ConstKind = -1 // 상수를 찾지 못했다
-	DecimalConst ConstKind = 0  // 십진 상수
-	FloatConst   ConstKind = 1  // 부동 상수
+	NoConst      ConstKind = -1 // no constant was found
+	DecimalConst ConstKind = 0  // decimal constant
+	FloatConst   ConstKind = 1  // floating constant
 )
 
 //line mmixarith.w:1802
 const (
-	buf0   = 8   // 유효 숫자가 시작하는 |buf|의 색인
-	bufMax = 777 // 유효 숫자가 끝나는 |buf|의 색인
+	buf0   = 8   // index in |buf| where significant digits begin
+	bufMax = 777 // index in |buf| where significant digits end
 )
 
 //line mmixarith.w:116
@@ -111,7 +111,7 @@ func SignedMult(y, z Octa) (x Octa, overflow bool) {
 //line mmixarith.w:192
 func Div(x, y, z Octa) (q, r Octa) {
 	if x >= z {
-		return x, y // 자명한 답
+		return x, y // trivial answer
 	}
 	return bits.Div64(x, y, z)
 }
@@ -203,7 +203,7 @@ func fpack(f Octa, e int, s bool, r Round) (o Octa, exc int) {
 			} else {
 				o = f >> -e
 				if o<<-e != f {
-					o |= 1 // 끈끈이 비트
+					o |= 1 // sticky bit
 				}
 			}
 			e = 0
@@ -235,9 +235,9 @@ func fpack(f Octa, e int, s bool, r Round) (o Octa, exc int) {
 	o >>= 2
 	o += Octa(e) << 52
 	if o >= 0x7ff0000000000000 {
-		exc |= OBit | XBit // 넘침
+		exc |= OBit | XBit // overflow
 	} else if o < 1<<52 {
-		exc |= UBit // 작음
+		exc |= UBit // tininess
 	}
 	if s {
 		o |= SignBit
@@ -263,7 +263,7 @@ func sfpack(f Octa, e int, s bool, r Round) (o Tetra, exc int) {
 				o0 := o
 				o >>= 0x380 - e
 				if o<<(0x380-e) != o0 {
-					o |= 1 // 끈끈이 비트
+					o |= 1 // sticky bit
 				}
 			}
 			e = 0x380
@@ -293,9 +293,9 @@ func sfpack(f Octa, e int, s bool, r Round) (o Tetra, exc int) {
 	o >>= 2
 	o += Tetra(e-0x380) << 23
 	if o >= 0x7f800000 {
-		exc |= OBit | XBit // 넘침
+		exc |= OBit | XBit // overflow
 	} else if o < 0x800000 {
-		exc |= UBit // 작음
+		exc |= UBit // tininess
 	}
 	if s {
 		o |= 1 << 31
@@ -401,7 +401,7 @@ func StoreSF(x Octa, r Round) (z Tetra, exc int) {
 	case nan:
 		if f&(1<<53) == 0 {
 			f |= 1 << 53
-			exc |= IBit // NaN은 신호용이었다
+			exc |= IBit // NaN was signaling
 		}
 		z = 0x7f800000 | Tetra(f>>31)
 	}
@@ -421,7 +421,7 @@ func FMult(y, z Octa, r Round) (x Octa, exc int) {
 //line mmixarith.w:808
 	case 4*nan + nan:
 		if y&(1<<51) == 0 {
-			exc |= IBit // |y|는 신호용이다
+			exc |= IBit // |y| is signaling
 		}
 		fallthrough
 	case 4*zro + nan, 4*num + nan, 4*inf + nan:
@@ -448,7 +448,7 @@ func FMult(y, z Octa, r Round) (x Octa, exc int) {
 	case 4*num + num:
 
 //line mmixarith.w:837
-		xe := ye + ze - 0x3fd // 날 지수
+		xe := ye + ze - 0x3fd // the raw exponent
 		aux, lo := bits.Mul64(yf, zf<<9)
 		var xf Octa
 		if aux >= 1<<54 {
@@ -458,7 +458,7 @@ func FMult(y, z Octa, r Round) (x Octa, exc int) {
 			xe--
 		}
 		if lo != 0 {
-			xf |= 1 // 끈끈이 비트를 맞춘다
+			xf |= 1 // adjust the sticky bit
 		}
 		return fpack(xf, xe, xs, r)
 
@@ -480,7 +480,7 @@ func FDivide(y, z Octa, r Round) (x Octa, exc int) {
 //line mmixarith.w:808
 	case 4*nan + nan:
 		if y&(1<<51) == 0 {
-			exc |= IBit // |y|는 신호용이다
+			exc |= IBit // |y| is signaling
 		}
 		fallthrough
 	case 4*zro + nan, 4*num + nan, 4*inf + nan:
@@ -510,7 +510,7 @@ func FDivide(y, z Octa, r Round) (x Octa, exc int) {
 	case 4*num + num:
 
 //line mmixarith.w:886
-		xe := ye - ze + 0x3fd // 날 지수
+		xe := ye - ze + 0x3fd // the raw exponent
 		xf, aux := Div(yf, 0, zf<<9)
 		if xf >= 1<<55 {
 			aux |= xf & 1
@@ -518,7 +518,7 @@ func FDivide(y, z Octa, r Round) (x Octa, exc int) {
 			xe++
 		}
 		if aux != 0 {
-			xf |= 1 // 끈끈이 비트를 맞춘다
+			xf |= 1 // adjust the sticky bit
 		}
 		return fpack(xf, xe, xs, r)
 
@@ -540,7 +540,7 @@ func FPlus(y, z Octa, r Round) (x Octa, exc int) {
 //line mmixarith.w:808
 	case 4*nan + nan:
 		if y&(1<<51) == 0 {
-			exc |= IBit // |y|는 신호용이다
+			exc |= IBit // |y| is signaling
 		}
 		fallthrough
 	case 4*zro + nan, 4*num + nan, 4*inf + nan:
@@ -560,9 +560,9 @@ func FPlus(y, z Octa, r Round) (x Octa, exc int) {
 
 //line mmixarith.w:938
 	case 4*zro + num:
-		return fpack(zf, ze, zs, RoundOff) // 아래넘칠 수 있다
+		return fpack(zf, ze, zs, RoundOff) // may underflow
 	case 4*num + zro:
-		return fpack(yf, ye, ys, RoundOff) // 아래넘칠 수 있다
+		return fpack(yf, ye, ys, RoundOff) // may underflow
 
 //line mmixarith.w:915
 
@@ -600,9 +600,9 @@ func FPlus(y, z Octa, r Round) (x Octa, exc int) {
 
 //line mmixarith.w:1030
 				if d <= 2 {
-					zf >>= d // 정확한 결과
+					zf >>= d // exact result
 				} else if d > 54 {
-					zf = 1 // 까다롭지만 괜찮다
+					zf = 1 // tricky but OK
 				} else {
 					if ys != zs {
 						d--
@@ -726,7 +726,7 @@ func FEpsComp(y, z, e Octa, s bool) int {
 		ee -= d
 	}
 	if ee >= 1023 {
-		return 1 // $\epsilon\ge2$이면 $z\in N_\epsilon(y)$
+		return 1 // if $\epsilon\ge2$, $z\in N_\epsilon(y)$
 	}
 
 //line mmixarith.w:1175
@@ -737,12 +737,12 @@ func FEpsComp(y, z, e Octa, s bool) int {
 		o = zf >> d
 		oo = o << d
 	}
-	if oo != zf { // 잘린 결과이므로 $d>2$이다
+	if oo != zf { // truncated result, hence $d>2$
 		if ee < 1020 {
-			return 0 // 비슷하기에는 차이가 너무 크다
+			return 0 // difference is too large for similarity
 		}
 		if ys != zs {
-			o++ // 천장값으로 맞춘다
+			o++ // adjust for ceiling
 		}
 	}
 	if ys == zs {
@@ -756,7 +756,7 @@ func FEpsComp(y, z, e Octa, s bool) int {
 		return 1
 	}
 	if ee < 968 {
-		return 0 // $y\ne z$이고 $\epsilon<2^{-54}$이면 $y\not\sim z$
+		return 0 // if $y\ne z$ and $\epsilon<2^{-54}$, $y\not\sim z$
 	}
 	if ee >= 1021 {
 		ef <<= ee - 1021
@@ -775,14 +775,14 @@ func FEpsComp(y, z, e Octa, s bool) int {
 func FloatString(x Octa) string {
 
 //line mmixarith.w:1279
-	var f, g Octa // 소수 부분의 아래 경계와 위 경계
-	var e int     // 지수 부분
-	var j, k int  // 두루 쓰는 색인
+	var f, g Octa // lower and upper bounds on the fraction part
+	var e int     // exponent part
+	var j, k int  // all purpose indices
 
 //line mmixarith.w:1587
-	var ff, gg bignum        // 분수들 또는 분수들의 분자들
-	var tt bignum            // 10의 거듭제곱(분모로 쓴다)
-	s := make([]byte, 0, 17) // 유효 숫자들
+	var ff, gg bignum        // fractions or numerators of fractions
+	var tt bignum            // power of ten (used as the denominator)
+	s := make([]byte, 0, 17) // significant digits
 
 //line mmixarith.w:1207
 	var sb strings.Builder
@@ -814,13 +814,13 @@ func FloatString(x Octa) string {
 		g = f + 1
 		f--
 		if e == 0 {
-			e = 1 // 비정규수
+			e = 1 // subnormal
 		} else if e == 0x7ff {
 			sb.WriteString("NaN")
 			if g == 1<<52+1 {
-				return sb.String() // ``표준'' NaN
+				return sb.String() // the ``standard'' NaN
 			}
-			e = 0x3ff // 극단적인 NaN도 |f|나 |g|를 고치지 않고 잘 나온다
+			e = 0x3ff // extreme NaNs come out OK even without adjusting |f| or |g|
 		} else {
 			f |= 1 << 53
 			g |= 1 << 53
@@ -878,7 +878,7 @@ func FloatString(x Octa) string {
 			}
 			s = append(s, byte(j))
 			if ff.a == bignumPrec-1 && open == 0 {
-				done = true // 닫힌 구간에서 $f=0$
+				done = true // $f=0$ in a closed interval
 				break
 			}
 		}
@@ -888,13 +888,13 @@ func FloatString(x Octa) string {
 			for k = j; gg.compare(&tt) >= open; k++ {
 				gg.dec(&tt, 0x10000000)
 			}
-			s = append(s, byte((j+1+k)>>1)) // 가운데 숫자
+			s = append(s, byte((j+1+k)>>1)) // the middle digit
 
 //line mmixarith.w:1571
 		}
 
 //line mmixarith.w:1510
-	} else { // |e<=0x401|이면 |gg.a>=origin|이고 |gg.dat[origin]<=8|이다
+	} else { // if |e<=0x401| we have |gg.a>=origin| and |gg.dat[origin]<=8|
 		if ff.a > origin {
 			ff.dat[origin] = 0
 		}
@@ -908,7 +908,7 @@ func FloatString(x Octa) string {
 			ff.timesTen()
 			gg.timesTen()
 		}
-		s = append(s, byte((ff.dat[origin]+1+gg.dat[origin])>>1)+'0') // 가운데 숫자
+		s = append(s, byte((ff.dat[origin]+1+gg.dat[origin])>>1)+'0') // the middle digit
 	}
 
 //line mmixarith.w:1214
@@ -1003,7 +1003,7 @@ func (f *bignum) dec(g *bignum, r Tetra) {
 
 //line mmixarith.w:1435
 	for f.dat[f.a] == 0 {
-		if f.a == f.b { // 결과가 0이다
+		if f.a == f.b { // the result is zero
 			f.a, f.b = bignumPrec-1, bignumPrec-1
 			f.dat[bignumPrec-1] = 0
 			return
@@ -1021,20 +1021,20 @@ func (f *bignum) dec(g *bignum, r Tetra) {
 func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 
 //line mmixarith.w:1710
-	var q int     // |buf|에서 다음 숫자가 들어갈 곳
-	var decPt int // |buf|에서 소수점의 위치; 없으면 $-1$
+	var q int     // where we put the next digit in |buf|
+	var decPt int // position of decimal point in |buf|; $-1$ if none
 
 //line mmixarith.w:1808
-	var buf [785]byte // 입력의 유효 숫자들을 넣는 곳
+	var buf [785]byte // where we put significant input digits
 	copy(buf[:], "00000000")
-	var exp int   // 읽은 지수; 나중에는 날 이진 지수로 쓴다
-	var zeros int // 소수점 뒤에서 떼어 낸 앞쪽 0의 개수
+	var exp int   // scanned exponent; later used for raw binary exponent
+	var zeros int // leading zeros removed after decimal point
 
 //line mmixarith.w:1914
 	var ff, tt bignum
 
 //line mmixarith.w:1675
-	s += "\x00" // \CEE/ 문자열처럼 끝에 파수꾼을 둔다
+	s += "\x00" // a sentinel at the end, like a \CEE/ string
 	p := 0
 	sign := byte('+')
 	if s[p] == '+' || s[p] == '-' {
@@ -1051,7 +1051,7 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 //line mmixarith.w:1745
 		q, decPt = buf0, -1
 		for ; isDigit(s[p]); p++ {
-			val = val + val<<2 // 5를 곱한다
+			val = val + val<<2 // multiply by 5
 			val = val<<1 + Octa(s[p]-'0')
 			if q > buf0 || s[p] != '0' {
 				if q < bufMax {
@@ -1124,17 +1124,17 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 		x := 341 + zeros - decPt - exp
 		switch {
 		case q == buf0 || x >= 1413:
-			exp = -99999 // 0으로 만든다
+			exp = -99999 // make it zero
 		case x < 10:
-			exp = 99999 // 무한대로 만든다
+			exp = 99999 // make it infinity
 		default:
 
 //line mmixarith.w:1885
 			ff.a = x / 9
 			for i := q; i < q+8; i++ {
-				buf[i] = '0' // 뒤에 0을 채운다
+				buf[i] = '0' // pad with trailing zeros
 			}
-			q = q - 1 - (q+341+zeros-decPt-exp)%9 // |buf|에서 멈출 곳을 계산한다
+			q = q - 1 - (q+341+zeros-decPt-exp)%9 // compute stopping place in |buf|
 			i, k := buf0-x%9, ff.a
 			for ; i <= q && k <= 156; i, k = i+9, k+1 {
 
@@ -1154,7 +1154,7 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 					x = 1
 				}
 			}
-			ff.dat[156] += Tetra(x) // 오른쪽으로 떨어져 나가는 0 아닌 숫자는 끈끈하다
+			ff.dat[156] += Tetra(x) // nonzero digits that fall off the right are sticky
 			for ff.dat[ff.b] == 0 {
 				ff.b--
 			}
@@ -1172,7 +1172,7 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 						val |= 1 << k
 						ff.dat[36] = 0
 						if ff.b == 36 {
-							break // |ff|가 이제 0이면 멈춘다
+							break // break if |ff| now zero
 						}
 					}
 					ff.double()
@@ -1188,13 +1188,13 @@ func ScanConst(s string) (val Octa, next int, kind ConstKind) {
 						val |= 1 << k
 						ff.dec(&tt, 1000000000)
 						if ff.a == bignumPrec-1 {
-							break // |ff|가 이제 0이면 멈춘다
+							break // break if |ff| now zero
 						}
 					}
 				}
 			}
 			if k == 0 {
-				val |= 1 // |ff|가 0이 아니면 끈끈이 비트를 더한다
+				val |= 1 // add sticky bit if |ff| nonzero
 			}
 
 //line mmixarith.w:1876
@@ -1306,7 +1306,7 @@ func FIntegerize(z Octa, r Round) (x Octa, exc int) {
 
 //line mmixarith.w:2089
 	if ze >= 1074 {
-		return fpack(zf, ze, zs, RoundOff) // 이미 정수다
+		return fpack(zf, ze, zs, RoundOff) // already an integer
 	}
 	var xf Octa
 	if ze <= 1020 {
@@ -1314,7 +1314,7 @@ func FIntegerize(z Octa, r Round) (x Octa, exc int) {
 	} else {
 		xf = zf >> (1074 - ze)
 		if xf<<(1074-ze) != zf {
-			xf |= 1 // 끈끈이 비트
+			xf |= 1 // sticky bit
 		}
 	}
 
@@ -1459,7 +1459,7 @@ func FRoot(z Octa, r Round) (x Octa, exc int) {
 				}
 			}
 			if rf != 0 {
-				xf++ // 끈끈이 비트
+				xf++ // sticky bit
 			}
 			return fpack(xf, xe, false, r)
 
@@ -1481,7 +1481,7 @@ func FRemStep(y, z Octa, delta int) (x Octa, exc int) {
 //line mmixarith.w:808
 	case 4*nan + nan:
 		if y&(1<<51) == 0 {
-			exc |= IBit // |y|는 신호용이다
+			exc |= IBit // |y| is signaling
 		}
 		fallthrough
 	case 4*zro + nan, 4*num + nan, 4*inf + nan:
@@ -1506,7 +1506,7 @@ func FRemStep(y, z Octa, delta int) (x Octa, exc int) {
 	case 4*num + num:
 
 //line mmixarith.w:2336
-		odd := false // $y$에서 $z$의 홀수 배를 뺐으면 참이 된다
+		odd := false // becomes true if we've subtracted an odd multiple of~$z$ from $y$
 		zero, complement := false, false
 		thresh := max(ye-delta, ze)
 		for ye >= thresh {

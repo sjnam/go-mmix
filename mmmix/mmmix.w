@@ -91,10 +91,10 @@ if mx.io != nil {
 	mx.io.FlushAll()
 }
 if mx.hio != nil {
-	mx.hio.io.FlushAll() // 보충: 커널의 장치가 연 파일들
+	mx.hio.io.FlushAll() // supplement: files opened by the kernel's devices
 }
 if mx.blk != nil {
-	mx.blk.f.Close() // 보충: 디스크 이미지
+	mx.blk.f.Close() // supplement: the disk image
 }
 if r := recover(); r != nil {
 	e, ok := r.(exitSignal)
@@ -132,7 +132,7 @@ for n = 1; n < len(args) && len(args[n]) > 0 && args[n][0] == '-'; n++ {
 	} else if len(args[n]) > 2 && args[n][1] == 'd' {
 		diskFileName = args[n][2:]
 	} else {
-		argc = 0 // 모르는 선택 사항
+		argc = 0 // unknown option
 	}
 }
 if argc != n+2 {
@@ -174,18 +174,18 @@ const bufSize = 100
 
 @ @<|mmmix|의 지역 변수@>=
 var (
-	n, m       int              // 잠시 쓰는 정수
-	curLoc     Octa             // 현재 위치
-	curDat     Octa             // 현재 데이터
-	newChunk   bool             // 새 덩이를 찾아야 하는가?
-	buffer     [bufSize]byte    // 입력 줄
-	progFile   *cfile           // 프로그램 파일
-	silent     bool             // \.{-s}를 주었는가?
-	badAddress bool             // 현재 위치를 쓸 수 없는가?
-	bp         Octa = negOne    // 멈춤점
-	tmp        Octa             // 잠시 관심을 두는 옥타바이트
-	kernelFileName string       // 보충: \.{-k}로 준 커널 목적 파일
-	diskFileName   string       // 보충: \.{-d}로 준 디스크 이미지
+	n, m       int              // temporary integers
+	curLoc     Octa             // the current location
+	curDat     Octa             // the current data
+	newChunk   bool             // should we look for a new chunk?
+	buffer     [bufSize]byte    // input line
+	progFile   *cfile           // the program file
+	silent     bool             // was \.{-s} given?
+	badAddress bool             // is the current location unusable?
+	bp         Octa = negOne    // breakpoint
+	tmp        Octa             // an octabyte of temporary interest
+	kernelFileName string       // supplement: kernel object file given by \.{-k}
+	diskFileName   string       // supplement: disk image given by \.{-d}
 )
 
 @ 보충: 원본은 첫 널 문자가 줄의 처음에 있으면 |buffer[-1]|을 읽었다. 여기서는 그런 줄을 너무
@@ -290,7 +290,7 @@ for {
 		badAddress = true
 	} else {
 		badAddress = false
-		curLoc = curLoc>>61<<32 | curLoc&0xffffffff // 세그먼트마다 하찮은 사상 함수를 적용한다
+		curLoc = curLoc>>61<<32 | curLoc&0xffffffff // apply trivial mapping function for each segment
 	}
 	@<|curLoc|에서 시작하는 잇단 옥타바이트들을 입력한다@>
 }
@@ -369,19 +369,19 @@ if curLoc>>32 != 3 {
 mx.instPtr.o = mx.memRead(curLoc - 8*14) // \.{Main}
 mx.instPtr.p = nil
 curLoc = 0x60000000<<32 | curLoc&0xffffffff
-mx.g[255].o = curLoc - 8 // \.{UNSAVE}할 곳
+mx.g[255].o = curLoc - 8 // place to \.{UNSAVE}
 curDat = curDat&^0xffffffff | 0xf0
 if mx.memRead(curDat)>>32 != 0 {
-	mx.instPtr.o = curDat // |0xf0|이 0이 아니면 거기서 시작한다
+	mx.instPtr.o = curDat // start at |0xf0| if nonzero
 }
-mx.head.inst = UNSAVE<<24 + 255 // 만들어 낸 명령을 미리 가져온다
+mx.head.inst = UNSAVE<<24 + 255 // prefetch a fabricated command
 mx.tail = mx.prevFetch(mx.tail)
-mx.head.loc = mx.instPtr.o - 4 // \.{UNSAVE}가 가로막힐 경우에 대비한다
+mx.head.loc = mx.instPtr.o - 4 // in case the \.{UNSAVE} is interrupted
 mx.g[rT].o = 0x80000005<<32 | mx.g[rT].o&0xffffffff
 mx.g[rTT].o = 0x80000006<<32 | mx.g[rTT].o&0xffffffff
 @<원시적인 트랩 처리기들을 쓴다@>
 @<뼈대만 있는 페이지 테이블을 쓴다@>
-mx.g[rK].o = negOne // 인터럽트를 모두 허용한다
+mx.g[rK].o = negOne // enable all interrupts
 mx.g[rV].o = 0x369c2004<<32 | mx.g[rV].o&0xffffffff
 mx.pageBad, mx.pageR, mx.pageS = false, 4<<(32-13), 32
 mx.pageMask = mx.pageMask&^0xffffffff | 0xffffffff
@@ -390,29 +390,29 @@ mx.pageB[1], mx.pageB[2], mx.pageB[3], mx.pageB[4] = 3, 6, 9, 12
 @ @<원시적인 트랩 처리기들을...@>=
 curDat = Octa(RESUME<<24+1) << 32
 curLoc = 5 << 32
-mx.memWrite(curLoc, curDat) // 원시적인 트랩 처리기
+mx.memWrite(curLoc, curDat) // the primitive trap handler
 curDat = Octa(NEGI<<24+255<<16+1)<<32 | curDat>>32
 curLoc = 6<<32 | 8
-mx.memWrite(curLoc, curDat) // 원시적인 동적 트랩 처리기
+mx.memWrite(curLoc, curDat) // the primitive dynamic trap handler
 curDat = Octa(GET<<24+rQ)<<32 | Octa(PUTI<<24+rQ<<16)
 curLoc = 6 << 32
-mx.memWrite(curLoc, curDat) // 원시적인 동적 트랩 처리기의 나머지
+mx.memWrite(curLoc, curDat) // more of the primitive dynamic trap handler
 
 @ @<뼈대만 있는 페이지 테이블을...@>=
-curDat = 7 // \.{rwx} 허가를 가진 PTE를 만든다
-curLoc = 4 << 32 // 뼈대 페이지 테이블의 처음
-mx.memWrite(curLoc, curDat) // 텍스트 세그먼트의 PTE
+curDat = 7 // generate a PTE with \.{rwx} permission
+curLoc = 4 << 32 // beginning of skeleton page table
+mx.memWrite(curLoc, curDat) // PTE for the text segment
 mx.ITcache.set[0][0].tag = 0
-mx.ITcache.set[0][0].data[0] = curDat // IT 캐시에 마중물을 붓는다
-curDat = 1<<32 | 6 // 읽기와 쓰기 허가만 가진 PTE
+mx.ITcache.set[0][0].data[0] = curDat // prime the IT cache
+curDat = 1<<32 | 6 // PTE with read and write permission only
 curLoc = 4<<32 | 3<<13
-mx.memWrite(curLoc, curDat) // 데이터 세그먼트의 PTE
+mx.memWrite(curLoc, curDat) // PTE for the data segment
 curDat = 2<<32 | 6
 curLoc = 4<<32 | 6<<13
-mx.memWrite(curLoc, curDat) // 풀 세그먼트의 PTE
+mx.memWrite(curLoc, curDat) // PTE for the pool segment
 curDat = 3<<32 | 6
 curLoc = 4<<32 | 9<<13
-mx.memWrite(curLoc, curDat) // 스택 세그먼트의 PTE
+mx.memWrite(curLoc, curDat) // PTE for the stack segment
 
 @* 커널 싣기. 보충: 이 장은 옮긴이가 덧붙인 것이다. 크누스가 만들지 않은 \NNIX\ 대신에 쓸
 작은 커널을 저장소의 \.{nnix/nnix.mms}에 두었다. 이 커널은 rT와 rTT에 진짜 처리기를 두고,
@@ -446,7 +446,7 @@ if kernelFileName != "" {
 }
 
 @ @<상수@>=
-const kernelBoot = 0x8000000500000000 // 커널이 시작하는 곳
+const kernelBoot = 0x8000000500000000 // where the kernel starts
 
 @ 디스크 이미지는 읽고 쓰기로 연다. 블록 수는 파일의 크기로 정한다.
 
@@ -466,19 +466,19 @@ mx.blk = &blk{mx: mx, f: f, nblk: Octa(st.Size() / blkSize)}
 
 @<상수@>=
 const (
-	mm       = 0x98 // \.{mmo} 형식의 탈출 코드
-	lopQuote = 0x0  // 인용 lopcode
-	lopLoc   = 0x1  // 위치 lopcode
-	lopSkip  = 0x2  // 건너뛰기 lopcode
-	lopFixo  = 0x3  // 옥타바이트 고치기 lopcode
-	lopFixr  = 0x4  // 상대 주소 고치기 lopcode
-	lopFixrx = 0x5  // 확장된 상대 주소 고치기 lopcode
-	lopFile  = 0x6  // 파일 이름 lopcode
-	lopLine  = 0x7  // 파일 위치 lopcode
-	lopPre   = 0x9  // 서문 lopcode
-	lopPost  = 0xa  // 후기 lopcode
-	lopStab  = 0xb  // 기호표 lopcode
-	lopEnd   = 0xc  // 모든 것을 끝내는 lopcode
+	mm       = 0x98 // the escape code of the \.{mmo} format
+	lopQuote = 0x0  // the quotation lopcode
+	lopLoc   = 0x1  // the location lopcode
+	lopSkip  = 0x2  // the skip lopcode
+	lopFixo  = 0x3  // the octabyte-fix lopcode
+	lopFixr  = 0x4  // the relative-fix lopcode
+	lopFixrx = 0x5  // extended relative-fix lopcode
+	lopFile  = 0x6  // the file name lopcode
+	lopLine  = 0x7  // the file position lopcode
+	lopPre   = 0x9  // the preamble lopcode
+	lopPost  = 0xa  // the postamble lopcode
+	lopStab  = 0xb  // the symbol table lopcode
+	lopEnd   = 0xc  // the end-it-all lopcode
 )
 
 @ 함수 |kernelTet|는 큰 쪽 먼저로 테트라바이트 하나를 읽는다. 파일이 잘렸으면 끝낸다.
@@ -525,7 +525,7 @@ func (mx *machine) kernelLoad(loc Octa, t Tetra, xor bool) {
 		panic(exitSignal(-5))
 	}
 	a := (loc - signBit) &^ 7
-	s := 32 * (^loc >> 2 & 1) // 윗 테트라면 32
+	s := 32 * (^loc >> 2 & 1) // 32 if the upper tetra
 	o := mx.memRead(a)
 	if xor {
 		o ^= Octa(t) << s
@@ -551,7 +551,7 @@ if t>>16 != mm<<8|lopPre || t>>8&0xff != 1 {
 	mx.kernelErr(kernelFileName)
 }
 for j := t & 0xff; j > 0; j-- {
-	mx.kernelTet(kf, kernelFileName) // 파일을 만든 시각
+	mx.kernelTet(kf, kernelFileName) // the time the file was created
 }
 curLoc = 0
 items:
@@ -589,7 +589,7 @@ case lopFixo:
 	continue items
 case lopFile:
 	for j := t & 0xff; j > 0; j-- {
-		mx.kernelTet(kf, kernelFileName) // 파일 이름
+		mx.kernelTet(kf, kernelFileName) // the file name
 	}
 	continue items
 case lopLine:
@@ -744,9 +744,9 @@ case '@@':
 	mx.instPtr.o = readHex(buffer[1:])
 	@<새 명령 포인터를 정한다@>
 case 'k':
-	mx.instPtr.o ^= 0x80000000 << 32 // 커널 방식으로 가는 지름길
+	mx.instPtr.o ^= 0x80000000 << 32 // shortcut to kernel mode
 	if Tetra(mx.ticks) == 0 && mx.head != nil {
-		mx.head.loc ^= 0x80000000 << 32 // \.{UNSAVE}의 위치를 고친다
+		mx.head.loc ^= 0x80000000 << 32 // fix the \.{UNSAVE} loc
 	}
 	@<새 명령 포인터를...@>
 case 'b':
@@ -756,7 +756,7 @@ case 'v':
 
 @ @<새 명령 포인터를...@>=
 if mx.instPtr.o&signBit != 0 {
-	mx.g[rK].o &^= 1 << 32 // |pBit|의 인터럽트를 끈다
+	mx.g[rK].o &^= 1 << 32 // disable interrupts on |pBit|
 }
 mx.instPtr.p = nil
 
@@ -841,7 +841,7 @@ case 'g':
 		n = int(v)
 	}
 	if n == rO || n == rS {
-		if mx.hot == mx.cool { // 파이프라인이 비어 있다
+		if mx.hot == mx.cool { // pipeline empty
 			mx.g[rO].o, mx.g[rS].o = mx.coolO<<3, mx.coolS<<3
 		} else {
 			mx.g[rO].o, mx.g[rS].o = mx.hot.curO<<3, mx.hot.curS<<3
@@ -923,10 +923,10 @@ case '!':
 
 @<타입 정의@>=
 type cfile struct {
-	f   *os.File      // 읽는 파일; 표준 입력이면 |nil|
-	r   *bufio.Reader // 읽기 버퍼
-	pos int64         // |ftell|이 돌려줄 위치
-	eof bool          // 파일 끝 표시(|feof|)
+	f   *os.File      // the file being read; |nil| if standard input
+	r   *bufio.Reader // read buffer
+	pos int64         // position that |ftell| would return
+	eof bool          // end-of-file indicator (|feof|)
 }
 
 @ @<함수들@>=
@@ -1018,7 +1018,7 @@ func sscanfD(b []byte) (int32, bool) {
 	if j == i {
 		return 0, false
 	}
-	v, _ := strconv.ParseInt(string(s[:j]), 10, 64) // 넘치면 끝값에서 멈춘다
+	v, _ := strconv.ParseInt(string(s[:j]), 10, 64) // saturates on overflow
 	return int32(v), true
 }
 
@@ -1883,7 +1883,7 @@ run := func(args ...string) (string, int) {
 		t.Fatalf("io %v: %q", args, out)
 	}
 	fmt.Sscanf(out[j:], "Halted at time %d", &n)
-	return out[i+7 : j], n // 프로그램이 찍은 것
+	return out[i+7 : j], n // what the program printed
 }
 outB, both := run()
 outR, reader := run("r")
@@ -1902,7 +1902,7 @@ func TestKernelErrors(t *testing.T) {
 	if err := os.WriteFile(bad, []byte("not an object file"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	pos := filepath.Join(dir, "pos.mmo") // 위치가 양수인 테트라 하나
+	pos := filepath.Join(dir, "pos.mmo") // one tetra whose location is positive
 	if err := os.WriteFile(pos, []byte{0x98, 9, 1, 0, 0x98, 1, 0, 1, 0, 0, 1, 0,
 		0xe3, 0, 0, 1}, 0o644); err != nil {
 		t.Fatal(err)

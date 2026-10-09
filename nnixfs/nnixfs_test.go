@@ -20,7 +20,7 @@ func TestRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	img := filepath.Join(dir, "disk.img")
 	big := filepath.Join(dir, "big.txt")
-	data := []byte(strings.Repeat("0123456789abcdef", 160)) // 2560바이트, 블록 셋
+	data := []byte(strings.Repeat("0123456789abcdef", 160)) // 2560 bytes, three blocks
 
 //line nnixfs.w:394
 	os.WriteFile(big, data, 0o644)
@@ -72,7 +72,7 @@ func TestErrors(t *testing.T) {
 	img := filepath.Join(dir, "disk.img")
 	run(t, "mkfs", img, "16")
 	notfs := filepath.Join(dir, "notfs")
-	os.WriteFile(notfs, make([]byte, 20*1024), 0o644) // 데이터 영역(10KB)보다 크다
+	os.WriteFile(notfs, make([]byte, 20*1024), 0o644) // larger than the data area (10KB)
 	for _, c := range []struct {
 		args []string
 		err  string

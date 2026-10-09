@@ -677,7 +677,7 @@ func TestKernelSleep(t *testing.T) {
 			t.Fatalf("io %v: %q", args, out)
 		}
 		fmt.Sscanf(out[j:], "Halted at time %d", &n)
-		return out[i+7 : j], n // 프로그램이 찍은 것
+		return out[i+7 : j], n // what the program printed
 	}
 	outB, both := run()
 	outR, reader := run("r")
@@ -697,7 +697,7 @@ func TestKernelErrors(t *testing.T) {
 	if err := os.WriteFile(bad, []byte("not an object file"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	pos := filepath.Join(dir, "pos.mmo") // 위치가 양수인 테트라 하나
+	pos := filepath.Join(dir, "pos.mmo") // one tetra whose location is positive
 	if err := os.WriteFile(pos, []byte{0x98, 9, 1, 0, 0x98, 1, 0, 1, 0, 0, 1, 0,
 		0xe3, 0, 0, 1}, 0o644); err != nil {
 		t.Fatal(err)

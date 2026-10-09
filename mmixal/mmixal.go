@@ -23,118 +23,118 @@ type (
 type assembler struct {
 
 //line mmixal.w:839
-	buffer      []byte // 현재 줄의 날 입력
-	bufPtr      int    // |buffer| 안의 현재 위치
-	labField    []byte // 현재 명령의 레이블 필드 사본
-	opField     []byte // 현재 명령의 연산 코드 필드 사본
-	operandList []byte // 현재 명령의 피연산자 필드 사본(널 문자로 끝난다)
+	buffer      []byte // raw input of the current line
+	bufPtr      int    // current position within |buffer|
+	labField    []byte // copy of the label field of the current instruction
+	opField     []byte // copy of the opcode field of the current instruction
+	operandList []byte // copy of the operand field of the current instruction (null-terminated)
 
 //line mmixal.w:914
-	curFile          int  // |filename|에서 현재 파일의 색인
-	lineNo           int  // 파일 안의 현재 위치
-	lineListed       bool // 버퍼 내용을 목록에 적었는가?
-	longWarningGiven bool // \.{-b}에 대한 힌트를 주었는가?
+	curFile          int  // index of the current file in |filename|
+	lineNo           int  // current position in the file
+	lineListed       bool // have we listed the buffer contents?
+	longWarningGiven bool // have we given the hint about \.{-b}?
 
 //line mmixal.w:923
-	filename []string // 줄 지시문에 나온 것까지 포함한 소스 파일 이름들
+	filename []string // source file names, including those in line directives
 
 //line mmixal.w:1011
-	curLoc      Octa    // 어셈블된 출력의 현재 위치
-	listingLoc  Octa    // 목록의 현재 위치
-	holdBuf     [4]byte // 어셈블된 바이트들
-	heldBits    byte    // |holdBuf|의 어느 바이트가 살아 있는가?
-	listingBits byte    // 그 가운데 어느 것을 아직 목록에 적지 않았는가?
-	specMode    bool    // \.{BSPEC}과 \.{ESPEC} 사이에 있는가?
-	specModeLoc Tetra   // 현재 특수 출력의 바이트 수
+	curLoc      Octa    // current location of assembled output
+	listingLoc  Octa    // current location on the listing
+	holdBuf     [4]byte // assembled bytes
+	heldBits    byte    // which bytes of |holdBuf| are active?
+	listingBits byte    // which of them haven't been listed yet?
+	specMode    bool    // are we between \.{BSPEC} and \.{ESPEC}?
+	specModeLoc Tetra   // number of bytes in the current special output
 
 //line mmixal.w:1146
-	errCount int // 찾아낸 오류의 수
+	errCount int // this many errors were found
 
 //line mmixal.w:1193
-	mmoBuf [4]byte // 출력을 기다리는 테트라바이트
-	mmoPtr int     // 기호표를 출력하면서 센 바이트 수
+	mmoBuf [4]byte // tetrabyte waiting to be output
+	mmoPtr int     // bytes counted while outputting the symbol table
 
 //line mmixal.w:1292
-	mmoCurLoc      Octa      // 목적 파일의 현재 위치
-	mmoLineNo      int       // 지금까지 \.{mmo} 출력의 현재 줄 번호
-	mmoCurFile     int       // 지금까지 \.{mmo} 출력의 현재 파일 색인
-	filenamePassed [256]bool // 파일 이름을 출력에 기록했는가?
+	mmoCurLoc      Octa      // current location in the object file
+	mmoLineNo      int       // current line number in the \.{mmo} output so far
+	mmoCurFile     int       // index of the current file in the \.{mmo} output so far
+	filenamePassed [256]bool // has a filename been recorded in the output?
 
 //line mmixal.w:1374
-	trieRoot  *trieNode // 트라이의 뿌리
-	opRoot    *trieNode // 연산 코드들의 부분 트라이의 뿌리
-	curPrefix *trieNode // 한정되지 않은 기호들의 부분 트라이의 뿌리
+	trieRoot  *trieNode // root of the trie
+	opRoot    *trieNode // root of subtrie for opcodes
+	curPrefix *trieNode // root of subtrie for unqualified symbols
 
 //line mmixal.w:1473
 	serialNumber int
 
 //line mmixal.w:1936
-	symBuf []byte // 가운데 가지를 따라 모은 기호의 문자들
+	symBuf []byte // the characters of a symbol, gathered along middle branches
 
 //line mmixal.w:2054
-	opStack  []stackOp // 처리를 기다리는 연산자들의 스택
-	opPtr    int       // |opStack|에 있는 항목의 수
-	valStack []valNode // 처리를 기다리는 피연산자들의 스택
-	valPtr   int       // |valStack|에 있는 항목의 수
-	rtOp     stackOp   // 새로 읽은 연산자
+	opStack  []stackOp // stack for pending operators
+	opPtr    int       // number of items on |opStack|
+	valStack []valNode // stack for pending operands
+	valPtr   int       // number of items on |valStack|
+	rtOp     stackOp   // newly scanned operator
 
 //line mmixal.w:2239
 	forwardLocalHost, backwardLocalHost [10]trieNode
 	forwardLocal, backwardLocal         [10]symNode
 
 //line mmixal.w:2676
-	opcode Tetra // \MMIX\ 연산이나 \MMIXAL\ 유사 연산의 수로 된 코드
-	opBits Tetra // 연산자의 특별한 성질을 나타내는 플래그들
+	opcode Tetra // numeric code for \MMIX\ operation or \MMIXAL\ pseudo-op
+	opBits Tetra // flags describing an operator's special characteristics
 
 //line mmixal.w:3040
-	z, y, x, yz, xyz Tetra // 어셈블할 조각들
-	futureBits       int   // 앞선 참조가 있는 자리들
+	z, y, x, yz, xyz Tetra // pieces for assembly
+	futureBits       int   // places where there are future references
 
 //line mmixal.w:3386
-	gregVal [256]Octa // 전역 레지스터의 처음 값들
+	gregVal [256]Octa // initial values of global registers
 
 //line mmixal.w:3585
-	stderr      io.Writer     // 오류 메시지를 쓰는 곳
-	srcFileName string        // \MMIXAL\ 입력 파일의 이름
-	objFileName string        // 이진 출력 파일의 이름
-	listingName string        // 목록 파일의 이름(있다면)
-	srcFile     *bufio.Reader // 입력 파일
-	objFile     *bufio.Writer // 이진 출력 파일
-	listingFile *bufio.Writer // 목록 파일; 없으면 |nil|
-	expanding   bool          // 기준 주소가 모자랄 때 명령을 펼치는가?
-	bufSize     int           // 입력 한 줄의 최대 문자 수
+	stderr      io.Writer     // where error messages are written
+	srcFileName string        // name of the \MMIXAL\ input file
+	objFileName string        // name of the binary output file
+	listingName string        // name of the optional listing file
+	srcFile     *bufio.Reader // the input file
+	objFile     *bufio.Writer // the binary output file
+	listingFile *bufio.Writer // the listing file; |nil| if none
+	expanding   bool          // are we expanding instructions when base address fail?
+	bufSize     int           // maximum number of characters per line of input
 
 //line mmixal.w:3628
-	greg    int // 전역 레지스터 할당기
-	curGreg int // 방금 할당한 전역 레지스터
-	lreg    int // 지역 레지스터 할당기
+	greg    int // global register allocator
+	curGreg int // global register just allocated
+	lreg    int // local register allocator
 
 //line mmixal.w:836
 }
 
 //line mmixal.w:1103
-type bypassSignal struct{} // 현재 명령의 나머지를 건너뛰라는 신호
-type fatalSignal struct{}  // 어셈블을 끝내라는 신호
+type bypassSignal struct{} // a signal to skip the rest of the current instruction
+type fatalSignal struct{}  // a signal to end the assembly
 
 //line mmixal.w:1363
 type trieNode struct {
-	ch               uint16    // 여기 저장된 (와이드일 수도 있는) 문자
-	left, mid, right *trieNode // 삼진 트라이의 아래쪽으로
-	sym              *symNode  // 기호의 등가
+	ch               uint16    // the (possibly wyde) character stored here
+	left, mid, right *trieNode // downward in a ternary trie
+	sym              *symNode  // equivalents of symbols
 }
 
 //line mmixal.w:1438
 type symNode struct {
-	serial int      // 기호의 일련번호; 고침 마디에서는 종류 번호
-	link   *symNode // |defined| 따위의 상태, 또는 고침 마디로의 연결
-	equiv  Octa     // 등가
+	serial int      // serial number of symbol; type number for fixups
+	link   *symNode // |defined| status or link to fixup
+	equiv  Octa     // the equivalent value
 }
 
 //line mmixal.w:1522
 type opSpec struct {
-	name string // 기호로 된 연산 코드
-	code Tetra  // 수로 된 연산 코드
-	bits Tetra  // 피연산자를 다루는 방법
+	name string // symbolic opcode
+	code Tetra  // numeric opcode
+	bits Tetra  // treatment of operands
 }
 
 //line mmixal.w:1688
@@ -154,29 +154,29 @@ type stat int
 
 //line mmixal.w:2002
 type valNode struct {
-	equiv  Octa      // 현재 값
-	link   *trieNode // 기호의 트라이 참조
+	equiv  Octa      // current value
+	link   *trieNode // trie reference for symbol
 	status stat      // |pure|, |regVal|, |undefined|
 }
 
 //line mmixal.w:568
-const mm = 0x98 // 적재기 명령의 탈출 코드
+const mm = 0x98 // the escape code of loader commands
 
 //line mmixal.w:750
 const (
-	lopQuote = 0x0 // 인용 lopcode
-	lopLoc   = 0x1 // 위치 lopcode
-	lopSkip  = 0x2 // 건너뛰기 lopcode
-	lopFixo  = 0x3 // 옥타바이트 고치기 lopcode
-	lopFixr  = 0x4 // 상대 주소 고치기 lopcode
-	lopFixrx = 0x5 // 확장된 상대 주소 고치기 lopcode
-	lopFile  = 0x6 // 파일 이름 lopcode
-	lopLine  = 0x7 // 파일 위치 lopcode
-	lopSpec  = 0x8 // 특수 고리(hook) lopcode
-	lopPre   = 0x9 // 서문 lopcode
-	lopPost  = 0xa // 후기 lopcode
-	lopStab  = 0xb // 기호표 lopcode
-	lopEnd   = 0xc // 모든 것을 끝내는 lopcode
+	lopQuote = 0x0 // the quotation lopcode
+	lopLoc   = 0x1 // the location lopcode
+	lopSkip  = 0x2 // the skip lopcode
+	lopFixo  = 0x3 // the octabyte-fix lopcode
+	lopFixr  = 0x4 // the relative-fix lopcode
+	lopFixrx = 0x5 // extended relative-fix lopcode
+	lopFile  = 0x6 // the file name lopcode
+	lopLine  = 0x7 // the file position lopcode
+	lopSpec  = 0x8 // the special hook lopcode
+	lopPre   = 0x9 // the preamble lopcode
+	lopPost  = 0xa // the postamble lopcode
+	lopStab  = 0xb // the symbol table lopcode
+	lopEnd   = 0xc // the end-it-all lopcode
 )
 
 //line mmixal.w:970
@@ -184,33 +184,33 @@ const filenameMax = 1024
 
 //line mmixal.w:1452
 const (
-	fixO   = 0 // 옥타바이트 고침의 |serial| 코드
-	fixYZ  = 1 // 상대 주소 고침의 |serial| 코드
-	fixXYZ = 2 // \.{JMP} 고침의 |serial| 코드
+	fixO   = 0 // |serial| code for octabyte fixup
+	fixYZ  = 1 // |serial| code for relative fixup
+	fixXYZ = 2 // |serial| code for \.{JMP} fixup
 )
 
 //line mmixal.w:1495
 const (
-	relAddrBit  = 0x1      // YZ나 XYZ가 상대 주소인가?
-	immedBit    = 0x2      // Z나 YZ가 레지스터가 아니면 즉치 연산 코드로 할까?
-	zarBit      = 0x4      // Z의 레지스터 상태를 무시할까?
-	zrBit       = 0x8      // Z는 레지스터여야 하는가?
-	yarBit      = 0x10     // Y의 레지스터 상태를 무시할까?
-	yrBit       = 0x20     // Y는 레지스터여야 하는가?
-	xarBit      = 0x40     // X의 레지스터 상태를 무시할까?
-	xrBit       = 0x80     // X는 레지스터여야 하는가?
-	yzarBit     = 0x100    // YZ의 레지스터 상태를 무시할까?
-	yzrBit      = 0x200    // YZ는 레지스터여야 하는가?
-	xyzarBit    = 0x400    // XYZ의 레지스터 상태를 무시할까?
-	xyzrBit     = 0x800    // XYZ는 레지스터여야 하는가?
-	oneArgBit   = 0x1000   // 피연산자가 없거나 하나여도 되는가?
-	twoArgBit   = 0x2000   // 피연산자가 정확히 둘이어도 되는가?
-	threeArgBit = 0x4000   // 피연산자가 정확히 셋이어도 되는가?
-	manyArgBit  = 0x8000   // 피연산자가 셋보다 많아도 되는가?
-	alignBits   = 0x30000  // 얼마나 맞출까: 바이트, 와이드, 테트라, 옥타?
-	noLabelBit  = 0x40000  // 레이블이 비어 있어야 하는가?
-	memBit      = 0x80000  // YZ는 메모리 참조여야 하는가?
-	specBit     = 0x100000 // 이 연산 코드를 \.{SPEC} 모드에서 쓸 수 있는가?
+	relAddrBit  = 0x1      // is YZ or XYZ relative?
+	immedBit    = 0x2      // should opcode be immediate if Z or YZ not register?
+	zarBit      = 0x4      // should register status of Z be ignored?
+	zrBit       = 0x8      // must Z be a register?
+	yarBit      = 0x10     // should register status of Y be ignored?
+	yrBit       = 0x20     // must Y be a register?
+	xarBit      = 0x40     // should register status of X be ignored?
+	xrBit       = 0x80     // must X be a register?
+	yzarBit     = 0x100    // should register status of YZ be ignored?
+	yzrBit      = 0x200    // must YZ be a register?
+	xyzarBit    = 0x400    // should register status of XYZ be ignored?
+	xyzrBit     = 0x800    // must XYZ be a register?
+	oneArgBit   = 0x1000   // is it OK to have zero or one operand?
+	twoArgBit   = 0x2000   // is it OK to have exactly two operands?
+	threeArgBit = 0x4000   // is it OK to have exactly three operands?
+	manyArgBit  = 0x8000   // is it OK to have more than three operands?
+	alignBits   = 0x30000  // how much alignment: byte, wyde, tetra, or octa?
+	noLabelBit  = 0x40000  // should the label be blank?
+	memBit      = 0x80000  // must YZ be a memory reference?
+	specBit     = 0x100000 // is this opcode allowed in \.{SPEC} mode?
 )
 
 //line mmixal.w:1529
@@ -285,9 +285,9 @@ const (
 
 //line mmixal.w:1445
 var (
-	defined    = new(symNode) // 옥타바이트 등가를 뜻하는 코드
-	register   = new(symNode) // 레지스터 번호 등가를 뜻하는 코드
-	predefined = new(symNode) // 아직 쓰이지 않은 미리 정의된 등가를 뜻하는 코드
+	defined    = new(symNode) // code value for octabyte equivalents
+	register   = new(symNode) // code value for register-number equivalents
+	predefined = new(symNode) // code value for not-yet-used predefined equivalents
 )
 
 //line mmixal.w:1558
@@ -598,12 +598,12 @@ func (a *assembler) mmoByte(b byte) {
 	}
 }
 
-func (a *assembler) mmoLop(x, y, z byte) { // 적재기 연산을 출력한다
+func (a *assembler) mmoLop(x, y, z byte) { // output a loader operation
 	a.mmoBuf = [4]byte{mm, x, y, z}
 	a.mmoOut()
 }
 
-func (a *assembler) mmoLopp(x byte, yz uint16) { // 두 바이트 피연산자를 가진 적재기 연산
+func (a *assembler) mmoLopp(x byte, yz uint16) { // output a loader operation with two-byte operand
 	a.mmoBuf = [4]byte{mm, x, byte(yz >> 8), byte(yz)}
 	a.mmoOut()
 }
@@ -819,7 +819,7 @@ func (a *assembler) outStab(t *trieNode) {
 			x := h
 			if h&0xffff0000 == 0x20000000 {
 				m += 8
-				x = h - 0x20000000 // 데이터 세그먼트
+				x = h - 0x20000000 // data segment
 			}
 			if x != 0 {
 				m += 4
@@ -840,7 +840,7 @@ func (a *assembler) outStab(t *trieNode) {
 //line mmixal.w:1958
 			c := byte(t.ch)
 			if m&0x80 != 0 {
-				c = '?' // 유니코드? 아직 아니다
+				c = '?' // Unicode? not yet
 			}
 			fmt.Fprintf(a.stderr, "undefined symbol: %s\n", string(append(a.symBuf, c))[1:])
 
@@ -864,7 +864,7 @@ func (a *assembler) outStab(t *trieNode) {
 		}
 		a.mmoByte(byte(t.ch))
 		if m&0x80 != 0 {
-			a.symBuf = append(a.symBuf, '?') // 유니코드? 아직 아니다
+			a.symBuf = append(a.symBuf, '?') // Unicode? not yet
 		} else {
 			a.symBuf = append(a.symBuf, byte(t.ch))
 		}
@@ -966,18 +966,18 @@ func scanInt(s string) (int, bool) {
 //line mmixal.w:3426
 func mmixal(args []string, stderr io.Writer, now int64) (code int) {
 	a := &assembler{stderr: stderr, greg: 255, lreg: 32}
-	var j, k int // 두루 쓰는 정수들
+	var j, k int // all-purpose integers
 	var files []*os.File
 
 //line mmixal.w:978
-	var p int // 지금 훑고 있는 곳
+	var p int // the place where we're currently scanning
 
 //line mmixal.w:1669
 	var tt *trieNode
 	var pp, qq *symNode
 
 //line mmixal.w:2070
-	var acc Octa // 임시 누산기
+	var acc Octa // temporary accumulator
 
 //line mmixal.w:3431
 	defer func() {
@@ -1165,7 +1165,7 @@ options:
 		a.lineListed = false
 		j = cstrlen(a.buffer)
 		if j > 0 && a.buffer[j-1] == '\n' {
-			a.buffer[j-1] = 0 // 줄바꿈 문자를 없앤다
+			a.buffer[j-1] = 0 // remove the newline
 		} else if c, err := a.srcFile.ReadByte(); err == nil {
 
 //line mmixal.w:899
@@ -1204,7 +1204,7 @@ options:
 					a.fatal("Capacity exceeded: File name too long")
 
 				}
-				if a.buffer[p] == '"' && a.buffer[p-1] != '"' { // 그렇다, 줄 지시문이다
+				if a.buffer[p] == '"' && a.buffer[p-1] != '"' { // yes, it's a line directive
 
 //line mmixal.w:954
 					for k = 0; k < len(a.filename) && a.filename[k] != string(name); k++ {
@@ -1237,7 +1237,7 @@ options:
 					}
 				}()
 				p = a.bufPtr
-				a.bufPtr = len(a.buffer) - 1 // 빈 문자열
+				a.bufPtr = len(a.buffer) - 1 // empty string
 
 //line mmixal.w:2619
 				if a.buffer[p] == 0 {
@@ -1246,7 +1246,7 @@ options:
 				a.labField = a.labField[:0]
 				if !isSpace(a.buffer[p]) {
 					if !isDigit(a.buffer[p]) && !isLetter(a.buffer[p]) {
-						return // 주석
+						return // comment
 					}
 					for isDigit(a.buffer[p]) || isLetter(a.buffer[p]) {
 						a.labField = append(a.labField, a.buffer[p])
@@ -1343,10 +1343,10 @@ options:
 				if a.buffer[p] == ';' {
 					p++
 				} else {
-					p = len(a.buffer) - 1 // 쌍반점이 뒤따르지 않으면 줄의 나머지는 주석이다
+					p = len(a.buffer) - 1 // if not followed by semicolon, rest of the line is a comment
 				}
 				if len(a.operandList) == 0 {
-					a.operandList = append(a.operandList, '0') // 빈 피연산자 필드를 `\.0'으로 바꾼다
+					a.operandList = append(a.operandList, '0') // change empty operand field to `\.0'
 				}
 				a.operandList = append(a.operandList, 0)
 
@@ -1372,8 +1372,8 @@ options:
 
 //line mmixal.w:2095
 				p = 0
-				a.valPtr = 0                       // |valStack|은 비었다
-				a.opStack[0], a.opPtr = outerLP, 1 // |opStack|에는 ``바깥 왼쪽 괄호''가 있다
+				a.valPtr = 0                       // |valStack| is empty
+				a.opStack[0], a.opPtr = outerLP, 1 // |opStack| contains an ``outer left parenthesis''
 			scan:
 				for {
 
@@ -1593,7 +1593,7 @@ options:
 							default:
 
 //line mmixal.w:2181
-								if p == 1 { // 피연산자 목록을 빈 것으로 취급한다
+								if p == 1 { // treat operand list as empty
 									a.operandList[0], a.operandList[1], p = '0', 0, 0
 									continue open
 								}
@@ -1681,7 +1681,7 @@ options:
 									if a.operandList[p-1] == 0 {
 										break scan
 									}
-									a.rtOp = outerLP // 반점
+									a.rtOp = outerLP // comma
 									break reduce
 
 //line mmixal.w:2393
@@ -2216,7 +2216,7 @@ options:
 
 							}
 						} else if a.opBits&immedBit != 0 {
-							a.opcode++ // 즉치
+							a.opcode++ // immediate
 						} else if a.opBits&zrBit != 0 {
 							a.derr("*Z field of `%s' should be a register number", a.opField)
 						}
@@ -2316,11 +2316,11 @@ options:
 									case 0:
 										a.yz = Tetra(o>>48) & 0xffff // \.{SETH}
 									case 1:
-										a.yz = Tetra(o>>32) & 0xffff // \.{SETMH} 또는 \.{ORMH}
+										a.yz = Tetra(o>>32) & 0xffff // \.{SETMH} or \.{ORMH}
 									case 2:
-										a.yz = Tetra(o>>16) & 0xffff // \.{SETML} 또는 \.{ORML}
+										a.yz = Tetra(o>>16) & 0xffff // \.{SETML} or \.{ORML}
 									case 3:
-										a.yz = Tetra(o) & 0xffff // \.{SETL} 또는 \.{ORL}
+										a.yz = Tetra(o) & 0xffff // \.{SETL} or \.{ORL}
 									}
 									if a.yz != 0 || j == SETL {
 										a.assemble(4, Tetra(j<<24)+255<<16+a.yz, 0)
@@ -2347,10 +2347,10 @@ options:
 								}
 								if a.opcode == SET {
 									v.equiv <<= 8
-									a.opcode = 0xc1 // \.{OR}로 바꾼다
+									a.opcode = 0xc1 // change to \.{OR}
 								} else if a.opBits&memBit != 0 {
 									v.equiv <<= 8
-									a.opcode++ // 조용히 \.{,0}을 덧붙인다
+									a.opcode++ // silently append \.{,0}
 								}
 
 //line mmixal.w:3129
@@ -2358,9 +2358,9 @@ options:
 
 //line mmixal.w:3157
 								if a.opcode == SET {
-									a.opcode = 0xe3 // \.{SETL}로 바꾼다
+									a.opcode = 0xe3 // change to \.{SETL}
 								} else if a.opBits&immedBit != 0 {
-									a.opcode++ // 즉치
+									a.opcode++ // immediate
 								} else if a.opBits&yzrBit != 0 {
 									a.derr("*YZ field of `%s' should be a register number", a.opField)
 								}
@@ -2440,7 +2440,7 @@ options:
 
 						}
 					} else if a.opBits&immedBit != 0 {
-						a.opcode++ // 즉치
+						a.opcode++ // immediate
 					} else if a.opBits&zrBit != 0 {
 						a.derr("*Z field of `%s' should be a register number", a.opField)
 					}
@@ -2530,7 +2530,7 @@ options:
 	}
 
 //line mmixal.w:1971
-	a.opRoot.mid = nil // 연산 코드들을 모두 없앤다
+	a.opRoot.mid = nil // annihilate all the opcodes
 	prune(a.trieRoot)
 	a.symBuf = a.symBuf[:0]
 	if a.listingFile != nil {

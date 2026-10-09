@@ -13,18 +13,18 @@ import (
 
 //line mmixpipe.w:279
 type (
-	Tetra = mmixarith.Tetra // 부호 없는 32비트 정수
-	Octa  = mmixarith.Octa  // 두 테트라바이트가 모여 옥타바이트를 이룬다
+	Tetra = mmixarith.Tetra // an unsigned 32-bit integer
+	Octa  = mmixarith.Octa  // two tetrabytes make one octabyte
 )
 
 //line mmixpipe.w:342
 type coroutine struct {
-	name    string     // 코루틴의 기호 이름
-	stage   int        // 그 순위
-	next    *coroutine // 그다음 것
-	lockloc *lockvar   // 그것이 잠그고 있을지 모르는 것
-	ctl     *control   // 그 데이터
-	succ    *coroutine // 원본의 |self+1|
+	name    string     // symbolic identification of a coroutine
+	stage   int        // its rank
+	next    *coroutine // its successor
+	lockloc *lockvar   // what it might be locking
+	ctl     *control   // its data
+	succ    *coroutine // the original's |self+1|
 }
 
 //line mmixpipe.w:483
@@ -41,57 +41,57 @@ type specnode struct {
 	known    bool
 	addr     Octa
 	up, down *specnode
-	ctl      *control // 이 \KW{specnode}를 담은 제어 블록
+	ctl      *control // the control block containing this \KW{specnode}
 }
 
 //line mmixpipe.w:612
 type control struct {
-	loc             Octa // 명령이 나온 가상 주소
-	op              int  // 원래의 명령 바이트들
+	loc             Octa // virtual address where an instruction originated
+	op              int  // the original instruction bytes
 	xx, yy, zz      byte
-	y, z, b, ra     spec       // 입력
-	x, a, goLoc, rl specnode   // 출력
-	owner           *coroutine // 이것을 |ctl|로 가진 코루틴
-	i               int        // 내부 연산 코드
-	state           int        // 내부 마음가짐
+	y, z, b, ra     spec       // inputs
+	x, a, goLoc, rl specnode   // outputs
+	owner           *coroutine // a coroutine whose |ctl| this is
+	i               int        // internal opcode
+	state           int        // internal mindset
 
 //line mmixpipe.w:634
-	usage      bool // rU를 늘려야 하는가?
-	needB      bool // |b.p==nil|이 될 때까지 멈추어야 하는가?
-	needRA     bool // |ra.p==nil|이 될 때까지 멈추어야 하는가?
-	renX       bool // |x|가 이름 바꾸기 레지스터에 해당하는가?
-	memX       bool // |x|가 메모리 쓰기에 해당하는가?
-	renA       bool // |a|가 이름 바꾸기 레지스터에 해당하는가?
-	setL       bool // |rl|이 rL의 새 값에 해당하는가?
-	interim    bool // 인터럽트가 걸리면 이 명령을 다시 발행해야 하는가?
-	stackAlert bool // 스택 넘침의 가능성이 있는가?
+	usage      bool // should rU be increased?
+	needB      bool // should we stall until |b.p==nil|?
+	needRA     bool // should we stall until |ra.p==nil|?
+	renX       bool // does |x| correspond to a rename register?
+	memX       bool // does |x| correspond to a memory write?
+	renA       bool // does |a| correspond to a rename register?
+	setL       bool // does |rl| correspond to a new value of rL?
+	interim    bool // does this instruction need to be reissued on interrupt?
+	stackAlert bool // is there potential for stack overflow?
 
 //line mmixpipe.w:622
-	arithExc         Tetra // rA의 사건 비트를 위한 산술 예외
-	hist             Tetra // 분기 예측에 쓰는 이력 비트
-	denin, denout    int   // 비정규수를 다루는 데 드는 실행 시간 벌칙
-	curO, curS       Octa  // 이 명령 전의 투기적 rO와 rS
-	interrupt        Tetra // 이 명령이 인터럽트를 일으키는가?
-	ptrA, ptrB, ptrC any   // 이런저런 쓰임새의 범용 포인터
-	idx              int   // 재정렬 버퍼 안의 위치
+	arithExc         Tetra // arithmetic exceptions for event bits of rA
+	hist             Tetra // history bits for use in branch prediction
+	denin, denout    int   // execution time penalties for subnormal handling
+	curO, curS       Octa  // speculative rO and rS before this instruction
+	interrupt        Tetra // does this instruction generate an interrupt?
+	ptrA, ptrB, ptrC any   // generic pointers for miscellaneous use
+	idx              int   // position in the reorder buffer
 }
 
 //line mmixpipe.w:1350
 type fetch struct {
-	loc       Octa  // 명령의 가상 주소
-	inst      Tetra // 명령 자체
-	interrupt Tetra // 인터럽트를 일으킬지 모르는 비트 코드들
-	noted     bool  // 이 명령을 엿보았는가?
-	hist      Tetra // 엿보았다면, 그때의 |peekHist|
-	idx       int   // 가져오기 버퍼 안의 위치
+	loc       Octa  // virtual address of instruction
+	inst      Tetra // the instruction itself
+	interrupt Tetra // bit codes that might cause interruption
+	noted     bool  // have we peeked at this instruction?
+	hist      Tetra // if we peeked, this was the |peekHist|
+	idx       int   // position in the fetch buffer
 }
 
 //line mmixpipe.w:1523
 type funcUnit struct {
-	name string      // 기호 이름
-	ops  [8]Tetra    // 지원하는 연산 코드의 큰 쪽 먼저 비트맵
-	k    int         // 파이프라인 단계의 수
-	co   []coroutine // 차례로 늘어선 코루틴 $k$개
+	name string      // symbolic designation
+	ops  [8]Tetra    // big-endian bitmap for the opcodes supported
+	k    int         // number of pipeline stages
+	co   []coroutine // $k$ consecutive coroutines
 }
 
 //line mmixpipe.w:2528
@@ -111,154 +111,154 @@ const (
 
 //line mmixpipe.w:3477
 type cacheblock struct {
-	tag   Octa   // 캐시 블록 주소에 들어가지 않는 열쇠의 비트들
-	dirty []bool // 알갱이마다 하나씩 있는 더러움 비트 $2^{g-b}$개의 배열
-	data  []Octa // 옥타바이트 $2^{b-3}$개의 배열, 곧 캐시 블록의 데이터
-	rank  int    // |random|이 아닌 방침을 위한 보조 정보
-	pos   int    // 집합 안의 위치
+	tag   Octa   // bits of key not included in the cache block address
+	dirty []bool // array of $2^{g-b}$ dirty bits, one per granule
+	data  []Octa // array of $2^{b-3}$ octabytes, the data in a cache block
+	rank  int    // auxiliary information for non-|random| policies
+	pos   int    // position within the set
 }
 
-type cacheset = []cacheblock // 블록 $2^a$개나 $2^v$개의 배열
+type cacheset = []cacheblock // array of $2^a$ or $2^v$ blocks
 
 type cache struct {
-	a, b, c, g, v      int           // 연관도, 블록 크기, 집합 수, 알갱이, 희생자 크기의 로그
-	aa, bb, cc, gg, vv int           // 연관도, 블록 크기, 집합 수, 알갱이, 희생자 크기(모두 2의 거듭제곱)
+	a, b, c, g, v      int           // logs of associativity, blocksize, setsize, granularity, victimsize
+	aa, bb, cc, gg, vv int           // associativity, blocksize, setsize, granularity, victimsize (all powers of 2)
 	tagmask            int           // $-2^{b+c}$
-	repl, vrepl        replacePolicy // 희생자와 희생자의 희생자를 고르는 방법
-	mode               int           // 선택 사항 |writeBack|과 |writeAlloc|
-	accessTime         int           // 적중인지 알기까지의 사이클
-	copyInTime         int           // 새 블록을 캐시에 복사해 넣는 사이클
-	copyOutTime        int           // 옛 블록을 캐시에서 복사해 내는 사이클
-	set                []cacheset    // 캐시 블록 배열의 집합 $2^c$개의 배열
-	victim             cacheset      // 있다면, 희생자 캐시
-	filler             coroutine     // 새 블록을 캐시에 복사해 넣는 코루틴
-	fillerCtl          control       // 그 제어 블록
-	flusher            coroutine     // 캐시의 더러운 옛 데이터를 쓰는 코루틴
-	flusherCtl         control       // 그 제어 블록
-	inbuf              cacheblock    // 채우기는 여기서 온다
-	outbuf             cacheblock    // 쏟아 내기는 여기로 간다
-	lock               lockvar       // 캐시를 크게 바꾸는 동안 0이 아니다
-	fillLock           lockvar       // 채우는 코루틴이 데이터를 돌려주어야 하면 0이 아니다
-	ports              int           // 몇 개의 코루틴이 캐시를 읽을 수 있는가?
-	reader             []coroutine   // 동시에 읽을지도 모르는 코루틴들의 배열
-	name               string        // 이를테면 |"Icache"|
+	repl, vrepl        replacePolicy // how to choose victims and victim-victims
+	mode               int           // optional |writeBack| and/or |writeAlloc|
+	accessTime         int           // cycles to know if there's a hit
+	copyInTime         int           // cycles to copy a new block into the cache
+	copyOutTime        int           // cycles to copy an old block from the cache
+	set                []cacheset    // array of $2^c$ sets of arrays of cache blocks
+	victim             cacheset      // the victim cache, if present
+	filler             coroutine     // a coroutine for copying new blocks into the cache
+	fillerCtl          control       // its control block
+	flusher            coroutine     // a coroutine for writing dirty old data from the cache
+	flusherCtl         control       // its control block
+	inbuf              cacheblock    // filling comes from here
+	outbuf             cacheblock    // flushing goes to here
+	lock               lockvar       // nonzero when the cache is being changed significantly
+	fillLock           lockvar       // nonzero when filler should pass data back
+	ports              int           // how many coroutines can be reading the cache?
+	reader             []coroutine   // array of coroutines that might be reading simultaneously
+	name               string        // |"Icache"|, for example
 }
 
 //line mmixpipe.w:3954
 type chunknode struct {
-	tag   Tetra  // 32비트 덩이 주소
-	chunk []Octa // |nil|이거나 옥타바이트 $2^{13}$개의 배열
+	tag   Tetra  // 32-bit chunk address
+	chunk []Octa // either |nil| or an array of $2^{13}$ octabytes
 }
 
 //line mmixpipe.w:4936
 type writeNode struct {
-	o     Octa  // 저장할 데이터
-	addr  Octa  // 그 물리 주소
-	stamp Tetra // 마지막으로 확정된 때($2^{32}$을 법으로)
-	i     int   // 이 쓰기는 특별한가?
-	size  int   // |specWrite|의 매개변수
-	idx   int   // 쓰기 버퍼 안의 위치
+	o     Octa  // data to be stored
+	addr  Octa  // its physical address
+	stamp Tetra // when last committed (mod $2^{32}$)
+	i     int   // is this write special?
+	size  int   // parameter for |specWrite|
+	idx   int   // position in the write buffer
 }
 
 //line mmixpipe.w:8599
 type machine struct {
 
 //line mmixpipe.w:139
-	verbose int // 진단 출력의 수준을 정한다
+	verbose int // controls the level of diagnostic output
 
 //line mmixpipe.w:199
-	breakpointHit bool // 멈춤점의 명령을 가져왔는가?
-	halted        bool // 기계가 멈추었는가?
-	breakpoint    Octa // |MMIXRun|의 멈춤점
+	breakpointHit bool // was the breakpoint instruction fetched?
+	halted        bool // has the machine halted?
+	breakpoint    Octa // the breakpoint of |MMIXRun|
 
 //line mmixpipe.w:312
-	curRound   mmixarith.Round // 현재 반올림 방식
-	exceptions int             // 부동소수점 연산이 켠 비트들
+	curRound   mmixarith.Round // the current rounding mode
+	exceptions int             // bits set by floating point operations
 
 //line mmixpipe.w:411
-	ringSize int         // |MMIX_config|가 정한다. 넉넉히 커야 한다
-	ring     []coroutine // 스케줄 큐들의 머리 노드
-	curTime  int         // |ring|에서 현재 시각의 위치
+	ringSize int         // set by |MMIX_config|, must be sufficiently large
+	ring     []coroutine // head nodes of the scheduling queues
+	curTime  int         // position of the current time in |ring|
 
 //line mmixpipe.w:467
-	sentinel coroutine // 원형 리스트의 원점에 있는 가짜 코루틴
+	sentinel coroutine // dummy coroutine at origin of circular list
 
 //line mmixpipe.w:1193
-	fetchMax, dispatchMax, peekahead, commitMax int // 한 클럭 사이클에 다룰 수 있는 명령의 한계
+	fetchMax, dispatchMax, peekahead, commitMax int // limits on instructions that can be handled per clock cycle
 
 //line mmixpipe.w:1215
-	reorder                []control // 재정렬 버퍼가 든 원
-	reorderBot, reorderTop *control  // 그 원의 가장 작은 원소와 가장 큰 원소
-	hot, cool              *control  // 재정렬 버퍼의 앞과 뒤
-	oldHot                 *control  // 사이클이 시작할 때의 |hot|
-	deissues               int       // 발행을 취소해야 할 명령의 개수
+	reorder                []control // the ring containing the reorder buffer
+	reorderBot, reorderTop *control  // least and greatest elements of that ring
+	hot, cool              *control  // front and rear of the reorder buffer
+	oldHot                 *control  // value of |hot| at beginning of cycle
+	deissues               int       // the number of instructions that need to be deissued
 
 //line mmixpipe.w:1300
-	dispatchCount    int     // 이 사이클에 몇 개를 배정했는가
-	suppressDispatch bool    // 배정을 건너뛰어야 하는가?
-	doingInterrupt   int     // 인터럽트 준비가 몇 사이클 남았는가
-	dispatchLock     lockvar // 명령 발행을 막는 잠금
-	dispatchStat     []int32 // 명령을 0, 1, \dots개 배정한 것이 몇 번인가?
-	securityDisabled bool    // 시험을 위해 보안 검사를 생략하는가?
+	dispatchCount    int     // how many dispatched on this cycle
+	suppressDispatch bool    // should dispatching be bypassed?
+	doingInterrupt   int     // how many cycles of interrupt preparations remain
+	dispatchLock     lockvar // lock to prevent instruction issues
+	dispatchStat     []int32 // how often did we dispatch 0, 1, \dots\ instructions?
+	securityDisabled bool    // omit security checks for testing purposes?
 
 //line mmixpipe.w:1367
-	fetchBuf           []fetch // 가져오기 버퍼가 든 원
-	fetchBot, fetchTop *fetch  // 그 원의 가장 작은 원소와 가장 큰 원소
-	head, tail         *fetch  // 가져오기 버퍼의 앞과 뒤
-	oldTail            *fetch  // 현재 사이클에 볼 수 있는 가져오기 버퍼의 뒤
+	fetchBuf           []fetch // the ring containing the fetch buffer
+	fetchBot, fetchTop *fetch  // least and greatest elements of that ring
+	head, tail         *fetch  // front and rear of the fetch buffer
+	oldTail            *fetch  // rear of the fetch buffer available on the current cycle
 
 //line mmixpipe.w:1388
-	unknownSpec specnode // 원본의 \.{UNKNOWN\_SPEC}이 가리키는 곳
+	unknownSpec specnode // where the original's \.{UNKNOWN\_SPEC} points
 
 //line mmixpipe.w:1531
-	funit      []funcUnit // 기능 장치들의 배열
-	funitCount int        // 기능 장치의 개수
+	funit      []funcUnit // array of functional units
+	funitCount int        // the number of functional units
 
 //line mmixpipe.w:1538
-	newCool  *control // |cool| 다음의 재정렬 버퍼 자리
-	resuming int      // 중단된 명령을 다시 시작하고 있으면 0이 아니다
-	support  [8]Tetra // 지원하는 모든 연산 코드의 큰 쪽 먼저 비트맵
+	newCool  *control // the reorder position following |cool|
+	resuming int      // nonzero if resuming an interrupted instruction
+	support  [8]Tetra // big-endian bitmap for all opcodes supported
 
 //line mmixpipe.w:1753
-	g                          [256]specnode // 전역 레지스터와 특수 레지스터
-	l                          []specnode    // 지역 레지스터의 고리
-	lringSize                  int           // 칩에 있는 지역 레지스터의 수(2의 거듭제곱이어야 한다)
-	maxRenameRegs, maxMemSlots int           // 재정렬 버퍼의 용량
-	renameRegs, memSlots       int           // 지금 쓰지 않는 용량
+	g                          [256]specnode // global registers and special registers
+	l                          []specnode    // the ring of local registers
+	lringSize                  int           // number of local registers on the chip (must be a power of 2)
+	maxRenameRegs, maxMemSlots int           // capacity of reorder buffer
+	renameRegs, memSlots       int           // currently unused capacity
 
 //line mmixpipe.w:1763
-	ticks     Octa // 내부 시계
-	lringMask int  // |lringSize|를 법으로 하는 계산을 위해
+	ticks     Octa // the internal clock
+	lringMask int  // for calculations modulo |lringSize|
 
 //line mmixpipe.w:1871
-	coolO, coolS       Octa  // |cool| 명령 전의 rO와 rS
-	coolL, coolG       int   // |cool| 명령 전의 rL과 rG
-	coolHist, peekHist Tetra // 분기 예측을 위한 이력 비트
-	newO, newS         Octa  // |cool| 다음의 rO와 rS
+	coolO, coolS       Octa  // values of rO, rS before the |cool| instruction
+	coolL, coolG       int   // values of rL and rG before the |cool| instruction
+	coolHist, peekHist Tetra // history bits for branch prediction
+	newO, newS         Octa  // values of rO, rS after |cool|
 
 //line mmixpipe.w:2174
 	mem specnode
 
 //line mmixpipe.w:2577
-	memLocker coroutine // 사라지는 하찮은 코루틴
-	dLocker   coroutine // 또 하나
-	vanishCtl control   // 그런 코루틴들이 함께 쓰는 제어 블록
+	memLocker coroutine // trivial coroutine that vanishes
+	dLocker   coroutine // another
+	vanishCtl control   // such coroutines share a common control block
 
 //line mmixpipe.w:2791
 	pipeSeq [maxPipeOp + 1][pipeLimit + 1]byte
 
 //line mmixpipe.w:3092
-	newQ            Octa // rQ의 어느 비트가 늘면 이것도 그래야 한다
-	stackOverflowed bool // 아직 알리지 않은 스택 넘침
+	newQ            Octa // when rQ increases in any bit position, so should this
+	stackOverflowed bool // stack overflow not yet reported
 
 //line mmixpipe.w:3160
-	bpA, bpB, bpC, bpN int    // 분기 예측의 매개변수
-	bpTable            []int8 // |nil|이거나 항목이 $2^{\mkern1mua+b+c}$개인 배열
+	bpA, bpB, bpC, bpN int    // parameters for branch prediction
+	bpTable            []int8 // either |nil| or an array of $2^{\mkern1mua+b+c}$ items
 
 //line mmixpipe.w:3249
 	bpAmask, bpCmask, bpBcmask, bpNmask, bpNpower int
-	bpRevStat, bpOkStat                           int32 // 몇 번 뒤집고 몇 번 따랐는가
-	bpBadStat, bpGoodStat                         int32 // 몇 번 틀리고 몇 번 맞았는가
+	bpRevStat, bpOkStat                           int32 // how often we overrode and agreed
+	bpBadStat, bpGoodStat                         int32 // how often we failed and succeeded
 
 //line mmixpipe.w:3512
 	Icache, Dcache, Scache, ITcache, DTcache *cache
@@ -267,20 +267,20 @@ type machine struct {
 	hitSet cacheset
 
 //line mmixpipe.w:3964
-	memChunks    int         // 지금까지 할당한 덩이의 수
-	memChunksMax int         // 한 번 돌 때 서로 다른 덩이를 이만큼까지
-	hashPrime    int         // |memChunksMax|보다 크되, 엄청나지는 않다
-	memHash      []chunknode // 모의 주 메모리
+	memChunks    int         // this many chunks are allocated so far
+	memChunksMax int         // up to this many different chunks per run
+	hashPrime    int         // larger than |memChunksMax|, but not enormous
+	memHash      []chunknode // the simulated main memory
 
 //line mmixpipe.w:4009
-	lastH int // 가장 최근에 맞은 해시 색인
+	lastH int // the hash index that was most recently correct
 
 //line mmixpipe.w:4041
-	memAddrTime  int     // 메모리 버스로 주소를 보내는 사이클
-	busWords     int     // 메모리 버스의 폭, 옥타바이트 단위
-	memReadTime  int     // 주 메모리에서 읽는 사이클
-	memWriteTime int     // 주 메모리에 쓰는 사이클
-	memLock      lockvar // 버스가 바쁘면 |nil|이 아니다
+	memAddrTime  int     // cycles to transmit an address on memory bus
+	busWords     int     // width of memory bus, in octabytes
+	memReadTime  int     // cycles to read from main memory
+	memWriteTime int     // cycles to write to main memory
+	memLock      lockvar // is non-|nil| when the bus is busy
 
 //line mmixpipe.w:4454
 	cleanCo   coroutine
@@ -288,69 +288,69 @@ type machine struct {
 	cleanLock lockvar
 
 //line mmixpipe.w:4726
-	IPTctl, DPTctl [5]control    // I와 D 페이지 변환을 위한 제어 블록
-	IPTco, DPTco   [10]coroutine // 코루틴마다 두 단계짜리 파이프라인이다
+	IPTctl, DPTctl [5]control    // control blocks for I and D page translation
+	IPTco, DPTco   [10]coroutine // each coroutine is a two-stage pipeline
 
 //line mmixpipe.w:4811
-	pageN    int    // rV의 10비트 |n| 필드에 8을 곱한 것
-	pageR    int    // rV의 27비트 |r| 필드
-	pageS    int    // rV의 8비트 |s| 필드
-	pageF    int    // rV의 3비트 |f| 필드
-	pageB    [5]int // rV의 4비트 |b| 필드들. |pageB[0]=0|
-	pageMask Octa   // 가장 아래 |s|비트
-	pageBad  bool   // rV가 규칙을 어기는가?
+	pageN    int    // the 10-bit |n| field of rV, times 8
+	pageR    int    // the 27-bit |r| field of rV
+	pageS    int    // the 8-bit |s| field of rV
+	pageF    int    // the 3-bit |f| field of rV
+	pageB    [5]int // the 4-bit |b| fields of rV; |pageB[0]=0|
+	pageMask Octa   // the least significant |s| bits
+	pageBad  bool   // does rV violate the rules?
 
 //line mmixpipe.w:4863
 	noHardwarePT bool
 
 //line mmixpipe.w:4952
-	wbuf                 []writeNode // 쓰기 버퍼가 든 원
-	wbufBot, wbufTop     *writeNode  // 가장 작은 쓰기 버퍼 노드와 가장 큰 노드
-	writeHead, writeTail *writeNode  // 쓰기 버퍼의 앞과 뒤
-	wbufLock             lockvar     // |writeHead|의 데이터를 쓰고 있는가?
-	holdingTime          int         // 최소 머무는 시간
-	speedLock            lockvar     // |holdingTime|을 무시해야 하는가?
+	wbuf                 []writeNode // the ring containing the write buffer
+	wbufBot, wbufTop     *writeNode  // least and greatest write buffer nodes
+	writeHead, writeTail *writeNode  // front and rear of the write buffer
+	wbufLock             lockvar     // is the data in |writeHead| being written?
+	holdingTime          int         // minimum holding time
+	speedLock            lockvar     // should we ignore |holdingTime|?
 
 //line mmixpipe.w:4978
-	writeCo  coroutine // 쓰기 버퍼를 비우는 코루틴
-	writeCtl control   // 그 제어 블록
+	writeCo  coroutine // coroutine that empties the write buffer
+	writeCtl control   // its control block
 
 //line mmixpipe.w:5041
-	dunno Octa // 원본의 \.{DUNNO}가 가리키는 곳
+	dunno Octa // where the original's \.{DUNNO} points
 
 //line mmixpipe.w:6077
-	instPtr spec   // 명령 포인터(프로그램 계수기라고도 한다)
-	fetched []Octa // 들어오는 명령을 담는 버퍼
+	instPtr spec   // the instruction pointer (aka program counter)
+	fetched []Octa // buffer for incoming instructions
 
 //line mmixpipe.w:6086
-	fetchLo, fetchHi int // 그 버퍼의 활성 영역
+	fetchLo, fetchHi int // the active region of that buffer
 	fetchCo          coroutine
 	fetchCtl         control
 
 //line mmixpipe.w:6503
-	sleepy bool // 페이지 테이블 에뮬레이션 호출을 막 내보냈는가?
+	sleepy bool // have we just emitted the page table emulation call?
 
 //line mmixpipe.w:6756
-	tryingToInterrupt bool // 가로막을 수 있는 연산들에게 멈추기를 권하는가?
-	nullifying        bool // 적재/저장 명령을 무효로 만들려고 배정을 멈추는가?
+	tryingToInterrupt bool // encouraging interruptible operations to pause
+	nullifying        bool // stopping dispatch to nullify a load/store command
 
 //line mmixpipe.w:7712
 	fremMax                     int
 	deninPenalty, denoutPenalty int
 
 //line mmixpipe.w:8587
-	stdinBuf      [256]byte // 모의 프로그램의 표준 입력
-	stdinBufStart int       // 그 버퍼에서의 현재 위치
-	stdinBufEnd   int       // 그 버퍼의 현재 끝
+	stdinBuf      [256]byte // standard input to the simulated program
+	stdinBufStart int       // current position in that buffer
+	stdinBufEnd   int       // current end of that buffer
 
 //line mmixpipe.w:8601
-	out     *bufio.Writer // 표준 출력
-	stderr  io.Writer     // 표준 오류
-	io      *mmixio.IO    // 모의 프로그램의 파일들
-	stdin   *cfile        // 표준 입력
-	specBuf [20]byte      // \.{mmixmem.w}의 |specRead|가 쓰는 버퍼
-	hio     *hio          // \.{mmixmem.w}의 호스트 입출력 장치(\.{-k}를 주었을 때만)
-	blk     *blk          // \.{mmixmem.w}의 블록 장치(\.{-d}를 주었을 때만)
+	out     *bufio.Writer // standard output
+	stderr  io.Writer     // standard error
+	io      *mmixio.IO    // files of the simulated program
+	stdin   *cfile        // standard input
+	specBuf [20]byte      // buffer used by |specRead| of \.{mmixmem.w}
+	hio     *hio          // host I/O device of \.{mmixmem.w} (only when \.{-k} is given)
+	blk     *blk          // block device of \.{mmixmem.w} (only when \.{-d} is given)
 }
 
 //line mmixpipe.w:8614
@@ -358,22 +358,22 @@ type exitSignal int
 
 //line mmixpipe.w:126
 const (
-	issueBit           = 1 << 0 // 명령을 발행하고, 발행을 취소하고, 확정할 때 제어 블록을 보인다
-	pipeBit            = 1 << 1 // 사이클마다 파이프라인과 잠금을 보인다
-	coroutineBit       = 1 << 2 // 사이클마다 시작하는 코루틴들을 보인다
-	scheduleBit        = 1 << 3 // 코루틴을 스케줄할 때 보인다
-	uninitMemBit       = 1 << 4 // 초기화하지 않은 메모리 덩이를 읽으면 알린다
-	interactiveReadBit = 1 << 5 // 입출력 위치를 읽을 때 사용자에게 묻는다
-	showSpecBit        = 1 << 6 // 특별한 읽기와 쓰기가 일어날 때 보인다
-	showPredBit        = 1 << 7 // 분기 예측의 자세한 사정을 보인다
-	showWholecacheBit  = 1 << 8 // 열쇠 태그가 무효인 캐시 블록도 보인다
+	issueBit           = 1 << 0 // show control blocks when issued, deissued, committed
+	pipeBit            = 1 << 1 // show the pipeline and locks on every cycle
+	coroutineBit       = 1 << 2 // show the coroutines when started on every cycle
+	scheduleBit        = 1 << 3 // show the coroutines when scheduled
+	uninitMemBit       = 1 << 4 // complain when reading from an uninitialized chunk of memory
+	interactiveReadBit = 1 << 5 // prompt user when reading from I/O location
+	showSpecBit        = 1 << 6 // display special read/write transactions as they happen
+	showPredBit        = 1 << 7 // display branch prediction details
+	showWholecacheBit  = 1 << 8 // display cache blocks even when their key tag is invalid
 )
 
 //line mmixpipe.w:305
 const (
-	signBit = mmixarith.SignBit // 64비트 부호 비트
+	signBit = mmixarith.SignBit // the 64-bit sign bit
 	negOne  = mmixarith.NegOne  // $-1$
-	sign32  = 0x80000000        // 32비트 부호 비트(원본의 |sign_bit|)
+	sign32  = 0x80000000        // the 32-bit sign bit (the original's |sign_bit|)
 )
 
 //line mmixpipe.w:737
@@ -673,15 +673,15 @@ const (
 const (
 
 //line mmixpipe.w:830
-	mul0  = iota // 0을 곱한다
-	mul1         // 1--8비트짜리를 곱한다
-	mul2         // 9--16비트짜리를 곱한다
-	mul3         // 17--24비트짜리를 곱한다
-	mul4         // 25--32비트짜리를 곱한다
-	mul5         // 33--40비트짜리를 곱한다
-	mul6         // 41--48비트짜리를 곱한다
-	mul7         // 49--56비트짜리를 곱한다
-	mul8         // 57--64비트짜리를 곱한다
+	mul0  = iota // multiplication by zero
+	mul1         // multiplication by 1--8 bits
+	mul2         // multiplication by 9--16 bits
+	mul3         // multiplication by 17--24 bits
+	mul4         // multiplication by 25--32 bits
+	mul5         // multiplication by 33--40 bits
+	mul6         // multiplication by 41--48 bits
+	mul7         // multiplication by 49--56 bits
+	mul8         // multiplication by 57--64 bits
 	div          // \.{DIV[U][I]}
 	sh           // \.{S[L,R][U][I]}
 	mux          // \.{MUX[I]}
@@ -738,8 +738,8 @@ const (
 	get      // \.{GET}
 	put      // \.{PUT[I]}
 	ld       // \.{LD[B,W,T,O][U][I]}, \.{LDHT[I]}, \.{LDSF[I]}
-	ldptp    // 페이지 테이블 포인터를 적재한다
-	ldpte    // 페이지 테이블 항목을 적재한다
+	ldptp    // load page table pointer
+	ldpte    // load page table entry
 	ldunc    // \.{LDUNC[I]}
 	ldvts    // \.{LDVTS[I]}
 	preld    // \.{PRELD[I]}
@@ -748,7 +748,7 @@ const (
 	syncd    // \.{SYNCD[I]}
 	syncid   // \.{SYNCID[I]}
 	pst      // \.{ST[B,W,T][U][I]}, \.{STHT[I]}
-	stunc    // 쓰기 버퍼 안의 \.{STUNC[I]}
+	stunc    // \.{STUNC[I]}, in write buffer
 	cswap    // \.{CSWAP[I]}
 	br       // \.{B[N][N,Z,P][B]}
 	pbr      // \.{PB[N][N,Z,P][B]}
@@ -765,12 +765,12 @@ const (
 	noop     // \.{SWYM}
 	trap     // \.{TRAP}
 	trip     // \.{TRIP}
-	incgamma // $\gamma$ 포인터를 늘린다
-	decgamma // $\gamma$ 포인터를 줄인다
-	incrl    // rL과 $\beta$를 늘린다
-	sav      // \.{SAVE}의 중간 단계
-	unsav    // \.{UNSAVE}의 중간 단계
-	resum    // \.{RESUME}의 중간 단계
+	incgamma // increase $\gamma$ pointer
+	decgamma // decrease $\gamma$ pointer
+	incrl    // increase rL and $\beta$
+	sav      // intermediate stage of \.{SAVE}
+	unsav    // intermediate stage of \.{UNSAVE}
+	resum    // intermediate stage of \.{RESUME}
 
 //line mmixpipe.w:820
 )
@@ -784,72 +784,72 @@ const (
 
 //line mmixpipe.w:987
 const (
-	rA  = 21 // 산술 상태 레지스터
-	rB  = 0  // 부트스트랩 레지스터(트립)
-	rC  = 8  // 계속 레지스터
-	rD  = 1  // 피제수 레지스터
-	rE  = 2  // 엡실론 레지스터
-	rF  = 22 // 실패 위치 레지스터
-	rG  = 19 // 전역 문턱 레지스터
-	rH  = 3  // 곱의 윗부분 레지스터
-	rI  = 12 // 구간 계수기
-	rJ  = 4  // 복귀 점프 레지스터
-	rK  = 15 // 인터럽트 마스크 레지스터
-	rL  = 20 // 지역 문턱 레지스터
-	rM  = 5  // 멀티플렉스 마스크 레지스터
-	rN  = 9  // 일련번호
-	rO  = 10 // 레지스터 스택 오프셋
-	rP  = 23 // 예측 레지스터
-	rQ  = 16 // 인터럽트 요청 레지스터
-	rR  = 6  // 나머지 레지스터
-	rS  = 11 // 레지스터 스택 포인터
-	rT  = 13 // 트랩 주소 레지스터
-	rU  = 17 // 사용 계수기
-	rV  = 18 // 가상 주소 변환 레지스터
-	rW  = 24 // 인터럽트된 곳 레지스터(트립)
-	rX  = 25 // 실행 레지스터(트립)
-	rY  = 26 // Y 피연산자(트립)
-	rZ  = 27 // Z 피연산자(트립)
-	rBB = 7  // 부트스트랩 레지스터(트랩)
-	rTT = 14 // 동적 트랩 주소 레지스터
-	rWW = 28 // 인터럽트된 곳 레지스터(트랩)
-	rXX = 29 // 실행 레지스터(트랩)
-	rYY = 30 // Y 피연산자(트랩)
-	rZZ = 31 // Z 피연산자(트랩)
+	rA  = 21 // arithmetic status register
+	rB  = 0  // bootstrap register (trip)
+	rC  = 8  // continuation register
+	rD  = 1  // dividend register
+	rE  = 2  // epsilon register
+	rF  = 22 // failure location register
+	rG  = 19 // global threshold register
+	rH  = 3  // himult register
+	rI  = 12 // interval counter
+	rJ  = 4  // return-jump register
+	rK  = 15 // interrupt mask register
+	rL  = 20 // local threshold register
+	rM  = 5  // multiplex mask register
+	rN  = 9  // serial number
+	rO  = 10 // register stack offset
+	rP  = 23 // prediction register
+	rQ  = 16 // interrupt request register
+	rR  = 6  // remainder register
+	rS  = 11 // register stack pointer
+	rT  = 13 // trap address register
+	rU  = 17 // usage counter
+	rV  = 18 // virtual translation register
+	rW  = 24 // where-interrupted register (trip)
+	rX  = 25 // execution register (trip)
+	rY  = 26 // Y operand (trip)
+	rZ  = 27 // Z operand (trip)
+	rBB = 7  // bootstrap register (trap)
+	rTT = 14 // dynamic trap address register
+	rWW = 28 // where-interrupted register (trap)
+	rXX = 29 // execution register (trap)
+	rYY = 30 // Y operand (trap)
+	rZZ = 31 // Z operand (trap)
 )
 
 //line mmixpipe.w:1031
 const (
-	pBit       = 1 << 0  // 특권 위치에 있는 명령
-	sBit       = 1 << 1  // 보안 위반
-	bBit       = 1 << 2  // 규칙을 어기는 명령
-	kBit       = 1 << 3  // 커널 전용 명령
-	nBit       = 1 << 4  // 가상 주소 변환을 건너뜀
-	pxBit      = 1 << 5  // 페이지에서 실행할 권한이 없음
-	pwBit      = 1 << 6  // 페이지에 쓸 권한이 없음
-	prBit      = 1 << 7  // 페이지에서 읽을 권한이 없음
-	protOffset = 5       // |prBit|에서 보호 코드 자리까지의 거리
-	xBit       = 1 << 8  // 부동소수점 부정확
-	zBit       = 1 << 9  // 부동소수점 0으로 나눔
-	uBit       = 1 << 10 // 부동소수점 아래넘침
-	oBit       = 1 << 11 // 부동소수점 넘침
-	iBit       = 1 << 12 // 부동소수점 잘못된 연산
-	wBit       = 1 << 13 // 부동소수점에서 고정소수점으로 바꿀 때 넘침
-	vBit       = 1 << 14 // 정수 넘침
-	dBit       = 1 << 15 // 정수 나눗셈 검사
-	hBit       = 1 << 16 // 트립 처리기 비트
-	fBit       = 1 << 17 // 강제 트랩 비트
-	eBit       = 1 << 18 // 외부(동적) 트랩 비트
+	pBit       = 1 << 0  // instruction in privileged location
+	sBit       = 1 << 1  // security violation
+	bBit       = 1 << 2  // instruction breaks the rules
+	kBit       = 1 << 3  // instruction for kernel only
+	nBit       = 1 << 4  // virtual translation bypassed
+	pxBit      = 1 << 5  // permission lacking to execute from page
+	pwBit      = 1 << 6  // permission lacking to write on page
+	prBit      = 1 << 7  // permission lacking to read from page
+	protOffset = 5       // distance from |prBit| to protection code position
+	xBit       = 1 << 8  // floating inexact
+	zBit       = 1 << 9  // floating division by zero
+	uBit       = 1 << 10 // floating underflow
+	oBit       = 1 << 11 // floating overflow
+	iBit       = 1 << 12 // floating invalid operation
+	wBit       = 1 << 13 // float-to-fix overflow
+	vBit       = 1 << 14 // integer overflow
+	dBit       = 1 << 15 // integer divide check
+	hBit       = 1 << 16 // trip handler bit
+	fBit       = 1 << 17 // forced trap bit
+	eBit       = 1 << 18 // external (dynamic) trap bit
 )
 
 //line mmixpipe.w:1070
 const (
-	powerFailure      = 1 << 0 // 침착하고 재빨리 끄려고 한다
-	parityError       = 1 << 1 // 파일 시스템을 지키려고 한다
-	nonexistentMemory = 1 << 2 // 쓸 수 없는 메모리 주소
-	rebootSignal      = 1 << 4 // 처음부터 다시 할 때다
-	intervalTimeout   = 1 << 6 // 타이머 레지스터 rI가 0이 되었다
-	stackOverflow     = 1 << 7 // rC 페이지에 데이터를 저장했다
+	powerFailure      = 1 << 0 // try to shut down calmly and quickly
+	parityError       = 1 << 1 // try to save the file systems
+	nonexistentMemory = 1 << 2 // a memory address can't be used
+	rebootSignal      = 1 << 4 // it's time to start over
+	intervalTimeout   = 1 << 6 // the timer register, rI, has reached zero
+	stackOverflow     = 1 << 7 // data has been stored on the rC page
 )
 
 //line mmixpipe.w:1641
@@ -863,88 +863,88 @@ const (
 
 //line mmixpipe.w:1781
 const (
-	version       = 1 // 우리가 지원하는 \MMIX\ 아키텍처의 판
-	subversion    = 0 // 판 번호의 둘째 바이트
-	subsubversion = 0 // 판 번호를 더 한정하는 번호
+	version       = 1 // version of the \MMIX\ architecture that we support
+	subversion    = 0 // secondary byte of version number
+	subsubversion = 0 // further qualification to version number
 )
 
 //line mmixpipe.w:2531
 const (
-	lSwitch0 label = iota // 가져오기 코루틴의 상태 스위치
-	lSwitch1              // 첫 단계의 상태 스위치
-	lSwitch2              // 뒤 단계들의 상태 스위치
+	lSwitch0 label = iota // state switch of the fetch coroutine
+	lSwitch1              // state switch of the first stage
+	lSwitch2              // state switch of the later stages
 
 //line mmixpipe.w:2735
-	lPassit // 원본의 |passit|
+	lPassit // the original's |passit|
 
 //line mmixpipe.w:2918
-	lDie // 원본의 |die|
+	lDie // the original's |die|
 
 //line mmixpipe.w:4315
-	lSNonMiss // 원본의 |S_non_miss|
+	lSNonMiss // the original's |S_non_miss|
 
 //line mmixpipe.w:4474
-	lDcleanLoop // 원본의 |Dclean_loop|
-	lDclean     // 원본의 |Dclean|
-	lDcleanInc  // 원본의 |Dclean_inc|
-	lScleanLoop // 원본의 |Sclean_loop|
-	lSclean     // 원본의 |Sclean|
-	lScleanInc  // 원본의 |Sclean_inc|
+	lDcleanLoop // the original's |Dclean_loop|
+	lDclean     // the original's |Dclean|
+	lDcleanInc  // the original's |Dclean_inc|
+	lScleanLoop // the original's |Sclean_loop|
+	lSclean     // the original's |Sclean|
+	lScleanInc  // the original's |Sclean_inc|
 
 //line mmixpipe.w:5159
-	lMemDirect // 원본의 |mem_direct|
+	lMemDirect // the original's |mem_direct|
 
 //line mmixpipe.w:5400
-	lMakeLdReady // 원본의 |make_ld_ready|
+	lMakeLdReady // the original's |make_ld_ready|
 
 //line mmixpipe.w:5679
-	lAvoidD // 원본의 |avoid_D|
+	lAvoidD // the original's |avoid_D|
 
 //line mmixpipe.w:6133
-	lKnownPhys // 원본의 |known_phys|
-	lBadFetch  // 원본의 |bad_fetch|
-	lSwymOne   // 원본의 |swym_one|
-	lFetchOne  // 원본의 |fetch_one|
+	lKnownPhys // the original's |known_phys|
+	lBadFetch  // the original's |bad_fetch|
+	lSwymOne   // the original's |swym_one|
+	lFetchOne  // the original's |fetch_one|
 
 //line mmixpipe.w:6567
-	lEmulateVirt // 원본의 |emulate_virt|
+	lEmulateVirt // the original's |emulate_virt|
 
 //line mmixpipe.w:8237
-	lSyncCheck // 원본의 |sync_check|
+	lSyncCheck // the original's |sync_check|
 
 //line mmixpipe.w:2536
 )
 
 const (
-	fetchSt    label = 1000  // 가져오기 코루틴의 상태 |case|
-	stage1St   label = 2000  // 첫 단계의 상태 |case|
-	stage2St   label = 3000  // 뒤 단계들의 상태 |case|
-	flushMemSt label = 4000  // |flushToMem|의 상태 |case|
-	flushSSt   label = 5000  // |flushToS|의 상태 |case|
-	fillMemSt  label = 6000  // |fillFromMem|의 상태 |case|
-	fillSSt    label = 7000  // |fillFromS|의 상태 |case|
-	cleanupSt  label = 8000  // |cleanup|의 상태 |case|
-	fillVirtSt label = 9000  // |fillFromVirt|의 상태 |case|
-	writeSt    label = 10000 // |writeFromWbuf|의 상태 |case|
+	fetchSt    label = 1000  // state |case| of the fetch coroutine
+	stage1St   label = 2000  // state |case| of the first stage
+	stage2St   label = 3000  // state |case| of the later stages
+	flushMemSt label = 4000  // state |case| of |flushToMem|
+	flushSSt   label = 5000  // state |case| of |flushToS|
+	fillMemSt  label = 6000  // state |case| of |fillFromMem|
+	fillSSt    label = 7000  // state |case| of |fillFromS|
+	cleanupSt  label = 8000  // state |case| of |cleanup|
+	fillVirtSt label = 9000  // state |case| of |fillFromVirt|
+	writeSt    label = 10000 // state |case| of |writeFromWbuf|
 )
 
 //line mmixpipe.w:2609
 const (
-	maxStage      = 99 // 모든 |stage| 번호보다 크다
-	vanish        = 98 // 그냥 사라지는 특별한 코루틴
-	flushToMem    = 97 // 캐시에서 메모리로 쏟아 내는 코루틴
-	flushToS      = 96 // 캐시에서 S-캐시로 쏟아 내는 코루틴
-	fillFromMem   = 95 // 메모리에서 캐시를 채우는 코루틴
-	fillFromS     = 94 // S-캐시에서 캐시를 채우는 코루틴
-	fillFromVirt  = 93 // 변환 캐시를 채우는 코루틴
-	writeFromWbuf = 92 // 쓰기 버퍼를 비우는 코루틴
-	cleanup       = 91 // 캐시를 청소하는 코루틴
+	maxStage      = 99 // exceeds all |stage| numbers
+	vanish        = 98 // special coroutine that just goes away
+	flushToMem    = 97 // coroutine for flushing from a cache to memory
+	flushToS      = 96 // coroutine for flushing from a cache to the S-cache
+	fillFromMem   = 95 // coroutine for filling a cache from memory
+	fillFromS     = 94 // coroutine for filling a cache from the S-cache
+	fillFromVirt  = 93 // coroutine for filling a translation cache
+	writeFromWbuf = 92 // coroutine for emptying the write buffer
+	cleanup       = 91 // coroutine for cleaning the caches
 )
 
 //line mmixpipe.w:2757
 const (
-	lPassData = stage1St + 2 // 원본의 |pass_data|
-	lFinEx    = stage1St + 3 // 원본의 |fin_ex|
+	lPassData = stage1St + 2 // the original's |pass_data|
+	lFinEx    = stage1St + 3 // the original's |fin_ex|
 )
 
 //line mmixpipe.w:2788
@@ -952,94 +952,94 @@ const pipeLimit = 90
 
 //line mmixpipe.w:3462
 const (
-	writeBack  = 1 // 즉시 쓰기가 아니면 이것을 쓴다
-	writeAlloc = 2 // 쓰기 우회가 아니면 이것을 쓴다
+	writeBack  = 1 // use this if not write-through
+	writeAlloc = 2 // use this if not write-around
 )
 
 //line mmixpipe.w:4482
-const lSprep = cleanupSt + 9 // 원본의 |Sprep|
+const lSprep = cleanupSt + 9 // the original's |Sprep|
 
 //line mmixpipe.w:4720
 const (
-	LDPTP = PREGO // 안에서는 헷갈릴 일이 없다
+	LDPTP = PREGO // internally this won't cause confusion
 	LDPTE = GO
 
 //line mmixpipe.w:4723
 )
 
 //line mmixpipe.w:5162
-const lWriteRestart = writeSt + 0 // 원본의 |write_restart|
+const lWriteRestart = writeSt + 0 // the original's |write_restart|
 
 //line mmixpipe.w:5352
-const ldStLaunch = 7 // 적재/저장 명령이 메모리 주소를 가졌을 때의 |state|
+const ldStLaunch = 7 // |state| when load/store command has its memory address
 
 //line mmixpipe.w:5446
 const (
-	dtMiss     = 10 // DT-캐시에 열쇠가 없을 때의 둘째 단계 |state|
-	dtHit      = 11 // 물리 주소를 알 때의 둘째 단계 |state|
-	hitAndMiss = 12 // D-캐시를 놓쳤을 때의 둘째 단계 |state|
-	ldReady    = 13 // 데이터를 읽었을 때의 둘째 단계 |state|
-	stReady    = 14 // 데이터를 읽을 필요가 없을 때의 둘째 단계 |state|
-	prestWin   = 15 // 블록을 0으로 채울 수 있을 때의 둘째 단계 |state|
+	dtMiss     = 10 // second stage |state| when DT-cache doesn't hold the key
+	dtHit      = 11 // second stage |state| when physical address is known
+	hitAndMiss = 12 // second stage |state| when D-cache misses
+	ldReady    = 13 // second stage |state| when data has been read
+	stReady    = 14 // second stage |state| when data needn't be read
+	prestWin   = 15 // second stage |state| when we can fill a block with zeroes
 )
 
 //line mmixpipe.w:5666
 const (
-	dtRetry = 8 // DT-캐시를 다시 찾아야 할 때의 둘째 단계 |state|
-	gotDT   = 9 // DT-캐시 항목을 계산했을 때의 둘째 단계 |state|
+	dtRetry = 8 // second stage |state| when DT-cache should be searched again
+	gotDT   = 9 // second stage |state| when DT-cache entry has been computed
 )
 
 const (
-	lSquareOne   = stage2St + dtRetry  // 원본의 |square_one|
-	lLdRetry     = stage2St + dtHit    // 원본의 |ld_retry|
-	lPrestSpan   = stage2St + prestWin // 원본의 |prest_span|
-	lFinishStore = stage2St + stReady  // 원본의 |finish_store|
+	lSquareOne   = stage2St + dtRetry  // the original's |square_one|
+	lLdRetry     = stage2St + dtHit    // the original's |ld_retry|
+	lPrestSpan   = stage2St + prestWin // the original's |prest_span|
+	lFinishStore = stage2St + stReady  // the original's |finish_store|
 )
 
 //line mmixpipe.w:6127
 const (
-	lNewFetch   = fetchSt + 0 // 원본의 |new_fetch|
-	lStartFetch = fetchSt + 1 // 원본의 |start_fetch|
+	lNewFetch   = fetchSt + 0 // the original's |new_fetch|
+	lStartFetch = fetchSt + 1 // the original's |start_fetch|
 )
 
 //line mmixpipe.w:6188
 const (
-	gotIT       = 19 // IT-캐시 항목을 계산했을 때의 |state|
-	itMiss      = 20 // IT-캐시에 열쇠가 없을 때의 |state|
-	itHit       = 21 // 명령의 물리 주소를 알 때의 |state|
-	iHitAndMiss = 22 // I-캐시를 놓쳤을 때의 |state|
-	fetchReady  = 23 // 명령들을 읽었을 때의 |state|
-	gotOne      = 24 // ``미리 보기'' 옥타바이트가 준비되었을 때의 |state|
+	gotIT       = 19 // |state| when IT-cache entry has been computed
+	itMiss      = 20 // |state| when IT-cache doesn't hold the key
+	itHit       = 21 // |state| when physical instruction address is known
+	iHitAndMiss = 22 // |state| when I-cache misses
+	fetchReady  = 23 // |state| when instructions have been read
+	gotOne      = 24 // |state| when a ``preview'' octabyte is ready
 )
 
 //line mmixpipe.w:6341
-const lFetchRetry = fetchSt + itHit // 원본의 |fetch_retry|
+const lFetchRetry = fetchSt + itHit // the original's |fetch_retry|
 
 //line mmixpipe.w:6570
 const (
-	lState4 = stage1St + 4 // 원본의 |state_4|
-	lState5 = stage1St + 5 // 원본의 |state_5|
+	lState4 = stage1St + 4 // the original's |state_4|
+	lState5 = stage1St + 5 // the original's |state_5|
 )
 
 //line mmixpipe.w:6834
 const (
-	resumeAgain = 0 // rX의 명령을 위치 $\rm rW-4$에 있는 것처럼 되풀이한다
-	resumeCont  = 1 // 같지만, 피연산자 대신 rY와 rZ를 쓴다
-	resumeSet   = 2 // 레지스터 \$X를 rZ로 정한다
-	resumeTrans = 3 // $\rm(rY,rZ)$를 IT-캐시나 DT-캐시에 넣고 |resumeAgain|을 한다
+	resumeAgain = 0 // repeat the command in rX as if in location $\rm rW-4$
+	resumeCont  = 1 // same, but substitute rY and rZ for operands
+	resumeSet   = 2 // set register \$X to rZ
+	resumeTrans = 3 // put $\rm(rY,rZ)$ into the IT-cache or DT-cache, then do |resumeAgain|
 )
 
 //line mmixpipe.w:7087
 const (
-	doResumeTrans = 17                       // |resumeTrans| 동작을 하는 |state|
-	lResumeTrans  = stage1St + doResumeTrans // 원본의 |resume_trans|
+	doResumeTrans = 17                       // |state| for performing |resumeTrans| actions
+	lResumeTrans  = stage1St + doResumeTrans // the original's |resume_trans|
 )
 
 //line mmixpipe.w:8047
 const (
-	lDoSyncid = stage2St + 30 // 원본의 |do_syncid|
-	lDoSyncd  = stage2St + 33 // 원본의 |do_syncd|
-	lNextSync = stage2St + 35 // 원본의 |next_sync|
+	lDoSyncid = stage2St + 30 // the original's |do_syncid|
+	lDoSyncd  = stage2St + 33 // the original's |do_syncd|
+	lNextSync = stage2St + 35 // the original's |next_sync|
 )
 
 //line mmixpipe.w:8259
@@ -1263,7 +1263,7 @@ func (mx *machine) MMIXInit() {
 	}
 	mx.g[rG].o = 255
 	mx.g[rN].o = (version<<24+subversion<<16+subsubversion<<8)<<32 |
-		Octa(Tetra(ABSTIME)) // 위의 설명과 경고를 보라
+		Octa(Tetra(ABSTIME)) // see comment and warning above
 	for j = 0; j < mx.lringSize; j++ {
 		mx.l[j].addr = sign32<<32 | Octa(256+j)
 		mx.l[j].known = true
@@ -1300,12 +1300,12 @@ func (mx *machine) MMIXInit() {
 	}
 
 //line mmixpipe.w:3238
-	mx.bpAmask = ((1 << mx.bpA) - 1) << 2            // 명령 주소의 가장 아래 $a$비트
-	mx.bpCmask = ((1 << mx.bpC) - 1) << (mx.bpA + 2) // 그다음 $c$개의 주소 비트
-	mx.bpBcmask = (1 << (mx.bpB + mx.bpC)) - 1       // 이력 정보의 가장 아래 $b+c$비트
-	mx.bpNmask = (1 << mx.bpN) - 1                   // 가장 아래 $n$비트
+	mx.bpAmask = ((1 << mx.bpA) - 1) << 2            // least $a$ bits of instruction address
+	mx.bpCmask = ((1 << mx.bpC) - 1) << (mx.bpA + 2) // the next $c$ address bits
+	mx.bpBcmask = (1 << (mx.bpB + mx.bpC)) - 1       // least $b+c$ bits of history info
+	mx.bpNmask = (1 << mx.bpN) - 1                   // least significant $n$ bits
 	if mx.bpN > 0 {
-		mx.bpNpower = 1 << (mx.bpN - 1) // $2^{n-1}$, 곧 $n$비트 수의 부호 비트
+		mx.bpNpower = 1 << (mx.bpN - 1) // $2^{n-1}$, the sign bit of an $n$-bit number
 	}
 
 //line mmixpipe.w:4459
@@ -1325,7 +1325,7 @@ func (mx *machine) MMIXInit() {
 				c.op, c.i = LDPTE, ldpte
 			}
 			c.loc = negOne
-			c.goLoc.o = 3 // 원본의 |incr(neg_one,4)|
+			c.goLoc.o = 3 // the original's |incr(neg_one,4)|
 			c.ptrA = &mx.mem
 			c.renX = true
 			c.x.addr = c.x.addr&0xffffffff | 0xffffffff<<32
@@ -1412,7 +1412,7 @@ func confusion(m string) string {
 	return "This can't happen: " + m
 }
 
-func (mx *machine) expire() { // 죽기 전 마지막 숨
+func (mx *machine) expire() { // the last gasp before dying
 	if mx.ticks>>32 != 0 {
 		mx.errprintf("(Clock time is %dH+%d.)\n",
 			int32(mx.ticks>>32), int32(Tetra(mx.ticks)))
@@ -1453,11 +1453,11 @@ func coroutineID(c *coroutine) string {
 //line mmixpipe.w:391
 func (mx *machine) schedule(c *coroutine, d, s int) {
 	tt := (mx.curTime + d) % mx.ringSize
-	if d <= 0 || d >= mx.ringSize { // 상식 검사를 한다
+	if d <= 0 || d >= mx.ringSize { // do a sanity check
 		mx.panic(confusion("Scheduling ") + coroutineID(c) +
 			fmt.Sprintf(" with delay %d", d))
 	}
-	p := &mx.ring[tt] // 머리 노드에서 시작한다
+	p := &mx.ring[tt] // start at the list head
 	for p.next.stage < c.stage {
 		p = p.next
 	}
@@ -1730,7 +1730,7 @@ func (mx *machine) cycle() {
 		}
 	}
 	if mx.blk != nil {
-		mx.blk.tick() // 보충: \.{mmixmem.w}의 블록 장치가 시간을 보낸다
+		mx.blk.tick() // supplement: the block device of \.{mmixmem.w} spends time
 	}
 	mx.tryingToInterrupt = false
 	if mx.g[rQ].o&mx.g[rK].o != 0 && mx.cool != mx.hot &&
@@ -1745,7 +1745,7 @@ func (mx *machine) cycle() {
 			i = mx.issuedBetween(mx.hot, mx.cool)
 			if i >= mx.deissues {
 				mx.deissues = i
-				mx.tail = mx.head // 가져오기 버퍼를 비운다
+				mx.tail = mx.head // clear the fetch buffer
 				mx.resuming = 0
 
 //line mmixpipe.w:6097
@@ -1769,8 +1769,8 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:1282
 	mx.dispatchCount = 0
-	mx.oldHot = mx.hot   // 사이클이 시작할 때 뜨거운 자리의 위치를 기억한다
-	mx.oldTail = mx.tail // 사이클이 시작할 때 가져오기 버퍼의 내용을 기억한다
+	mx.oldHot = mx.hot   // remember the hot seat position at beginning of cycle
+	mx.oldTail = mx.tail // remember the fetch buffer contents at beginning of cycle
 	mx.suppressDispatch = mx.deissues != 0 || mx.dispatchLock != nil
 	if mx.doingInterrupt != 0 {
 
@@ -1808,7 +1808,7 @@ func (mx *machine) cycle() {
 			{
 				hot := mx.hot
 				j = int(packBytes(hot.op, int(hot.xx), int(hot.yy), int(hot.zz)))
-				if hot.interrupt&hBit != 0 { // 트립
+				if hot.interrupt&hBit != 0 { // trip
 					mx.g[rW].o = hot.loc + 4
 					mx.g[rX].o = sign32<<32 | Octa(Tetra(j))
 					if mx.verbose&issueBit != 0 {
@@ -1818,22 +1818,22 @@ func (mx *machine) cycle() {
 						mx.printOcta(mx.g[rX].o)
 						mx.printf("\n")
 					}
-				} else { // 트랩
+				} else { // trap
 					mx.g[rWW].o = hot.goLoc.o
 					mx.g[rXX].o = mx.g[rXX].o&^0xffffffff | Octa(Tetra(j))
 
 //line mmixpipe.w:6876
-					if hot.interrupt&fBit != 0 { // 강제
+					if hot.interrupt&fBit != 0 { // forced
 						if hot.i != trap {
-							j = resumeTrans // 페이지 변환을 에뮬레이트한다
+							j = resumeTrans // emulate page translation
 						} else if hot.op == TRAP {
 							j = 0x80 // |TRAP|
 						} else if flags[hot.op]&xIsDestBit != 0 {
-							j = resumeSet // 에뮬레이션
+							j = resumeSet // emulation
 						} else {
-							j = 0x80 // r[X]가 목적지가 아닐 때의 에뮬레이션
+							j = 0x80 // emulation when r[X] is not a destination
 						}
-					} else { // 동적
+					} else { // dynamic
 						if hot.interim {
 							if hot.i == frem || hot.i == syncd || hot.i == syncid {
 								j = resumeCont
@@ -1843,7 +1843,7 @@ func (mx *machine) cycle() {
 						} else if isLoadStore(hot.i) {
 							j = resumeAgain
 						} else {
-							j = 0x80 // 보통의 바깥 인터럽트
+							j = 0x80 // normal external interruption
 						}
 					}
 
@@ -1955,7 +1955,7 @@ func (mx *machine) cycle() {
 	commit:
 		for ; m > 0; m-- {
 			if mx.hot == mx.cool {
-				break // 재정렬 버퍼가 비어 있다
+				break // reorder buffer is empty
 			}
 			if !mx.securityDisabled {
 
@@ -1990,7 +1990,7 @@ func (mx *machine) cycle() {
 //line mmixpipe.w:1321
 			}
 			if mx.hot.owner != nil {
-				break // 뜨거운 자리의 명령이 끝나지 않았다
+				break // hot seat instruction isn't finished
 			}
 
 //line mmixpipe.w:2996
@@ -2066,7 +2066,7 @@ func (mx *machine) cycle() {
 						if !found {
 							p := mx.prevWrite(mx.writeTail)
 							if p == mx.writeHead {
-								break commit // 쓰기 버퍼가 차 있다
+								break commit // the write buffer is full
 							}
 							q = mx.writeTail
 							mx.writeTail = p
@@ -2128,14 +2128,14 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:6782
 				if hot.interrupt&hBit == 0 {
-					mx.g[rK].o = 0 // 트랩
+					mx.g[rK].o = 0 // trap
 				}
 				if (hot.interrupt&hBit != 0 && hot.i != trip) ||
 					(hot.interrupt&fBit != 0 && hot.i != trap) || hot.interrupt&eBit != 0 {
 					mx.doingInterrupt = 3
 					mx.suppressDispatch = true
 				} else {
-					mx.doingInterrupt = 2 // 배정기가 시작한 트립이나 트랩
+					mx.doingInterrupt = 2 // trip or trap started by dispatcher
 				}
 				break
 
@@ -2146,7 +2146,7 @@ func (mx *machine) cycle() {
 			i = mx.hot.i
 			mx.hot = mx.prevCtl(mx.hot)
 			if i == resum {
-				break // 다시 시작한 명령이 새 rK를 보게 한다
+				break // allow the resumed instruction to see the new rK
 			}
 		}
 
@@ -2160,7 +2160,7 @@ func (mx *machine) cycle() {
 	}
 	for self := mx.queuelist(mx.curTime); self != &mx.sentinel; self = mx.sentinel.next {
 		mx.sentinel.next = self.next
-		self.next = nil // 이 코루틴의 스케줄을 푼다
+		self.next = nil // unschedule this coroutine
 		if mx.verbose&coroutineBit != 0 {
 			mx.printf(" running ")
 			mx.printCoroutineID(self)
@@ -2168,7 +2168,7 @@ func (mx *machine) cycle() {
 			mx.printControlBlock(self.ctl)
 			mx.printf("\n")
 		}
-		if mx.step(self) { // 원본의 |terminate|
+		if mx.step(self) { // the original's |terminate|
 			if self.lockloc != nil {
 				*self.lockloc = nil
 				self.lockloc = nil
@@ -2189,7 +2189,7 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:1464
 			if mx.head == mx.oldTail {
-				break // 가져오기 버퍼가 비어 있다
+				break // fetch buffer empty
 			}
 			newHead := mx.prevFetch(mx.head)
 			op := int(mx.head.inst >> 24)
@@ -2201,7 +2201,7 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:1550
 			if mx.support[op>>5]&(sign32>>(op&31)) == 0 {
-				// 아이고, 이 연산 코드는 어떤 기능 장치도 지원하지 않는다
+				// oops, this opcode isn't supported by any functional unit
 				f, i = int(flags[TRAP]), trap
 			} else {
 				f, i = int(flags[op]), internalOp[op]
@@ -2267,7 +2267,7 @@ func (mx *machine) cycle() {
 					if op&0xe0 == 0x40 {
 
 //line mmixpipe.w:3167
-						predicted = op & 0x10 // 명령의 권고로 시작한다
+						predicted = op & 0x10 // start with the instruction's recommendation
 						if mx.bpTable != nil {
 							m = mx.bpIndex(mx.head.loc)
 							if int(mx.bpTable[m])&mx.bpNpower != 0 {
@@ -2285,7 +2285,7 @@ func (mx *machine) cycle() {
 					mx.head.noted = true
 					mx.head.hist = mx.peekHist
 					if predicted != 0 || f&ctlChangeBit != 0 || (i == syncid && cool.loc&signBit == 0) {
-						mx.oldTail, mx.tail = newHead, newHead // 남은 가져오기를 모두 버린다
+						mx.oldTail, mx.tail = newHead, newHead // discard all remaining fetches
 
 //line mmixpipe.w:6097
 						if mx.fetchCo.lockloc != nil {
@@ -2305,7 +2305,7 @@ func (mx *machine) cycle() {
 								mx.instPtr = spec{o: mx.g[rJ].up.o + Octa(yz<<2)}
 								break
 							}
-							fallthrough // 그렇지 않으면 |cool.goLoc|을 기다린다
+							fallthrough // otherwise fall through, will wait on |cool.goLoc|
 						case goOp, pushgo, trap, resume, syncid:
 							mx.instPtr.p = &mx.unknownSpec
 						case trip:
@@ -2320,7 +2320,7 @@ func (mx *machine) cycle() {
 //line mmixpipe.w:1475
 			if j >= mx.dispatchMax || mx.dispatchLock != nil || mx.nullifying {
 				mx.head = newHead
-				continue // 배정할 수는 없지만, 앞을 엿볼 수는 있다
+				continue // can't dispatch, but can peek ahead
 			}
 
 //line mmixpipe.w:1494
@@ -2331,7 +2331,7 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:1915
 				if mx.newCool == mx.hot {
-					break stall // 재정렬 버퍼가 차 있다
+					break stall // reorder buffer is full
 				}
 
 //line mmixpipe.w:1936
@@ -2406,7 +2406,7 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:2048
 						cool.z.o = Octa(yz) << (48 - 16*(op&3))
-						if i != set { // 레지스터 X가 Y 피연산자도 되어야 한다
+						if i != set { // register X should also be the Y operand
 							cool.y = cool.b
 							cool.b = spec{}
 						}
@@ -2444,7 +2444,7 @@ func (mx *machine) cycle() {
 								cool.renX = true
 								mx.specInstall(mx.lr(Tetra(mx.coolO)+Tetra(cool.xx)), &cool.x)
 							}
-						} else { // |head.inst|를 발행하기 전에 L을 늘려야 한다
+						} else { // we need to increase L before issuing |head.inst|
 
 //line mmixpipe.w:2076
 							if (Tetra(mx.coolS)-Tetra(mx.coolO)-Tetra(mx.coolL)-1)&Tetra(mx.lringMask) == 0 {
@@ -2458,7 +2458,7 @@ func (mx *machine) cycle() {
 								cool.z = spec{}
 								cool.memX = true
 								mx.specInstall(&mx.mem, &cool.x)
-								op = STOU // 이 명령은 적재/저장 장치가 다루어야 한다
+								op = STOU // this instruction needs to be handled by load/store unit
 								cool.interim = true
 								cool.stackAlert = cool.y.o&signBit == 0
 								break dispatchDone
@@ -2475,7 +2475,7 @@ func (mx *machine) cycle() {
 								mx.specInstall(&mx.g[rL], &cool.rl)
 								cool.rl.o = Octa(Tetra(mx.coolL + 1))
 								cool.renX, cool.setL = true, true
-								op = SETH // 이 명령은 가장 단순한 장치가 다룬다
+								op = SETH // this instruction to be handled by the simplest units
 								cool.interim = true
 								break dispatchDone
 
@@ -2592,7 +2592,7 @@ func (mx *machine) cycle() {
 								cool.z = spec{}
 								cool.memX = true
 								mx.specInstall(&mx.mem, &cool.x)
-								op = STOU // 이 명령은 적재/저장 장치가 다루어야 한다
+								op = STOU // this instruction needs to be handled by load/store unit
 								cool.interim = true
 								cool.stackAlert = cool.y.o&signBit == 0
 								break dispatchDone
@@ -2631,14 +2631,14 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:2142
 							if Tetra(mx.coolO)+Tetra(mx.coolL) == Tetra(mx.coolS)+Tetra(mx.lringSize) {
-								// $\gamma$가 $\beta$를 지나가지 못하게 한다
+								// don't let $\gamma$ pass $\beta$
 								if cool.i == pop && int(cool.xx) == mx.coolL && mx.coolL > 1 {
-									cool.i = or             // 주된 결과를 아래로 옮겨서 보존한다
-									mx.head.inst -= 0x10000 // 가져오기 버퍼에 있는 \.{POP}의 X 필드를 줄인다
+									cool.i = or             // we'll preserve the main result by moving it down
+									mx.head.inst -= 0x10000 // decrease X field of \.{POP} in fetch buffer
 									op = OR
 									cool.y = mx.specval(mx.lr(Tetra(mx.coolO) + Tetra(cool.xx) - 1))
 									mx.specInstall(mx.lr(Tetra(mx.coolO)+Tetra(cool.xx)-2), &cool.x)
-								} else { // rL을 1 줄인다
+								} else { // decrease rL by 1
 									mx.specInstall(&mx.g[rL], &cool.rl)
 									cool.rl.o = Octa(Tetra(mx.coolL - 1))
 									cool.setL = true
@@ -2649,7 +2649,7 @@ func (mx *machine) cycle() {
 								mx.newS = mx.coolS - 1
 								cool.y = spec{o: mx.newS << 3}
 								mx.specInstall(mx.lr(Tetra(mx.newS)), &cool.x)
-								op = LDOU // 이 명령은 적재/저장 장치가 다루어야 한다
+								op = LDOU // this instruction needs to be handled by load/store unit
 								cool.ptrA = mx.mem.up
 							}
 							cool.z, cool.b = spec{}, spec{}
@@ -2670,14 +2670,14 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:2142
 								if Tetra(mx.coolO)+Tetra(mx.coolL) == Tetra(mx.coolS)+Tetra(mx.lringSize) {
-									// $\gamma$가 $\beta$를 지나가지 못하게 한다
+									// don't let $\gamma$ pass $\beta$
 									if cool.i == pop && int(cool.xx) == mx.coolL && mx.coolL > 1 {
-										cool.i = or             // 주된 결과를 아래로 옮겨서 보존한다
-										mx.head.inst -= 0x10000 // 가져오기 버퍼에 있는 \.{POP}의 X 필드를 줄인다
+										cool.i = or             // we'll preserve the main result by moving it down
+										mx.head.inst -= 0x10000 // decrease X field of \.{POP} in fetch buffer
 										op = OR
 										cool.y = mx.specval(mx.lr(Tetra(mx.coolO) + Tetra(cool.xx) - 1))
 										mx.specInstall(mx.lr(Tetra(mx.coolO)+Tetra(cool.xx)-2), &cool.x)
-									} else { // rL을 1 줄인다
+									} else { // decrease rL by 1
 										mx.specInstall(&mx.g[rL], &cool.rl)
 										cool.rl.o = Octa(Tetra(mx.coolL - 1))
 										cool.setL = true
@@ -2688,7 +2688,7 @@ func (mx *machine) cycle() {
 									mx.newS = mx.coolS - 1
 									cool.y = spec{o: mx.newS << 3}
 									mx.specInstall(mx.lr(Tetra(mx.newS)), &cool.x)
-									op = LDOU // 이 명령은 적재/저장 장치가 다루어야 한다
+									op = LDOU // this instruction needs to be handled by load/store unit
 									cool.ptrA = mx.mem.up
 								}
 								cool.z, cool.b = spec{}, spec{}
@@ -2779,7 +2779,7 @@ func (mx *machine) cycle() {
 								cool.z = spec{}
 								cool.memX = true
 								mx.specInstall(&mx.mem, &cool.x)
-								op = STOU // 이 명령은 적재/저장 장치가 다루어야 한다
+								op = STOU // this instruction needs to be handled by load/store unit
 								cool.interim = true
 								cool.stackAlert = cool.y.o&signBit == 0
 								break dispatchDone
@@ -2796,7 +2796,7 @@ func (mx *machine) cycle() {
 								mx.specInstall(&mx.g[rL], &cool.rl)
 								cool.rl.o = Octa(Tetra(mx.coolL + 1))
 								cool.renX, cool.setL = true, true
-								op = SETH // 이 명령은 가장 단순한 장치가 다룬다
+								op = SETH // this instruction to be handled by the simplest units
 								cool.interim = true
 								break dispatchDone
 
@@ -2808,7 +2808,7 @@ func (mx *machine) cycle() {
 						if !mx.g[rT].up.known || !mx.g[rJ].up.known {
 							break stall
 						}
-						mx.instPtr = mx.specval(&mx.g[rT]) // 트랩과 에뮬레이트하는 연산
+						mx.instPtr = mx.specval(&mx.g[rT]) // traps and emulated ops
 						cool.needB, cool.b = true, mx.specval(&mx.g[255])
 						fallthrough
 					case trip:
@@ -2905,7 +2905,7 @@ func (mx *machine) cycle() {
 											mx.g[rBB].o = mx.io.Ftell(zz)
 										}
 									}
-									mx.g[255].o = negOne // 이것이 인터럽트를 허용한다
+									mx.g[255].o = negOne // this will enable interrupts
 								}
 
 //line mmixpipe.w:6964
@@ -2937,7 +2937,7 @@ func (mx *machine) cycle() {
 										fallthrough
 									case resumeCont:
 										mx.resuming += 1 + int(cool.zz)
-										if (Tetra(cool.b.o)>>24)&0xfa != 0xb8 { // |syncd|나 |syncid|가 아니다
+										if (Tetra(cool.b.o)>>24)&0xfa != 0xb8 { // not |syncd| or |syncid|
 
 //line mmixpipe.w:7048
 											m = int(Tetra(cool.b.o) >> 28)
@@ -2965,7 +2965,7 @@ func (mx *machine) cycle() {
 												again = true
 												break
 											}
-											cool.i = resume // 위의 ``미묘한 점''을 보라
+											cool.i = resume // see ``subtle point'' above
 											break
 										}
 										bad = true
@@ -2982,7 +2982,7 @@ func (mx *machine) cycle() {
 										mx.head.inst = Tetra(cool.b.o)
 										m = int(mx.head.inst >> 24)
 										if m == RESUME {
-											bad = true // 가로막을 수 없는 루프를 피한다
+											bad = true // avoid uninterruptible loop
 										} else {
 											if cool.zz == 0 && m > RESUME && m <= SYNC && mx.head.inst&badInstMask[m-RESUME] != 0 {
 												mx.head.interrupt |= bBit
@@ -3011,7 +3011,7 @@ func (mx *machine) cycle() {
 							cool.i = noop
 						} else {
 							cool.interim = true
-							op = LDOU // 이 명령은 적재/저장 장치가 다루어야 한다
+							op = LDOU // this instruction needs to be handled by load/store unit
 							cool.i = unsav
 							switch cool.xx {
 							case 0:
@@ -3050,14 +3050,14 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:2142
 									if Tetra(mx.coolO)+Tetra(mx.coolL) == Tetra(mx.coolS)+Tetra(mx.lringSize) {
-										// $\gamma$가 $\beta$를 지나가지 못하게 한다
+										// don't let $\gamma$ pass $\beta$
 										if cool.i == pop && int(cool.xx) == mx.coolL && mx.coolL > 1 {
-											cool.i = or             // 주된 결과를 아래로 옮겨서 보존한다
-											mx.head.inst -= 0x10000 // 가져오기 버퍼에 있는 \.{POP}의 X 필드를 줄인다
+											cool.i = or             // we'll preserve the main result by moving it down
+											mx.head.inst -= 0x10000 // decrease X field of \.{POP} in fetch buffer
 											op = OR
 											cool.y = mx.specval(mx.lr(Tetra(mx.coolO) + Tetra(cool.xx) - 1))
 											mx.specInstall(mx.lr(Tetra(mx.coolO)+Tetra(cool.xx)-2), &cool.x)
-										} else { // rL을 1 줄인다
+										} else { // decrease rL by 1
 											mx.specInstall(&mx.g[rL], &cool.rl)
 											cool.rl.o = Octa(Tetra(mx.coolL - 1))
 											cool.setL = true
@@ -3068,7 +3068,7 @@ func (mx *machine) cycle() {
 										mx.newS = mx.coolS - 1
 										cool.y = spec{o: mx.newS << 3}
 										mx.specInstall(mx.lr(Tetra(mx.newS)), &cool.x)
-										op = LDOU // 이 명령은 적재/저장 장치가 다루어야 한다
+										op = LDOU // this instruction needs to be handled by load/store unit
 										cool.ptrA = mx.mem.up
 									}
 									cool.z, cool.b = spec{}, spec{}
@@ -3089,14 +3089,14 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:2142
 										if Tetra(mx.coolO)+Tetra(mx.coolL) == Tetra(mx.coolS)+Tetra(mx.lringSize) {
-											// $\gamma$가 $\beta$를 지나가지 못하게 한다
+											// don't let $\gamma$ pass $\beta$
 											if cool.i == pop && int(cool.xx) == mx.coolL && mx.coolL > 1 {
-												cool.i = or             // 주된 결과를 아래로 옮겨서 보존한다
-												mx.head.inst -= 0x10000 // 가져오기 버퍼에 있는 \.{POP}의 X 필드를 줄인다
+												cool.i = or             // we'll preserve the main result by moving it down
+												mx.head.inst -= 0x10000 // decrease X field of \.{POP} in fetch buffer
 												op = OR
 												cool.y = mx.specval(mx.lr(Tetra(mx.coolO) + Tetra(cool.xx) - 1))
 												mx.specInstall(mx.lr(Tetra(mx.coolO)+Tetra(cool.xx)-2), &cool.x)
-											} else { // rL을 1 줄인다
+											} else { // decrease rL by 1
 												mx.specInstall(&mx.g[rL], &cool.rl)
 												cool.rl.o = Octa(Tetra(mx.coolL - 1))
 												cool.setL = true
@@ -3107,7 +3107,7 @@ func (mx *machine) cycle() {
 											mx.newS = mx.coolS - 1
 											cool.y = spec{o: mx.newS << 3}
 											mx.specInstall(mx.lr(Tetra(mx.newS)), &cool.x)
-											op = LDOU // 이 명령은 적재/저장 장치가 다루어야 한다
+											op = LDOU // this instruction needs to be handled by load/store unit
 											cool.ptrA = mx.mem.up
 										}
 										cool.z, cool.b = spec{}, spec{}
@@ -3152,7 +3152,7 @@ func (mx *machine) cycle() {
 								cool.interim, cool.i = false, noop
 								cool.interrupt |= bBit
 							}
-						} // 이것이 우리를 |dispatchDone|으로 데려간다
+						} // this takes us to |dispatchDone|
 
 //line mmixpipe.w:7362
 					case save:
@@ -3172,7 +3172,7 @@ func (mx *machine) cycle() {
 							cool.z = spec{}
 							cool.memX = true
 							mx.specInstall(&mx.mem, &cool.x)
-							op = STOU // 이 명령은 적재/저장 장치가 다루어야 한다
+							op = STOU // this instruction needs to be handled by load/store unit
 							cool.interim = true
 							cool.stackAlert = cool.y.o&signBit == 0
 							break dispatchDone
@@ -3206,7 +3206,7 @@ func (mx *machine) cycle() {
 									cool.z = spec{}
 									cool.memX = true
 									mx.specInstall(&mx.mem, &cool.x)
-									op = STOU // 이 명령은 적재/저장 장치가 다루어야 한다
+									op = STOU // this instruction needs to be handled by load/store unit
 									cool.interim = true
 									cool.stackAlert = cool.y.o&signBit == 0
 									break dispatchDone
@@ -3219,7 +3219,7 @@ func (mx *machine) cycle() {
 							case 2, 3:
 
 //line mmixpipe.w:7405
-								op = STOU // 이 명령은 적재/저장 장치가 다루어야 한다
+								op = STOU // this instruction needs to be handled by load/store unit
 								cool.memX = true
 								mx.specInstall(&mx.mem, &cool.x)
 								cool.z.o = mx.coolO << 3
@@ -3292,8 +3292,8 @@ func (mx *machine) cycle() {
 				{
 					t, b := op>>5, Tetra(sign32)>>(op&31)
 					found := false
-					if cool.i == trap && op != TRAP { // 연산 코드를 에뮬레이트해야 한다
-						u = &mx.funit[mx.funitCount] // 이 장치는 \.{TRIP}과 \.{TRAP}만 지원한다
+					if cool.i == trap && op != TRAP { // opcode needs to be emulated
+						u = &mx.funit[mx.funitCount] // this unit supports just \.{TRIP} and \.{TRAP}
 						found = true
 					}
 				units:
@@ -3315,7 +3315,7 @@ func (mx *machine) cycle() {
 						}
 					}
 					if !found {
-						break stall // 이 |op|를 다루는 장치가 모두 바쁘다
+						break stall // all units for this |op| are busy
 					}
 				}
 
@@ -3356,11 +3356,11 @@ func (mx *machine) cycle() {
 						if reversed != 0 {
 							mx.bpTable[m] = int8(hDown)
 							cool.x.o = Octa(Tetra(hUp))
-							cool.i = pbr + br - cool.i // 뜻을 뒤집는다
+							cool.i = pbr + br - cool.i // reverse the sense
 							mx.bpRevStat++
 						} else {
 							mx.bpTable[m] = int8(hUp)
-							cool.x.o = Octa(Tetra(hDown)) // 흐름을 따른다
+							cool.x.o = Octa(Tetra(hDown)) // go with the flow
 							mx.bpOkStat++
 						}
 						if mx.verbose&showPredBit != 0 {
@@ -3443,10 +3443,10 @@ func (mx *machine) cycle() {
 					if flags[cool.op]&ctlChangeBit != 0 || cool.i == pbr {
 						if mx.instPtr.p == nil && mx.instPtr.o&signBit != 0 && cool.loc&signBit == 0 &&
 							cool.i != trap {
-							cool.interrupt |= pBit // 음이 아닌 곳에서 음인 곳으로 점프한다
+							cool.interrupt |= pBit // jumping from nonnegative to negative
 						}
 					}
-					trueHead, mx.head = newHead, newHead // 가져오기 버퍼에서 명령을 지운다
+					trueHead, mx.head = newHead, newHead // delete instruction from fetch buffer
 					mx.resuming = 0
 				}
 				if freezeDispatch {
@@ -3454,7 +3454,7 @@ func (mx *machine) cycle() {
 				}
 				cool.owner = &u.co[0]
 				u.co[0].ctl = cool
-				mx.startup(&u.co[0], 1) // 새 명령의 실행을 스케줄한다
+				mx.startup(&u.co[0], 1) // schedule execution of the new inst
 				if mx.verbose&issueBit != 0 {
 					mx.printf("Issuing ")
 					mx.printControlBlock(cool)
@@ -3496,7 +3496,7 @@ func (mx *machine) cycle() {
 
 //line mmixpipe.w:1294
 	}
-	mx.ticks++ // 그리고 박자가 넘어간다
+	mx.ticks++ // and the beat moves on
 	mx.dispatchStat[mx.dispatchCount]++
 }
 
@@ -3573,7 +3573,7 @@ func (mx *machine) specval(r *specnode) spec {
 }
 
 //line mmixpipe.w:1840
-func (mx *machine) specInstall(r, t *specnode) { // |t|를 리스트 |r|에 넣는다
+func (mx *machine) specInstall(r, t *specnode) { // insert |t| into list |r|
 	t.up = r.up
 	t.up.down = t
 	r.up = t
@@ -3582,7 +3582,7 @@ func (mx *machine) specInstall(r, t *specnode) { // |t|를 리스트 |r|에 넣�
 }
 
 //line mmixpipe.w:1851
-func specRem(t *specnode) { // |t|를 그 리스트에서 뺀다
+func specRem(t *specnode) { // remove |t| from its list
 	u, d := t.up, t.down
 	u.down = d
 	d.up = u
@@ -3611,7 +3611,7 @@ func (mx *machine) passAfter(self *coroutine, t int) {
 	mx.schedule(self.succ, t, self.ctl.state)
 }
 
-func (mx *machine) sleep(self *coroutine) bool { // 영원히 기다린다
+func (mx *machine) sleep(self *coroutine) bool { // wait forever
 	self.next = self
 	return false
 }
@@ -3632,7 +3632,7 @@ func (mx *machine) step(self *coroutine) bool {
 		pc   label
 
 //line mmixpipe.w:4126
-		blockDiff int // |flushToS|에서 더 읽어야 할 바이트 수
+		blockDiff int // bytes still to be read in |flushToS|
 
 //line mmixpipe.w:2500
 	)
@@ -3682,7 +3682,7 @@ func (mx *machine) step(self *coroutine) bool {
 	case fillFromVirt:
 		c = data.ptrA.(*cache)
 		cc = c.fillLock
-		co = data.ptrC.([]coroutine) // |IPTco|나 |DPTco|
+		co = data.ptrC.([]coroutine) // |IPTco| or |DPTco|
 		pc = fillVirtSt + label(data.state)
 
 //line mmixpipe.w:5154
@@ -3810,7 +3810,7 @@ func (mx *machine) step(self *coroutine) bool {
 				data.z.o = mx.physAddr(data.y.o, p.data[0])
 				if mx.Icache.b+mx.Icache.c > mx.pageS &&
 					(Tetra(data.y.o)^Tetra(data.z.o))&Tetra((mx.Icache.bb<<mx.Icache.c)-(1<<mx.pageS)) != 0 {
-					data.state = itHit // 가짜 I-캐시 찾기
+					data.state = itHit // spurious I-cache lookup
 				} else {
 
 //line mmixpipe.w:6233
@@ -3950,7 +3950,7 @@ func (mx *machine) step(self *coroutine) bool {
 //line mmixpipe.w:6354
 			}
 			p = mx.allocSlot(mx.ITcache, mx.transKey(data.y.o))
-			if p == nil { // 이런, 결국 있었다
+			if p == nil { // hey, it was present after all
 				if data.i == prego {
 					pc = lFinEx
 				} else {
@@ -4032,7 +4032,7 @@ func (mx *machine) step(self *coroutine) bool {
 			pc = lFetchOne
 			continue
 		case fetchSt + gotOne:
-			mx.fetched[0] = data.x.o // 새 캐시 데이터의 ``미리 보기''
+			mx.fetched[0] = data.x.o // a ``preview'' of the new cache data
 			fallthrough
 		case lFetchOne:
 			mx.fetchLo, mx.fetchHi = 0, 1
@@ -4053,7 +4053,7 @@ func (mx *machine) step(self *coroutine) bool {
 			for j = 0; j < mx.fetchMax; j++ {
 				newTail := mx.prevFetch(mx.tail)
 				if newTail == mx.head {
-					break // 가져오기 버퍼가 차 있다
+					break // fetch buffer is full
 				}
 
 //line mmixpipe.w:6509
@@ -4150,7 +4150,7 @@ func (mx *machine) step(self *coroutine) bool {
 				data.state = 1
 			}
 			if j != 0 {
-				return mx.wait(self, 1) // 그렇지 않으면 |case 1|로 흘러내린다
+				return mx.wait(self, 1) // otherwise we fall through to |case 1|
 			}
 
 //line mmixpipe.w:2630
@@ -4249,7 +4249,7 @@ func (mx *machine) step(self *coroutine) bool {
 					for j = mul0; aux != 0; j++ {
 						aux >>= 8
 					}
-					data.i = j // |j|는 |mul0|이나 |mul1|이나 \dots~|mul8|이다
+					data.i = j // |j| is |mul0| or |mul1| or \dots~or |mul8|
 				}
 
 //line mmixpipe.w:7466
@@ -4268,7 +4268,7 @@ func (mx *machine) step(self *coroutine) bool {
 					for j = mul0; aux != 0; j++ {
 						aux >>= 8
 					}
-					data.i = j // |j|는 |mul0|이나 |mul1|이나 \dots~|mul8|이다
+					data.i = j // |j| is |mul0| or |mul1| or \dots~or |mul8|
 				}
 
 //line mmixpipe.w:7475
@@ -4279,7 +4279,7 @@ func (mx *machine) step(self *coroutine) bool {
 				if data.z.o == 0 {
 					data.interrupt |= dBit
 					data.a.o = data.y.o
-					data.i = set // 0으로 나누기는 파이프라인에서 기다릴 필요가 없다
+					data.i = set // divide by zero needn't wait in the pipeline
 				} else {
 					q, r, overflow := mmixarith.SignedDiv(data.y.o, data.z.o)
 					data.x.o = q
@@ -4314,7 +4314,7 @@ func (mx *machine) step(self *coroutine) bool {
 			case zset:
 				if registerTruth(data.y.o, data.op) != 0 {
 					data.x.o = data.z.o
-				} // 그렇지 않으면 |data.x.o|는 이미 0이다
+				} // otherwise |data.x.o| is already zero
 				pc = lFinEx
 				continue
 			case cset:
@@ -4331,7 +4331,7 @@ func (mx *machine) step(self *coroutine) bool {
 
 //line mmixpipe.w:7595
 			case fadd, fsub, fmul, fdiv, fsqrt, fint, fix:
-				entry := 0 // |fin_bflot|이면 0, |fin_uflot|이면 1, |fin_flot|이면 2
+				entry := 0 // 0 for |fin_bflot|, 1 for |fin_uflot|, 2 for |fin_flot|
 				mx.setRound(data)
 				switch data.i {
 
@@ -4344,7 +4344,7 @@ func (mx *machine) step(self *coroutine) bool {
 						data.a.o ^= signBit
 					}
 					data.x.o, mx.exceptions = mmixarith.FPlus(data.y.o, data.a.o, mx.curRound)
-					data.i = fadd // 덧셈의 파이프라인 시간을 쓴다
+					data.i = fadd // use pipeline times for addition
 				case fmul:
 					data.x.o, mx.exceptions = mmixarith.FMult(data.y.o, data.z.o, mx.curRound)
 				case fdiv:
@@ -4358,7 +4358,7 @@ func (mx *machine) step(self *coroutine) bool {
 				case fix:
 					data.x.o, mx.exceptions = mmixarith.FixIt(data.z.o, mx.roundMode(data.y.o))
 					if data.op&0x2 != 0 {
-						mx.exceptions &^= wBit // 부호 없는 경우는 넘치지 않는다
+						mx.exceptions &^= wBit // unsigned case doesn't overflow
 					}
 					entry = 2
 
@@ -4490,7 +4490,7 @@ func (mx *machine) step(self *coroutine) bool {
 					if data.i == prego {
 						bb = mx.Icache.bb
 					}
-					data.z.o += Octa(int(data.xx) & -bb) // (덧셈기가 넉넉히 빠르기를 바란다)
+					data.z.o += Octa(int(data.xx) & -bb) // (I hope the adder is fast enough)
 				}
 				fallthrough
 			case ld, ldunc, ldvts, st, pst, syncd, syncid:
@@ -4514,7 +4514,7 @@ func (mx *machine) step(self *coroutine) bool {
 //line mmixpipe.w:5369
 				}
 				data.x.o, data.x.known = 0, true
-				pc = lDie // 페이지 테이블 실패
+				pc = lDie // page table fault
 				continue
 
 //line mmixpipe.w:3257
@@ -4527,7 +4527,7 @@ func (mx *machine) step(self *coroutine) bool {
 				}
 				if (j != 0) == (data.i == pbr) {
 					mx.bpGoodStat++
-				} else { // 아이고, 잘못 예측했다
+				} else { // oops, misprediction
 					mx.bpBadStat++
 
 //line mmixpipe.w:3316
@@ -4537,7 +4537,7 @@ func (mx *machine) step(self *coroutine) bool {
 						continue
 					}
 					mx.deissues = i
-					mx.oldTail, mx.tail = mx.head, mx.head // 가져오기 버퍼를 비운다
+					mx.oldTail, mx.tail = mx.head, mx.head // clear the fetch buffer
 					mx.resuming = 0
 
 //line mmixpipe.w:6097
@@ -4558,7 +4558,7 @@ func (mx *machine) step(self *coroutine) bool {
 						}
 					}
 					if mx.bpTable != nil {
-						mx.bpTable[data.x.o>>32] = int8(data.x.o) // 이것이 넣었어야 할 값이다
+						mx.bpTable[data.x.o>>32] = int8(data.x.o) // this is what we should have stored
 						if mx.verbose&showPredBit != 0 {
 							mx.printf(" mispredicted ")
 							mx.printOcta(data.loc)
@@ -4696,7 +4696,7 @@ func (mx *machine) step(self *coroutine) bool {
 							data.interrupt |= bBit
 							data.z.o = mx.g[rG].o
 						} else if Tetra(data.z.o) < Tetra(mx.g[rG].o) {
-							data.interim = true // 가로막힐 수 있다
+							data.interim = true // potentially interruptible
 							for j = 0; j < mx.commitMax; j++ {
 								mx.g[rG].o--
 								mx.g[Tetra(mx.g[rG].o)].o = 0
@@ -4739,7 +4739,7 @@ func (mx *machine) step(self *coroutine) bool {
 //line mmixpipe.w:7250
 			case pop:
 				data.x.o = data.y.o
-				data.y.o = data.b.o // rJ를 |y| 필드로 옮긴다
+				data.y.o = data.b.o // move rJ to |y| field
 				fallthrough
 			case pushgo:
 
@@ -4866,7 +4866,7 @@ func (mx *machine) step(self *coroutine) bool {
 				s := &mx.pipeSeq[data.i]
 				j = int(s[0]) + data.denin
 				if s[1] != 0 {
-					data.state = 2 // 단계가 하나보다 많다
+					data.state = 2 // more than one stage
 				} else {
 					j += data.denout
 				}
@@ -4882,14 +4882,14 @@ func (mx *machine) step(self *coroutine) bool {
 
 //line mmixpipe.w:2738
 			if self.succ.next != nil {
-				return mx.wait(self, 1) // 다음 단계가 차 있으면 멈춘다
+				return mx.wait(self, 1) // stall if the next stage is occupied
 			}
 			{
 				s := &mx.pipeSeq[data.i]
 				j = int(s[self.stage])
 				if s[self.stage+1] == 0 {
 					j += data.denout
-					data.state = 3 // 다음 단계가 마지막이다
+					data.state = 3 // the next stage is the last
 				}
 				mx.passAfter(self, j)
 			}
@@ -4915,7 +4915,7 @@ func (mx *machine) step(self *coroutine) bool {
 				data.a.known = true
 			}
 			if data.loc&signBit != 0 {
-				data.ra.o &^= 0xffffffff // 운영체제에서는 트립을 허용하지 않는다
+				data.ra.o &^= 0xffffffff // no trips enabled for the operating system
 			}
 			if data.interrupt&0xffff != 0 {
 
@@ -4939,7 +4939,7 @@ func (mx *machine) step(self *coroutine) bool {
 						continue
 					}
 					mx.deissues = i
-					mx.oldTail, mx.tail = mx.head, mx.head // 가져오기 버퍼를 비운다
+					mx.oldTail, mx.tail = mx.head, mx.head // clear the fetch buffer
 					mx.resuming = 0
 
 //line mmixpipe.w:6097
@@ -4956,7 +4956,7 @@ func (mx *machine) step(self *coroutine) bool {
 					for i = j & int(Tetra(data.ra.o)); i&dBit == 0; i <<= 1 {
 						m += 16
 					}
-					data.arithExc |= Tetra(j&^(0x10000>>(m>>4))) >> 8 // 일어난 트립은 사건으로 기록하지 않는다
+					data.arithExc |= Tetra(j&^(0x10000>>(m>>4))) >> 8 // trips taken are not logged as events
 					data.goLoc.o = Octa(m)
 					mx.instPtr = spec{o: data.goLoc.o}
 					data.interrupt |= hBit
@@ -4975,12 +4975,12 @@ func (mx *machine) step(self *coroutine) bool {
 			fallthrough
 		case lDie:
 			data.owner = nil
-			return true // 이 코루틴은 이제 사라진다
+			return true // this coroutine now fades away
 
 //line mmixpipe.w:5403
 		case stage1St + ldStLaunch:
 			if self.succ.next != nil {
-				return mx.wait(self, 1) // 둘째 단계가 비어 있어야 한다
+				return mx.wait(self, 1) // second stage must be clear
 			}
 
 //line mmixpipe.w:6174
@@ -5004,7 +5004,7 @@ func (mx *machine) step(self *coroutine) bool {
 				}
 				mx.startup(&mx.DTcache.reader[j], mx.DTcache.accessTime)
 				data.z.o = data.y.o & 0x7
-				p = mx.cacheSearch(mx.DTcache, data.y.o) // 주의: |transKey(data.y.o)|가 아니다
+				p = mx.cacheSearch(mx.DTcache, data.y.o) // N.B.: Not |transKey(data.y.o)|
 				if p != nil {
 					data.x.o = data.x.o&^0xffffffff | 2
 					c = mx.DTcache
@@ -5015,7 +5015,7 @@ func (mx *machine) step(self *coroutine) bool {
 						p.data[0] = p.data[0]&^0xffffffff | Octa(Tetra(p.data[0])&^7+Tetra(data.z.o))
 					} else {
 						p = mx.demoteAndFix(c, p)
-						p.tag |= signBit // 태그를 무효로 만든다
+						p.tag |= signBit // invalidate the tag
 					}
 
 //line mmixpipe.w:7789
@@ -5169,7 +5169,7 @@ func (mx *machine) step(self *coroutine) bool {
 						if Tetra(data.z.o)&(pwBit>>protOffset) != 0 {
 							data.stackAlert = false
 						} else {
-							data.z.o = mx.g[rC].o // 스택 넘침에는 계속 페이지를 쓴다
+							data.z.o = mx.g[rC].o // use the continuation page for stack overflow
 						}
 					}
 					j = int(prwBits(data))
@@ -5216,7 +5216,7 @@ func (mx *machine) step(self *coroutine) bool {
 						if Tetra(data.z.o)&(pwBit>>protOffset) != 0 {
 							data.stackAlert = false
 						} else {
-							data.z.o = mx.g[rC].o // 스택 넘침에는 계속 페이지를 쓴다
+							data.z.o = mx.g[rC].o // use the continuation page for stack overflow
 						}
 					}
 					j = int(prwBits(data))
@@ -5263,7 +5263,7 @@ func (mx *machine) step(self *coroutine) bool {
 					if Tetra(data.z.o)&(pwBit>>protOffset) != 0 {
 						data.stackAlert = false
 					} else {
-						data.z.o = mx.g[rC].o // 스택 넘침에는 계속 페이지를 쓴다
+						data.z.o = mx.g[rC].o // use the continuation page for stack overflow
 					}
 				}
 				j = int(prwBits(data))
@@ -5288,7 +5288,7 @@ func (mx *machine) step(self *coroutine) bool {
 					data.x.o, data.state = *m, ldReady
 				} else if mx.Dcache.b+mx.Dcache.c > mx.pageS &&
 					(Tetra(data.y.o)^Tetra(data.z.o))&Tetra((mx.Dcache.bb<<mx.Dcache.c)-(1<<mx.pageS)) != 0 {
-					data.state = dtHit // 가짜 D-캐시 찾기
+					data.state = dtHit // spurious D-cache lookup
 				} else {
 
 //line mmixpipe.w:5499
@@ -5338,7 +5338,7 @@ func (mx *machine) step(self *coroutine) bool {
 				continue
 			}
 			mx.deissues = i
-			mx.oldTail, mx.tail = mx.head, mx.head // 가져오기 버퍼를 비운다
+			mx.oldTail, mx.tail = mx.head, mx.head // clear the fetch buffer
 			mx.resuming = 0
 
 //line mmixpipe.w:6097
@@ -5431,7 +5431,7 @@ func (mx *machine) step(self *coroutine) bool {
 			if mx.wbufLock != nil {
 				return mx.wait(self, 1)
 			}
-			mx.writeHead, mx.writeCtl.state = mx.writeTail, 0 // 쓰기 버퍼를 지운다
+			mx.writeHead, mx.writeCtl.state = mx.writeTail, 0 // zap the write buffer
 			if mx.Dcache == nil {
 				data.state = 12
 				pc = lSwitch1
@@ -5471,11 +5471,11 @@ func (mx *machine) step(self *coroutine) bool {
 		case stage1St + 13:
 			if mx.cleanCo.next == nil {
 				data.interim = false
-				pc = lFinEx // 끝났다!
+				pc = lFinEx // it's done!
 				continue
 			}
 			if mx.tryingToInterrupt {
-				pc = lFinEx // 가로막기를 받아들인다
+				pc = lFinEx // accept an interruption
 				continue
 			}
 			return mx.wait(self, 1)
@@ -5543,7 +5543,7 @@ func (mx *machine) step(self *coroutine) bool {
 					if Tetra(data.z.o)&(pwBit>>protOffset) != 0 {
 						data.stackAlert = false
 					} else {
-						data.z.o = mx.g[rC].o // 스택 넘침에는 계속 페이지를 쓴다
+						data.z.o = mx.g[rC].o // use the continuation page for stack overflow
 					}
 				}
 				j = int(prwBits(data))
@@ -5615,7 +5615,7 @@ func (mx *machine) step(self *coroutine) bool {
 				if Tetra(data.z.o)&(pwBit>>protOffset) != 0 {
 					data.stackAlert = false
 				} else {
-					data.z.o = mx.g[rC].o // 스택 넘침에는 계속 페이지를 쓴다
+					data.z.o = mx.g[rC].o // use the continuation page for stack overflow
 				}
 			}
 			j = int(prwBits(data))
@@ -5638,7 +5638,7 @@ func (mx *machine) step(self *coroutine) bool {
 				pc = lFinishStore
 				continue
 			}
-			fallthrough // 그렇지 않으면 아래의 |ld_retry|로 흘러내린다
+			fallthrough // otherwise we fall through to |ld_retry| below
 
 //line mmixpipe.w:5757
 		case lLdRetry:
@@ -5756,7 +5756,7 @@ func (mx *machine) step(self *coroutine) bool {
 				pc = lFinEx
 				continue
 			}
-			q = mx.allocSlot(mx.Dcache, data.z.o) // |Dcache.filler|가 바빠도 괜찮다
+			q = mx.allocSlot(mx.Dcache, data.z.o) // OK if |Dcache.filler| is busy
 			if q != nil {
 				cleanBlock(mx.Dcache, q)
 				q.tag = data.z.o&^0xffffffff | Octa(Tetra(data.z.o)&Tetra(-mx.Dcache.bb))
@@ -5820,8 +5820,8 @@ func (mx *machine) step(self *coroutine) bool {
 
 //line mmixpipe.w:7346
 				if data.xx == 0 {
-					data.a.o = data.x.o & (0xffffff<<32 | 0xffffffff) // 되살린 rA
-					data.x.o >>= 56                                   // 되살린 rG
+					data.a.o = data.x.o & (0xffffff<<32 | 0xffffffff) // unsaved rA
+					data.x.o >>= 56                                   // unsaved rG
 					if data.a.o>>32 != 0 || Tetra(data.a.o)&0xfffc0000 != 0 {
 						data.a.o &= 0x3ffff
 						data.interrupt |= bBit
@@ -5947,17 +5947,17 @@ func (mx *machine) step(self *coroutine) bool {
 						return mx.wait(self, 1)
 					}
 					if data.x.o == mx.g[rP].o {
-						data.a.o = 1 // |data.a.o|의 윗 테트라는 0이다
+						data.a.o = 1 // the upper tetra of |data.a.o| is zero
 						data.x.o = data.b.o
 					} else {
-						mx.g[rP].o = data.x.o // |data.a.o|는 0이다
+						mx.g[rP].o = data.x.o // |data.a.o| is zero
 						if mx.verbose&issueBit != 0 {
 							mx.printf(" setting rP=")
 							mx.printOcta(mx.g[rP].o)
 							mx.printf("\n")
 						}
 					}
-					data.i = cswap // 겉모습만 바꾼다. 추적 출력에만 영향을 준다
+					data.i = cswap // cosmetic change, affects the trace output only
 
 //line mmixpipe.w:6015
 				case SAVE >> 1:
@@ -5967,7 +5967,7 @@ func (mx *machine) step(self *coroutine) bool {
 						data.x.o = data.b.o
 					} else {
 						if data != mx.oldHot {
-							return mx.wait(self, 1) // rA의 가장 뜨거운 값이 필요하다
+							return mx.wait(self, 1) // we need the hottest value of rA
 						}
 						data.x.o = Octa(Tetra(mx.g[rG].o)<<24)<<32 | Octa(Tetra(mx.g[rA].o))
 						data.a.o = data.y.o
@@ -5999,7 +5999,7 @@ func (mx *machine) step(self *coroutine) bool {
 				pc = lDoSyncid
 				continue
 			}
-			return true // 원본에서는 |switch|를 빠져나가 |terminate|에 이른다
+			return true // the original breaks out of the |switch| and reaches |terminate|
 
 //line mmixpipe.w:6396
 		case stage2St + itMiss, stage2St + iHitAndMiss, stage2St + itHit, stage2St + fetchReady:
@@ -6023,7 +6023,7 @@ func (mx *machine) step(self *coroutine) bool {
 				return mx.wait(self, 1)
 			}
 			mx.startup(&mx.ITcache.reader[j], mx.ITcache.accessTime)
-			p = mx.cacheSearch(mx.ITcache, data.y.o) // 주의: |transKey(data.y.o)|가 아니다
+			p = mx.cacheSearch(mx.ITcache, data.y.o) // N.B.: Not |transKey(data.y.o)|
 			if p != nil {
 				data.x.o |= 1
 				c = mx.ITcache
@@ -6034,7 +6034,7 @@ func (mx *machine) step(self *coroutine) bool {
 					p.data[0] = p.data[0]&^0xffffffff | Octa(Tetra(p.data[0])&^7+Tetra(data.z.o))
 				} else {
 					p = mx.demoteAndFix(c, p)
-					p.tag |= signBit // 태그를 무효로 만든다
+					p.tag |= signBit // invalidate the tag
 				}
 
 //line mmixpipe.w:7820
@@ -6190,8 +6190,8 @@ func (mx *machine) step(self *coroutine) bool {
 				continue
 			}
 			if mx.tryingToInterrupt && data.interim && data == mx.oldHot {
-				data.z.o = 0 // |resumeCont|를 내다본다
-				pc = lFinEx  // 가로막기를 받아들인다
+				data.z.o = 0 // anticipate |resumeCont|
+				pc = lFinEx  // accept an interruption
 				continue
 			}
 			return mx.wait(self, 1)
@@ -6214,7 +6214,7 @@ func (mx *machine) step(self *coroutine) bool {
 					data.y.o = data.y.o&^0xffffffff | Octa(Tetra(data.y.o)&-bl)
 					data.z.o = data.z.o&^0xffffffff | Octa(Tetra(data.z.o)&^8191+Tetra(data.y.o)&8191)
 					if Tetra(data.y.o)&8191 == 0 {
-						pc = lSquareOne // 페이지 경계를 넘었을지도 모른다
+						pc = lSquareOne // maybe crossed a page boundary
 						continue
 					}
 					if data.i == syncd {
@@ -6258,7 +6258,7 @@ func (mx *machine) step(self *coroutine) bool {
 
 //line mmixpipe.w:4073
 			{
-				del := c.gg >> 3 // 알갱이 하나의 옥타바이트 수
+				del := c.gg >> 3 // octabytes per granule
 				addr := c.outbuf.tag
 				off := int(Tetra(addr)&0xffff) >> 3
 				count, first, lastOff := 0, true, 0
@@ -6293,7 +6293,7 @@ func (mx *machine) step(self *coroutine) bool {
 
 //line mmixpipe.w:4069
 		case flushMemSt + 2:
-			return true // 이것이 |memLock|과 |c.outbuf|를 풀어 준다
+			return true // this frees |memLock| and |c.outbuf|
 
 //line mmixpipe.w:4129
 		case flushSSt + 0:
@@ -6347,7 +6347,7 @@ func (mx *machine) step(self *coroutine) bool {
 
 //line mmixpipe.w:4186
 			if mx.Scache.filler.next != nil {
-				return mx.wait(self, 1) // 어쩌면 불필요한 조심일지도?
+				return mx.wait(self, 1) // perhaps an unnecessary precaution?
 			}
 			p = mx.allocSlot(mx.Scache, c.outbuf.tag)
 			if p == nil {
@@ -6375,11 +6375,11 @@ func (mx *machine) step(self *coroutine) bool {
 		case flushSSt + 4:
 			mx.copyBlock(c, &c.outbuf, mx.Scache, p)
 			mx.hitSet = mx.Scache.cacheAddr(c.outbuf.tag)
-			mx.useAndFix(mx.Scache, p) // |p|는 옮겨지지 않는다
+			mx.useAndFix(mx.Scache, p) // |p| not moved
 			data.state = 5
 			return mx.wait(self, mx.Scache.copyInTime)
 		case flushSSt + 5:
-			if mx.Scache.mode&writeBack == 0 { // 즉시 쓰기
+			if mx.Scache.mode&writeBack == 0 { // write-through
 				if mx.Scache.flusher.next != nil {
 					return mx.wait(self, 1)
 				}
@@ -6436,7 +6436,7 @@ func (mx *machine) step(self *coroutine) bool {
 				setLock(self, &c.lock)
 			}
 			if cc != nil {
-				mx.awaken(cc, c.copyInTime) // 두 번째로 깨운다
+				mx.awaken(cc, c.copyInTime) // the second wakeup call
 			}
 			mx.loadCache(c, data.ptrB.(*cacheblock))
 			data.state = 3
@@ -6475,11 +6475,11 @@ func (mx *machine) step(self *coroutine) bool {
 			return mx.sleep(self)
 		case fillSSt + 2:
 			if cc != nil {
-				cc.ctl.x.o = data.x.o               // 이 데이터는 |Scache.filler|가 공급했다
-				mx.awaken(cc, mx.Scache.accessTime) // 우리는 그것을 되돌려 전한다
+				cc.ctl.x.o = data.x.o               // this data has been supplied by |Scache.filler|
+				mx.awaken(cc, mx.Scache.accessTime) // we propagate it back
 			}
 			data.state = 3
-			return mx.sleep(self) // 깨어나면 S-캐시에 우리 데이터가 있을 것이다
+			return mx.sleep(self) // when we awake, the S-cache will have our data
 
 //line mmixpipe.w:4339
 		case lSNonMiss:
@@ -6505,7 +6505,7 @@ func (mx *machine) step(self *coroutine) bool {
 			data.state = 4
 			return mx.wait(self, mx.Scache.accessTime)
 		case fillSSt + 4:
-			mx.Scache.lock = nil // 우리가 그 잠금을 쥐고 있었다
+			mx.Scache.lock = nil // we had been holding that lock
 			data.state = 5
 			fallthrough
 		case fillSSt + 5:
@@ -6518,7 +6518,7 @@ func (mx *machine) step(self *coroutine) bool {
 			return mx.wait(self, c.copyInTime)
 		case fillSSt + 6:
 			if cc != nil {
-				mx.awaken(cc, 1) // 두 번째로 깨운다
+				mx.awaken(cc, 1) // second wakeup call
 			}
 			return true
 
@@ -6568,7 +6568,7 @@ func (mx *machine) step(self *coroutine) bool {
 			return mx.wait(self, mx.Dcache.copyOutTime)
 		case cleanupSt + 2:
 			if mx.cleanLock == nil {
-				return false // 일찍 끝난다
+				return false // premature termination
 			}
 			if mx.Dcache.flusher.next != nil {
 				return mx.wait(self, 1)
@@ -6672,7 +6672,7 @@ func (mx *machine) step(self *coroutine) bool {
 			return mx.wait(self, mx.Scache.copyOutTime)
 		case cleanupSt + 7:
 			if mx.cleanLock == nil {
-				return false // 일찍 끝난다
+				return false // premature termination
 			}
 			if mx.Scache.flusher.next != nil {
 				return mx.wait(self, 1)
@@ -6734,15 +6734,15 @@ func (mx *machine) step(self *coroutine) bool {
 
 //line mmixpipe.w:4874
 			aaaaa := data.y.o
-			i = int(aaaaa >> 61) // 세그먼트 번호
-			aaaaa &= 1<<61 - 1   // 세그먼트~$i$ 안의 주소
-			aaaaa >>= mx.pageS   // 페이지 주소
+			i = int(aaaaa >> 61) // the segment number
+			aaaaa &= 1<<61 - 1   // the address within segment~$i$
+			aaaaa >>= mx.pageS   // the page address
 			for j = 0; aaaaa != 0; j++ {
 				co[2*j].ctl.z.o = (aaaaa & 0x3ff) << 3
 				aaaaa >>= 10
 			}
-			if mx.pageB[i+1] < mx.pageB[i]+j { // 주소가 너무 크다
-				// |data.b.o|가 0이므로 할 일이 없다
+			if mx.pageB[i+1] < mx.pageB[i]+j { // address too large
+				// nothing needs to be done, since |data.b.o| is zero
 				//
 //line mmixpipe.w:4883
 //line mmixpipe.w:4884
@@ -6809,7 +6809,7 @@ func (mx *machine) step(self *coroutine) bool {
 		case writeSt + 4:
 
 //line mmixpipe.w:5316
-			if mx.Dcache.mode&writeBack == 0 { // 즉시 쓰기
+			if mx.Dcache.mode&writeBack == 0 { // write-through
 				if mx.Dcache.flusher.next != nil {
 					return mx.wait(self, 1)
 				}
@@ -6831,7 +6831,7 @@ func (mx *machine) step(self *coroutine) bool {
 				self.lockloc = nil
 			}
 			if mx.writeHead == mx.writeTail {
-				return mx.wait(self, 1) // 쓰기 버퍼가 비어 있다
+				return mx.wait(self, 1) // write buffer is empty
 			}
 			if mx.writeHead.i == sync {
 
@@ -6847,14 +6847,14 @@ func (mx *machine) step(self *coroutine) bool {
 				continue
 			}
 			if Tetra(mx.ticks)-mx.writeHead.stamp < Tetra(mx.holdingTime) && mx.speedLock == nil {
-				return mx.wait(self, 1) // 데이터가 아직 설익었다
+				return mx.wait(self, 1) // data too raw
 			}
 			if mx.Dcache == nil {
-				pc = lMemDirect // 캐시하지 않는다
+				pc = lMemDirect // not cached
 				continue
 			}
 			if mx.Dcache.lock != nil {
-				return mx.wait(self, 1) // D-캐시가 바쁘다
+				return mx.wait(self, 1) // D-cache busy
 			}
 			if j = getReader(mx.Dcache); j < 0 {
 				return mx.wait(self, 1)
@@ -6915,7 +6915,7 @@ func (mx *machine) step(self *coroutine) bool {
 			return mx.sleep(self)
 		case writeSt + 2:
 			data.state = 0
-			return mx.sleep(self) // D-캐시에 블록이 들어오면 깨어난다
+			return mx.sleep(self) // wake up when the D-cache has the block
 		case writeSt + 3:
 
 //line mmixpipe.w:5230
@@ -6936,7 +6936,7 @@ func (mx *machine) step(self *coroutine) bool {
 				}
 				c.outbuf.data[(a&Tetra(c.bb-1))>>3] = mx.writeHead.o
 				c.outbuf.dirty[(a&Tetra(c.bb-1))>>c.g] = true
-				c.outbuf.rank = c.gg // 유효한 바이트가 이만큼 있다
+				c.outbuf.rank = c.gg // this many valid bytes
 			}
 			setLock(self, &mx.wbufLock)
 			mx.startup(&mx.Dcache.flusher, mx.Dcache.copyOutTime)
@@ -6951,7 +6951,7 @@ func (mx *machine) step(self *coroutine) bool {
 				return mx.wait(self, 1)
 			}
 			setLock(self, &mx.wbufLock)
-			setLock(&mx.memLocker, &mx.memLock) // |vanish| 타입의 코루틴
+			setLock(&mx.memLocker, &mx.memLock) // a coroutine of type |vanish|
 			mx.startup(&mx.memLocker, mx.memAddrTime+mx.memWriteTime)
 			if mx.writeHead.addr>>32&0xffff0000 != 0 {
 				mx.specWrite(mx.writeHead.addr, mx.writeHead.o, mx.writeHead.size)
@@ -7002,13 +7002,13 @@ func registerTruth(o Octa, op int) int {
 	var b int
 	switch (op >> 1) & 0x3 {
 	case 0:
-		b = int(o >> 63) // 음수인가?
+		b = int(o >> 63) // negative?
 	case 1:
-		b = b2i(o == 0) // 0인가?
+		b = b2i(o == 0) // zero?
 	case 2:
-		b = b2i(o < signBit && o != 0) // 양수인가?
+		b = b2i(o < signBit && o != 0) // positive?
 	case 3:
-		b = int(o & 0x1) // 홀수인가?
+		b = int(o & 0x1) // odd?
 	}
 	if op&0x8 != 0 {
 		return b ^ 1
@@ -7188,7 +7188,7 @@ func (mx *machine) chooseVictim(s cacheset, aa int, policy replacePolicy) *cache
 				return &s[k]
 			}
 		}
-		mx.panic(confusion("lru victim")) // 무슨 일인가? 순위가 0인 것이 없다
+		mx.panic(confusion("lru victim")) // what happened? nobody has rank zero
 	case pseudoLRU:
 		l := 1
 		for m := aa >> 1; m != 0; m >>= 1 {
@@ -7259,7 +7259,7 @@ func (c *cache) cacheAddr(alf Octa) cacheset {
 }
 
 func (mx *machine) cacheSearch(c *cache, alf Octa) *cacheblock {
-	s := c.cacheAddr(alf) // |alf|에 해당하는 집합
+	s := c.cacheAddr(alf) // the set corresponding to |alf|
 	for k := 0; k < c.aa; k++ {
 		if p := &s[k]; (Tetra(p.tag)^Tetra(alf))&Tetra(c.tagmask) == 0 && p.tag>>32 == alf>>32 {
 			mx.hitSet = s
@@ -7268,7 +7268,7 @@ func (mx *machine) cacheSearch(c *cache, alf Octa) *cacheblock {
 	}
 	s = c.victim
 	if s == nil {
-		return nil // 캐시를 놓쳤고, 희생자 영역도 없다
+		return nil // cache miss, and no victim area
 	}
 	for k := 0; k < c.vv; k++ {
 		if p := &s[k]; (Tetra(p.tag)^Tetra(alf))&Tetra(-c.bb) == 0 && p.tag>>32 == alf>>32 {
@@ -7276,7 +7276,7 @@ func (mx *machine) cacheSearch(c *cache, alf Octa) *cacheblock {
 			return p
 		}
 	}
-	return nil // 두 번 놓쳤다
+	return nil // double miss
 }
 
 //line mmixpipe.w:3803
@@ -7289,7 +7289,7 @@ func (mx *machine) useAndFix(c *cache, p *cacheblock) *cacheblock {
 	if !sameSet(mx.hitSet, c.victim) {
 		noteUsage(p, mx.hitSet, c.aa, c.repl)
 	} else {
-		noteUsage(p, mx.hitSet, c.vv, c.vrepl) // 희생자 캐시에서 찾았다
+		noteUsage(p, mx.hitSet, c.vv, c.vrepl) // found in victim cache
 		if c.filler.next == nil {
 			s := c.cacheAddr(p.tag)
 			q := mx.chooseVictim(s, c.aa, c.repl)
@@ -7326,13 +7326,13 @@ func (mx *machine) loadCache(c *cache, p *cacheblock) {
 	p.data, c.inbuf.data = c.inbuf.data, p.data
 	p.tag = c.inbuf.tag
 	mx.hitSet = c.cacheAddr(p.tag)
-	mx.useAndFix(c, p) // |p|는 옮겨지지 않는다
+	mx.useAndFix(c, p) // |p| not moved
 }
 
 //line mmixpipe.w:3870
 func (mx *machine) flushCache(c *cache, p *cacheblock, keep bool) {
 	c.outbuf.tag = p.tag
-	if keep { // |p|의 데이터를 보존해야 하는가?
+	if keep { // should we preserve the data in |p|?
 		copy(c.outbuf.data[:c.bb>>3], p.data)
 	} else {
 		c.outbuf.data, p.data = p.data, c.outbuf.data
@@ -7341,8 +7341,8 @@ func (mx *machine) flushCache(c *cache, p *cacheblock, keep bool) {
 	for j := 0; j < c.bb>>c.g; j++ {
 		p.dirty[j] = false
 	}
-	c.outbuf.rank = c.bb                  // 유효한 바이트가 이만큼 있다
-	mx.startup(&c.flusher, c.copyOutTime) // 중단되지 않는다
+	c.outbuf.rank = c.bb                  // this many valid bytes
+	mx.startup(&c.flusher, c.copyOutTime) // will not be aborted
 }
 
 //line mmixpipe.w:3903
@@ -7354,7 +7354,7 @@ func (mx *machine) allocSlot(c *cache, alf Octa) *cacheblock {
 		(Tetra(c.outbuf.tag)^Tetra(alf))&Tetra(-c.bb) == 0 {
 		return nil
 	}
-	s := c.cacheAddr(alf) // |alf|에 해당하는 집합
+	s := c.cacheAddr(alf) // the set corresponding to |alf|
 	var p *cacheblock
 	if c.victim != nil {
 		p = mx.chooseVictim(c.victim, c.vv, c.vrepl)
@@ -7370,7 +7370,7 @@ func (mx *machine) allocSlot(c *cache, alf Octa) *cacheblock {
 	if c.victim != nil {
 		q := mx.chooseVictim(s, c.aa, c.repl)
 		swapBlocks(p, q)
-		q.tag |= sign32 << 32 // 태그를 무효로 만든다
+		q.tag |= sign32 << 32 // invalidate the tag
 		return q
 	}
 	p.tag |= sign32 << 32
@@ -7389,7 +7389,7 @@ func (mx *machine) memRead(addr Octa) Octa {
 
 			}
 			h = mx.hashPrime
-			break // 0을 돌려줄 것이다
+			break // zero will be returned
 		}
 		if h == 0 {
 			h = mx.hashPrime
@@ -7430,7 +7430,7 @@ func (mx *machine) transKey(addr Octa) Octa {
 }
 
 func (mx *machine) physAddr(virt, trans Octa) Octa {
-	t := trans &^ mx.pageMask // PTE의 \\{ynp} 필드들을 지운다
+	t := trans &^ mx.pageMask // zero out the \\{ynp} fields of a PTE
 	return t + virt&mx.pageMask
 }
 
@@ -7504,7 +7504,7 @@ func (mx *machine) writeSearch(ctl *control, addr Octa) *Octa {
 			}
 		}
 	}
-	for { // 원본의 |qloop|
+	for { // the original's |qloop|
 		if q == mx.writeHead {
 			return nil
 		}

@@ -14,60 +14,60 @@ import (
 type typer struct {
 
 //line mmotype.w:126
-	listing bool           // 모든 것을 나열하는가?
-	verbose bool           // 입력의 테트라들도 읽는 대로 보여 주는가?
-	mmoFile *bufio.Reader  // 입력 파일
-	out     *bufio.Writer  // 표준 출력
-	stderr  io.Writer      // 표준 오류
-	loc     *time.Location // 파일을 만든 시각을 찍을 시간대
+	listing bool           // are we listing everything?
+	verbose bool           // are we also showing the tetras of input as they are read?
+	mmoFile *bufio.Reader  // the input file
+	out     *bufio.Writer  // standard output
+	stderr  io.Writer      // standard error
+	loc     *time.Location // time zone for printing the file creation time
 
 //line mmotype.w:204
-	count     int     // 지금까지 읽은 테트라바이트의 수
-	byteCount int     // 다음에 읽을 바이트의 색인
-	buf       [4]byte // 가장 최근에 읽은 바이트들
-	yz        int     // 가장 낮은 두 바이트
-	tet       Tetra   // |buf|의 바이트들을 큰 끝 방식으로 묶은 것
+	count     int     // the number of tetrabytes we've read
+	byteCount int     // index of the next-to-be-read byte
+	buf       [4]byte // the most recently read bytes
+	yz        int     // the two least significant bytes
+	tet       Tetra   // |buf| bytes packed big-endianwise
 
 //line mmotype.w:294
-	curLoc     Octa        // 현재 위치
-	listedFile int         // 가장 최근에 나열한 파일 번호
-	curFile    int         // 가장 최근에 고른 파일 번호
-	curLine    int         // |curFile| 안의 현재 위치
-	fileName   [256]string // 본 파일 이름들
-	fileNamed  [256]bool   // 그 번호의 파일 이름을 보았는가?
-	tmp        Octa        // 잠깐 관심 있는 옥타바이트
+	curLoc     Octa        // the current location
+	listedFile int         // the most recently listed file number
+	curFile    int         // the most recently selected file number
+	curLine    int         // the current position in |curFile|
+	fileName   [256]string // file names seen
+	fileNamed  [256]bool   // have we seen the file name with that number?
+	tmp        Octa        // an octabyte of temporary interest
 
 //line mmotype.w:684
-	stabStart int    // 기호표가 시작한 곳
-	symBuf    []byte // 현재 마디로 오는 가운데 가지들의 문자들
+	stabStart int    // where the symbol table began
+	symBuf    []byte // the characters on middle transitions to current node
 
 //line mmotype.w:90
 }
 
-type exitSignal int // 이 종료 코드로 프로그램을 끝내라는 신호
+type exitSignal int // a signal to end the program with this exit code
 
 //line mmotype.w:162
 type (
-	Tetra = uint32 // 테트라바이트
-	Octa  = uint64 // 옥타바이트
+	Tetra = uint32 // a tetrabyte
+	Octa  = uint64 // an octabyte
 )
 
 //line mmotype.w:137
 const (
-	mm       = 0x98 // \.{mmo} 형식의 탈출 코드
-	lopQuote = 0x0  // 인용 lopcode
-	lopLoc   = 0x1  // 위치 lopcode
-	lopSkip  = 0x2  // 건너뛰기 lopcode
-	lopFixo  = 0x3  // 옥타바이트 고치기 lopcode
-	lopFixr  = 0x4  // 상대 주소 고치기 lopcode
-	lopFixrx = 0x5  // 확장된 상대 주소 고치기 lopcode
-	lopFile  = 0x6  // 파일 이름 lopcode
-	lopLine  = 0x7  // 파일 위치 lopcode
-	lopSpec  = 0x8  // 특수 고리 lopcode
-	lopPre   = 0x9  // 서문 lopcode
-	lopPost  = 0xa  // 후기 lopcode
-	lopStab  = 0xb  // 기호표 lopcode
-	lopEnd   = 0xc  // 모든 것을 끝내는 lopcode
+	mm       = 0x98 // the escape code of \.{mmo} format
+	lopQuote = 0x0  // the quotation lopcode
+	lopLoc   = 0x1  // the location lopcode
+	lopSkip  = 0x2  // the skip lopcode
+	lopFixo  = 0x3  // the octabyte-fix lopcode
+	lopFixr  = 0x4  // the relative-fix lopcode
+	lopFixrx = 0x5  // extended relative-fix lopcode
+	lopFile  = 0x6  // the file name lopcode
+	lopLine  = 0x7  // the file position lopcode
+	lopSpec  = 0x8  // the special hook lopcode
+	lopPre   = 0x9  // the preamble lopcode
+	lopPost  = 0xa  // the postamble lopcode
+	lopStab  = 0xb  // the symbol table lopcode
+	lopEnd   = 0xc  // the end-it-all lopcode
 )
 
 //line mmotype.w:681
@@ -105,25 +105,25 @@ func (t *typer) err(m string) {
 }
 
 //line mmotype.w:311
-func (t *typer) y() int { return int(t.buf[2]) } // 둘째로 낮은 바이트
-func (t *typer) z() int { return int(t.buf[3]) } // 가장 낮은 바이트
+func (t *typer) y() int { return int(t.buf[2]) } // the next-to-least significant byte
+func (t *typer) z() int { return int(t.buf[3]) } // the least significant byte
 
 //line mmotype.w:595
 func (t *typer) printStab() {
-	m := int(t.readByte()) // 주 조절 바이트
+	m := int(t.readByte()) // the master control byte
 	if m&0x40 != 0 {
-		t.printStab() // 왼쪽 부분 트라이가 비어 있지 않으면 순회한다
+		t.printStab() // traverse the left subtrie, if it is nonempty
 	}
 	if m&0x2f != 0 {
 
 //line mmotype.w:628
 		var hi byte
 		if m&0x80 != 0 {
-			hi = t.readByte() // 16비트 문자
+			hi = t.readByte() // 16-bit character
 		}
 		c := t.readByte()
 		if hi != 0 {
-			c = '?' // 아이고, |(hi<<8)+c|는 지금으로서는 쉽게 찍을 수 없다
+			c = '?' // oops, we can't print |(hi<<8)+c| easily at this time
 		}
 
 //line mmotype.w:602
@@ -147,7 +147,7 @@ func (t *typer) printStab() {
 					equiv += fmt.Sprintf("%02x", t.readByte())
 				}
 				if equiv == "#0000" {
-					equiv = "?" // 정의되지 않음
+					equiv = "?" // undefined
 				}
 			default:
 				equiv = "#20000000000000"[:33-2*j]
@@ -163,19 +163,19 @@ func (t *typer) printStab() {
 			}
 			sym := t.symBuf[1:]
 			if i := bytes.IndexByte(sym, 0); i >= 0 {
-				sym = sym[:i] // \CEE/ 문자열처럼 널 문자에서 끝난다
+				sym = sym[:i] // null-terminated, like a \CEE/ string
 			}
-			fmt.Fprintf(t.out, "    %s = %s (%d)\n", sym, equiv, serial-128) // 일련번호는 $|serial|-128$
+			fmt.Fprintf(t.out, "    %s = %s (%d)\n", sym, equiv, serial-128) // the serial number is $|serial|-128$
 
 //line mmotype.w:610
 		}
 		if m&0x20 != 0 {
-			t.printStab() // 가운데 부분 트라이를 순회한다
+			t.printStab() // traverse the middle subtrie
 		}
 		t.symBuf = t.symBuf[:len(t.symBuf)-1]
 	}
 	if m&0x10 != 0 {
-		t.printStab() // 오른쪽 부분 트라이가 비어 있지 않으면 순회한다
+		t.printStab() // traverse the right subtrie, if it is nonempty
 	}
 }
 
@@ -236,7 +236,7 @@ options:
 //line mmotype.w:58
 
 //line mmotype.w:523
-	t.readTet() // 입력의 첫 테트라바이트를 읽는다
+	t.readTet() // read the first tetrabyte of input
 	if t.buf[0] != mm || t.buf[1] != lopPre {
 		fmt.Fprintf(stderr, "Input is not an MMO file (first two bytes are wrong)!\n")
 
@@ -438,7 +438,7 @@ items:
 						t.readTet()
 						if t.buf[0] == mm {
 							if t.buf[1] != lopQuote || t.yz != 1 {
-								continue loop // 특수 데이터의 끝
+								continue loop // end of special data
 							}
 							t.readTet()
 						}

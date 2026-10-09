@@ -105,27 +105,27 @@ return 2
 
 @<상수@>=
 const (
-	bsize     = 1024       // 블록의 바이트 수
-	magic     = "NNIXFS01" // 슈퍼블록의 이름표
-	fatFree   = 0          // 빈 블록
-	fatEnd    = 0xffffffff // 파일의 마지막 블록
-	fatMeta   = 0xfffffffe // 슈퍼블록, FAT, 디렉터리
-	dirBlocks = 4          // 디렉터리의 블록 수
-	entSize   = 64         // 디렉터리 항목의 바이트 수
-	nameMax   = 47         // 이름의 최대 길이
-	maxBlocks = 4096       // 커널이 다룰 수 있는 블록 수
+	bsize     = 1024       // bytes per block
+	magic     = "NNIXFS01" // the superblock's label
+	fatFree   = 0          // a free block
+	fatEnd    = 0xffffffff // the last block of a file
+	fatMeta   = 0xfffffffe // superblock, FAT, directory
+	dirBlocks = 4          // number of directory blocks
+	entSize   = 64         // bytes per directory entry
+	nameMax   = 47         // maximum length of a name
+	maxBlocks = 4096       // number of blocks the kernel can handle
 )
 
 @ 이미지를 메모리에 올린 것이 |fsys|다. 슈퍼블록의 값들을 풀어 둔다.
 
 @<타입 정의@>=
 type fsys struct {
-	b         []byte // 이미지 전체
-	nblocks   int    // 블록의 수
-	fatStart  int    // FAT가 시작하는 블록
-	fatBlocks int    // FAT의 블록 수
-	dirStart  int    // 디렉터리가 시작하는 블록
-	dataStart int    // 데이터가 시작하는 블록
+	b         []byte // the whole image
+	nblocks   int    // number of blocks
+	fatStart  int    // block where the FAT begins
+	fatBlocks int    // number of FAT blocks
+	dirStart  int    // block where the directory begins
+	dataStart int    // block where the data begins
 }
 
 @ 빈 디스크를 만들 때는 FAT의 크기부터 정한다. 블록마다 4바이트이므로 FAT는
@@ -385,7 +385,7 @@ func TestRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	img := filepath.Join(dir, "disk.img")
 	big := filepath.Join(dir, "big.txt")
-	data := []byte(strings.Repeat("0123456789abcdef", 160)) // 2560바이트, 블록 셋
+	data := []byte(strings.Repeat("0123456789abcdef", 160)) // 2560 bytes, three blocks
 	@<빈 디스크에 |big|과 빈 파일을 넣고 목록을 본다@>
 	@<꺼내서 견주고, 덮어쓰고, 지운다@>
 }
@@ -437,7 +437,7 @@ func TestErrors(t *testing.T) {
 	img := filepath.Join(dir, "disk.img")
 	run(t, "mkfs", img, "16")
 	notfs := filepath.Join(dir, "notfs")
-	os.WriteFile(notfs, make([]byte, 20*1024), 0o644) // 데이터 영역(10KB)보다 크다
+	os.WriteFile(notfs, make([]byte, 20*1024), 0o644) // larger than the data area (10KB)
 	for _, c := range []struct {
 		args []string
 		err  string
