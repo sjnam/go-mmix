@@ -1,4 +1,4 @@
-# mmix 빌드용 Makefile: 크누스의 MMIXware를 한글 GWEB(Go)로 옮긴 것.
+# mmix 빌드용 Makefile: 커누스의 MMIXware를 한글 GWEB(Go)로 옮긴 것.
 #
 #   make            # tangle + go vet + go test
 #   make tangle     # 각 .w -> .go (+ _test.go)
@@ -34,7 +34,7 @@ tangle: $(PKGS)
 $(PKGS):
 	cd $@ && for w in $(call webs,$@); do $(GTANGLE) $$w.w || exit 1; done
 
-# 원본의 rN에는 컴파일한 시각이 들어간다. 크누스의 Makefile이 abstime.h를 새로 만들듯이,
+# 원본의 rN에는 컴파일한 시각이 들어간다. 커누스의 Makefile이 abstime.h를 새로 만들듯이,
 # 시뮬레이터를 tangle할 때마다 abstime.go를 새로 만든다.
 mmixsim: mmixsim-abstime
 mmixsim-abstime: abstime
@@ -61,7 +61,7 @@ doc:
 	     $$(grep -ac 'Overfull\|Underfull\|Error\|Missing\|Undefined' $$w.log)); \
 	done
 
-# 크누스의 Makefile은 dvips -pp로 mmixal.dvi의 0--13쪽과 mmix-sim.dvi의 0--8쪽을 떼어
+# 커누스의 Makefile은 dvips -pp로 mmixal.dvi의 0--13쪽과 mmix-sim.dvi의 0--8쪽을 떼어
 # 사용자 안내서로 삼았다. 번역하면서 쪽이 달라졌으므로 쪽 번호 대신 안내가 끝난 뒤
 # 처음 오는 별표 절의 번호를 적고, 그 절이 시작하는 쪽을 .toc에서 읽어 그 앞쪽까지
 # 뗀다(별표 절은 늘 새 쪽에서 시작한다). 목차 쪽(N, 마지막 쪽)도 원본처럼 붙인다.

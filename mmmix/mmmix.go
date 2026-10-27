@@ -292,15 +292,11 @@ scan:
 
 //line mmmix/mmmix.w:39
 func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
-	mx := &machine{
-
-//line mmmix/mmmix.w:68
-		out:    bufio.NewWriter(stdout),
+	mx := &machine{ /*line mmmix/mmmix.w:68*/ out: bufio.NewWriter(stdout),
+//line mmmix/mmmix.w:69
 		stderr: stderr,
-		stdin:  &cfile{r: bufio.NewReader(stdin)},
-
-//line mmmix/mmmix.w:40
-	}
+		stdin:  &cfile{r: bufio.NewReader(stdin)} /*line mmmix/mmmix.w:40*/}
+//line mmmix/mmmix.w:41
 	defer func() {
 
 //line mmmix/mmmix.w:77
