@@ -20,7 +20,6 @@
 #
 # gtwill은 system.bux, 웹 자신의 정의, 웹이름.bux 차례로 읽으므로 웹 자신의 정의가
 # 가져온 것을 이기고, 힌트가 둘 다를 이긴다. 둘 다 생성물이라 커밋하지 않는다.
-import functools
 import os
 import re
 import subprocess
@@ -74,68 +73,7 @@ def aux_lines(stem):
     path = os.path.join(webdir(stem), stem + '.aux')
     if not os.path.exists(path):
         die('%s가 없다: make twill이 먼저 gtwill을 한 바퀴 돌려 .aux를 마련한다' % path)
-    return ([l.rstrip('\n') for l in open(path, encoding='utf-8') if l.startswith('@$')]
-            + spliced_decls(stem))
-
-
-@functools.lru_cache(maxsize=None)
-def spliced_decls(stem):
-    r"""const나 var 묶음 안에 끼워 넣는 절이 선언하는 이름들. mmixpipe의 |@<상수@>|는
-    |const (| 안에 |@<다른 산술 내부 연산 코드@>| 따위를 끼우고, 그 절은 |fcmp|,
-    |funeq|, ... 처럼 이름만 늘어놓는다. mmixsim의 |main|도 |var (| 안에
-    |@<지역 변수@>|를 끼운다. gtwill은 절을 하나씩 보므로 이것들이 선언인 줄 모르고
-    .aux에 적지 않는다. 그런 절의 코드 줄마다 이름을 찾아, 값이 있으면 `= 값',
-    형이 있으면 형, 둘 다 없는 iota 상수면 gtwill처럼 \KW{const}로 적는다."""
-    path = os.path.join(webdir(stem), stem + '.w')
-    parts, cur, kind, inner = [], None, None, {}
-    for n, ln in lines_by_section(path):
-        if SECTION.match(ln):
-            cur, kind = None, None
-        m = re.search(r'@<(.+?)@>=', ln)
-        if m or ln.startswith('@c'):
-            cur, kind = (m.group(1) if m else ''), None
-            parts.append((cur, n, []))
-            continue
-        if cur is None:
-            continue
-        parts[-1][2].append(ln)
-        code = ln.split('//')[0].strip()
-        if re.match(r'(const|var) \($', code):
-            kind = code[:-2].strip()
-        elif kind and code == ')':
-            kind = None
-        elif kind:
-            for x in re.findall(r'@<(.+?)@>', code):
-                inner[x.rstrip('.')] = kind
-    decls = []
-    for name, n, body in parts:
-        hit = name and [k for x, k in inner.items()
-                        if x.startswith(name.rstrip('.')) or name.startswith(x)]
-        if not hit:
-            continue
-        for ln in body:
-            code = ln.split('//')[0].strip()
-            m = re.match(r'([A-Za-z_]\w*(?:, *[A-Za-z_]\w*)*)(?: +([^=\s][^=]*?))?(?: *= *(.+))?$', code)
-            if not m or code.startswith('@'):
-                continue
-            names, typ, val = re.split(r', *', m.group(1)), m.group(2), m.group(3)
-            if hit[0] == 'const' and val:
-                mean = ('=', val)
-            elif typ:
-                mean = ('', typ)
-            elif val:
-                mean = ('=', val)
-            elif hit[0] == 'const':
-                mean = ('', None)
-            else:
-                continue
-            decls.append((names, n, mean))
-    pbs = iter(typeset([e for _, _, (_, e) in decls if e]))
-    out = []
-    for names, n, (eq, e) in decls:
-        tex = eq + (next(pbs) if e else r'\PB{\KW{const}}')
-        out += ['@$%s {%s}%d %s@>' % (x, title(stem), n, tex) for x in names]
-    return out
+    return [l.rstrip('\n') for l in open(path, encoding='utf-8') if l.startswith('@$')]
 
 
 def toplevel(stem):
@@ -296,7 +234,7 @@ def main():
     head = '%% twill/bux.py가 만든 것이다. 고치려면 %s를 고친다.\n'
     with open('system.bux', 'w', encoding='utf-8') as f:
         f.write(head % '이 웹이 가져오는 패키지의 .w')
-        f.writelines(l + '\n' for l in spliced_decls(stem) + system_bux(stem, srcs))
+        f.writelines(l + '\n' for l in system_bux(stem, srcs))
     with open(stem + '.bux', 'w', encoding='utf-8') as f:
         f.write(head % 'twill/hints.txt')
         f.writelines(l + '\n' for l in hint_bux(stem, srcs))

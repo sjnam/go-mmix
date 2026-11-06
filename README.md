@@ -65,7 +65,7 @@ go build -o bin/ ./mmixal ./mmixsim ./mmotype ./mmmix
 
 문학적 프로그램 `.w`를 고치고 다시 만들 때는 GWEB 도구(`gtangle`, `gweave`)가 필요하다.
 문서를 조판할 때는 `luatex`와 한글 조판용 `kotexgweb`, 그림을 그릴 `luamplib`도 필요하다.
-`make twill`에는 `gtwill`과 `gtwill-refsort`, `python3`도 필요하다.
+`make twill`에는 GWEB 0.10.7 이상에 맞춘 `gtwill`과 `gtwill-refsort`, `python3`도 필요하다.
 
 ```sh
 make          # 모든 .w를 tangle한 뒤 go vet, go test
