@@ -7,6 +7,12 @@
 *.dvi
 *.pdf
 
+# gtwill 생성물 (*.bux는 make twill이 twill/hints.txt에서 만든다)
+*.aux
+*.mref
+*.smref
+*.bux
+
 # go build로 만든 실행 파일. 디렉터리 이름과 같으므로 경로를 고정한다.
 /mmixal/mmixal
 /mmixsim/mmixsim

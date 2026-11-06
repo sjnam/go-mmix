@@ -1,0 +1,414 @@
+# gtwill 힌트: 서술의 |...|에는 나오지만 웹의 코드가 정의하지 않는 이름들의 뜻.
+# make twill이 웹마다 twill/bux.py로 이 표에서 웹이름.bux를 만든다.
+# go-sgb의 twill/hints.txt와 꼴이 같다.
+#
+# "== 웹이름" 줄 아래에 한 줄에 하나씩:  이름  자리  뜻
+#
+# 자리
+#   §            이 웹에서 그 이름이 |...| 안에 처음 나오는 절. 절 번호는 조판할
+#                때마다 찾으니, 절을 보태거나 빼도 어긋나지 않는다.
+#   §12          이 웹의 12절. 이름이 그 절의 |...|에 정말 나오는지 검사한다.
+#   mmixal§      다른 웹의 절(§12도 된다).
+#   "mmix-sim.w" 문자열. 커누스의 C 원본 파일이면 그 원본에 있던 이름이고, "C"면
+#                C 언어나 표준 라이브러리의 이름, "fmt"·"os"이면 Go 꾸러미다.
+#                TeX 특수 문자는 gtwill이 막아 준다.
+#   -            뜻이 aux:일 때 자리는 그 .aux가 정한다.
+#
+# 뜻
+#   =EXPR        `= EXPR'로 적힌다. EXPR은 Go 원문이고 gweave로 조판한다. C 이름이면
+#                이 옮김에서 그것을 대신하는 Go 쪽 이름이나 식이다.
+#   :EXPR        `: EXPR'로 적힌다(형, package 따위).
+#   -            자리만 적힌다(\zip).
+#   aux:mmixsim  그 웹의 .aux에 있는 이 이름의 첫 정의를 그대로 쓴다. 가져오지 않는
+#                꾸러미의 이름이나, 내보내지 않는 이름에 쓴다.
+#
+# 다른 go-mmix 꾸러미에서 가져온 이름과 같은 꾸러미의 형제 웹(mmmix)이 정의한
+# 이름은 bux.py가 system.bux로 모으므로 여기 없다.
+
+== mmixarith
+byte_diff "mmix-arith.w" =ByteDiff
+count_bits "mmix-arith.w" -
+cur_round "mmix-arith.w" -
+divlu "C" -
+exceptions "mmix-arith.w" -
+fintegerize "mmix-arith.w" -
+fixit "mmix-arith.w" -
+floatit "mmix-arith.w" -
+froot "mmix-arith.w" -
+h "mmix-arith.w" -
+incr "mmix-arith.w" -
+isdigit "C" -
+l "mmix-arith.w" -
+load_sf "mmix-arith.w" -
+make_it_infinite "mmix-arith.w" -
+make_it_zero "mmix-arith.w" -
+neg_one "mmix-arith.w" =NegOne
+negate_q "mmix-arith.w" -
+next_char "mmix-arith.w" -
+oand "mmix-arith.w" -
+oandn "mmix-arith.w" -
+odiv "mmix-arith.w" -
+ominus "mmix-arith.w" -
+omult "mmix-arith.w" -
+oplus "mmix-arith.w" -
+oxor "mmix-arith.w" -
+packit "mmix-arith.w" -
+print_float "mmix-arith.w" -
+printf "C" =fmt.Printf
+rand "C" -
+scan_const "mmix-arith.w" =ScanConst
+shift_left "mmix-arith.w" -
+shift_right "mmix-arith.w" =ShiftRight
+sign_bit "mmix-arith.w" =SignBit
+try_complement "mmix-arith.w" -
+wyde_diff "mmix-arith.w" =WydeDiff
+zero_octa "mmix-arith.w" -
+zero_out "mmix-arith.w" -
+
+== abstime
+ABSTIME "abstime.go" -
+
+== mmixal
+assemble_inst "mmixal.w" -
+assemble_X "mmixal.w" -
+binary_check "mmixal.w" =binaryCheck
+bypass "mmixal.w" -
+calloc "C" -
+constant_found "mmixal.w" -
+cur_loc "mmixal.w" =curLoc
+dderr "mmixal.w" -
+delink "mmixal.w" -
+dpanic "mmixal.w" -
+err_count "mmixal.w" =errCount
+exit "C" =os.Exit
+fgetc "C" -
+fgets "C" -
+fin_bin "mmixal.w" -
+fprintf "C" =fmt.Fprintf
+fwprintf "C" =fmt.Fprintf
+got_greg "mmixal.w" -
+hold_op "mmixal.w" -
+incr "mmix-arith.w" -
+isdigit "C" -
+isspace "C" -
+isxdigit "C" -
+make_two_three "mmixal.w" -
+mmo_write "mmixal.w" =mmoWrite
+next_val "mmixal.w" =nextVal
+oand "mmix-arith.w" -
+odiv "mmix-arith.w" -
+ominus "mmix-arith.w" -
+omult "mmix-arith.w" -
+operands_done "mmixal.w" -
+oplus "mmix-arith.w" -
+rt_op "mmixal.w" =rtOp
+scan_close "mmixal.w" -
+scan_open "mmixal.w" -
+shift_left "mmix-arith.w" -
+shift_right "mmix-arith.w" =ShiftRight
+sprintf "C" =fmt.Sprintf
+sscanf "C" =fmt.Sscanf
+store_new_char "mmixal.w" -
+strlen "C" =len
+sym_ptr "mmixal.w" -
+symbol_found "mmixal.w" -
+terminator "mmixal.w" -
+top_op "mmixal.w" =topOp
+top_val "mmixal.w" =topVal
+unary_check "mmixal.w" -
+update_listing_loc "mmixal.w" -
+
+== mmotype
+asctime "C" -
+char "C" -
+do "C" -
+exit "C" =os.Exit
+fixr "mmotype.w" -
+incr "mmotype.w" -
+localtime "C" -
+printf "C" =fmt.Printf
+sym_ptr "mmotype.w" -
+while "C" -
+
+== mmixio
+calloc "C" -
+exit "C" =os.Exit
+feof "C" -
+ferror "C" -
+fflush "C" -
+FILE "C" -
+Flush "bufio" -
+fopen "C" -
+fread "C" -
+fseek "C" -
+ftell "C" -
+fwrite "C" -
+mmgetchars "mmix-io.w" -
+mmix_io_init "mmix-io.w" -
+mmputchars "mmix-io.w" -
+
+== mmixsim
+ABSTIME "abstime.go" -
+argv "mmix-sim.w" -
+BYTE "MMIXAL" -
+byte_count "mmix-sim.w" -
+calloc "C" -
+catchint "mmix-sim.w" -
+char "C" -
+char_switch "mmix-sim.w" =charSwitch
+check_ld "mmix-sim.w" -
+check_st "mmix-sim.w" -
+check_syntax "mmix-sim.w" -
+cmp_fin "mmix-sim.w" -
+cmp_neg "mmix-sim.w" -
+cmp_pos "mmix-sim.w" -
+cmp_zero "mmix-sim.w" -
+command_buf "mmix-sim.w" =commandBuf
+count_bits "mmix-arith.w" -
+cur_round "mmix-arith.w" =curRound
+do "C" -
+end_simulation "mmix-sim.w" -
+enum "C" -
+exceptions "mmix-arith.w" -
+exit "C" =os.Exit
+fclose "C" -
+feof "C" -
+fflush "C" -
+fgetws "C" -
+FILE "C" -
+file "mmix-sim.w" -
+fin_float "mmix-sim.w" -
+fin_ld "mmix-sim.w" -
+fin_pst "mmix-sim.w" -
+fin_st "mmix-sim.w" -
+fin_unifloat "mmix-sim.w" -
+fixr "mmix-sim.w" -
+fopen "C" -
+found "mmix-sim.w" -
+fp "C" -
+fprintf "C" =fmt.Fprintf
+fputs "C" -
+fputws "C" -
+fread "C" -
+freopen "C" -
+fseek "C" -
+ftell "C" -
+fwrite "C" -
+illegal_inst "mmix-sim.w" -
+incl_read "mmix-sim.w" -
+incomplete_str "mmix-sim.w" -
+incr "mmix-arith.w" -
+loc_implied "mmix-sim.w" -
+loop "mmix-sim.w" -
+lring_mask "mmix-sim.w" =lringMask
+make_map "mmix-sim.w" -
+mem_find "mmix-sim.w" =memFind
+mmgetchars "mmix-io.w" -
+mmix_io_init "mmix-io.w" -
+mmo_file_name "mmix-sim.w" -
+mmo_load "mmix-sim.w" =mmoLoad
+mmputchars "mmix-io.w" -
+mode "mmix-io.w" -
+mode_string "mmix-io.w" -
+neg_one "mmix-arith.w" =negOne
+NULL "C" -
+oand "mmix-arith.w" -
+ominus "mmix-arith.w" -
+omult "mmix-arith.w" -
+oplus "mmix-arith.w" -
+passit "mmix-sim.w" -
+print_float "mmix-arith.w" -
+print_hex "mmix-sim.w" =printHex
+print_string "mmix-sim.w" -
+privileged_inst "mmix-sim.w" -
+push "mmix-sim.w" -
+read_byte "mmix-sim.w" -
+register "C" -
+resume_simulation "mmix-sim.w" -
+round_mode "mmix-sim.w" =roundMode
+scan_const "mmix-arith.w" =ScanConst
+scan_eql "mmix-sim.w" -
+scan_string "mmix-sim.w" -
+scan_type "mmix-sim.w" -
+SEEK_END "C" -
+SEEK_SET "C" -
+shift_amt "mmix-sim.w" =shiftAmt
+shift_left "mmix-arith.w" -
+shift_right "mmix-arith.w" =ShiftRight
+shown_line "mmix-sim.w" =shownLine
+sprintf "C" =fmt.Sprintf
+src_file "mmix-sim.w" =srcFile
+stat "C" -
+stdin_buf "mmix-sim.w" =stdinBuf
+StdOut "MMIXAL" -
+store_x "mmix-sim.w" -
+String § -
+strtoimax "C" -
+switchable_string "mmix-sim.w" -
+sync_L "mmix-sim.w" -
+tdif_l "mmix-sim.w" -
+test_load_bkpt "mmix-sim.w" =testLoadBkpt
+test_store_bkpt "mmix-sim.w" =testStoreBkpt
+unsigned "C" -
+wchar_t "C" -
+wcslen "C" -
+what_say "mmix-sim.w" =whatSay
+while "C" -
+ybyte "mmix-sim.w" -
+zbyte "mmix-sim.w" -
+
+== mmixpipe
+ABSTIME "abstime.go" -
+add_go "mmix-pipe.w" -
+addr_found "mmix-pipe.w" -
+avoid_D "mmix-pipe.w" =lAvoidD
+bad_fetch "mmix-pipe.w" =lBadFetch
+bad_resume "mmix-pipe.w" -
+bp_table "mmix-pipe.w" =bpTable
+breakpoint_hit "mmix-pipe.w" =breakpointHit
+cache_addr "mmix-pipe.w" =cacheAddr
+char "C" -
+cmp_fin "mmix-pipe.w" -
+cmp_neg "mmix-pipe.w" -
+cmp_pos "mmix-pipe.w" -
+cmp_zero "mmix-pipe.w" -
+cmp_zero_or_invalid "mmix-pipe.w" -
+cool_O "mmix-pipe.w" =coolO
+count_bits "mmix-arith.w" -
+cur_round "mmix-arith.w" =curRound
+Dclean "mmix-pipe.w" =lDclean
+Dclean_inc "mmix-pipe.w" =lDcleanInc
+Dclean_loop "mmix-pipe.w" =lDcleanLoop
+die "mmix-pipe.w" =lDie
+dispatch_done "mmix-pipe.w" =dispatchDone
+do_resume_trans "mmix-pipe.w" =doResumeTrans
+do_syncd "mmix-pipe.w" =lDoSyncd
+do_syncid "mmix-pipe.w" =lDoSyncid
+done_with_write "mmix-pipe.w" -
+DPTname "mmix-pipe.w" -
+DT_retry "mmix-pipe.w" -
+emulate_virt "mmix-pipe.w" =lEmulateVirt
+exit "C" =os.Exit
+fetch_one "mmix-pipe.w" =lFetchOne
+fetch_retry "mmix-pipe.w" =lFetchRetry
+fin_bflot "mmix-pipe.w" -
+fin_ex "mmix-pipe.w" =lFinEx
+fin_flot "mmix-pipe.w" -
+fin_ld "mmix-pipe.w" -
+fin_st "mmix-pipe.w" -
+fin_uflot "mmix-pipe.w" -
+finish_store "mmix-pipe.w" =lFinishStore
+fprintf "C" =fmt.Fprintf
+fread "C" -
+hit_set "mmix-pipe.w" =hitSet
+illegal_inst "mmix-pipe.w" -
+incr "mmix-arith.w" -
+increase_L "mmix-pipe.w" -
+IPTname "mmix-pipe.w" -
+is_load_store "mmix-pipe.w" =isLoadStore
+IT_hit "mmix-pipe.w" -
+known_phys "mmix-pipe.w" =lKnownPhys
+ld_retry "mmix-pipe.w" =lLdRetry
+lring_mask "mmix-pipe.w" =lringMask
+magic_done "mmix-pipe.w" -
+make_ld_ready "mmix-pipe.w" =lMakeLdReady
+mem_direct "mmix-pipe.w" =lMemDirect
+mem_read "mmix-pipe.w" =memRead
+mem_write "mmix-pipe.w" =memWrite
+MMIX_config "mmix-config.w" =MMIXConfig
+MMIX_init "mmix-pipe.w" =MMIXInit
+MMIX_run "mmix-pipe.w" =MMIXRun
+MMIX_silent "mmix-pipe.w" =MMIXSilent
+neg_one "mmix-arith.w" =negOne
+new_fetch "mmix-pipe.w" =newFetch
+next_sync "mmix-pipe.w" =lNextSync
+noop_inst "mmix-pipe.w" -
+NULL "C" -
+oand "mmix-arith.w" -
+oandn "mmix-arith.w" -
+octa "mmix-arith.w" =Octa
+ominus "mmix-arith.w" -
+omult "mmix-arith.w" -
+oplus "mmix-arith.w" -
+page_bad "mmix-pipe.w" =pageBad
+pass_after "mmix-pipe.w" =passAfter
+pass_data "mmix-pipe.w" =lPassData
+passit "mmix-pipe.w" =lPassit
+pop_unsave "mmix-pipe.w" -
+prest_span "mmix-pipe.w" =lPrestSpan
+print_octa "mmix-pipe.w" =printOcta
+privileged_inst "mmix-pipe.w" -
+ptr_a "mmix-pipe.w" =ptrA
+ptr_b "mmix-pipe.w" =ptrB
+ptr_c "mmix-pipe.w" =ptrC
+qloop "mmix-pipe.w" -
+quantify_mul "mmix-pipe.w" -
+release_lock "mmix-pipe.w" =releaseLock
+resume_again "mmix-pipe.w" =resumeAgain
+resume_trans "mmix-pipe.w" =resumeTrans
+S_non_miss "mmix-pipe.w" =lSNonMiss
+Sclean "mmix-pipe.w" =lSclean
+Sclean_inc "mmix-pipe.w" =lScleanInc
+Sclean_loop "mmix-pipe.w" =lScleanLoop
+set_lock "mmix-pipe.w" =setLock
+set_round "mmix-pipe.w" =setRound
+shift_amt "mmix-pipe.w" =shiftAmt
+shift_left "mmix-arith.w" -
+shift_right "mmix-arith.w" -
+sign_bit "mmix-arith.w" =signBit
+spec_read "mmix-pipe.w" =specRead
+spec_write "mmix-pipe.w" =specWrite
+Sprep "mmix-pipe.w" =lSprep
+square_one "mmix-pipe.w" =lSquareOne
+stack_overflow "mmix-pipe.w" =stackOverflow
+start_fetch "mmix-pipe.w" =lStartFetch
+start_ld_st "mmix-pipe.w" -
+state_4 "mmix-pipe.w" =lState4
+state_5 "mmix-pipe.w" =lState5
+stdin_buf "mmix-pipe.w" =stdinBuf
+switch1 "mmix-pipe.w" =lSwitch1
+switch2 "mmix-pipe.w" =lSwitch2
+swym_one "mmix-pipe.w" =lSwymOne
+sync_check "mmix-pipe.w" =lSyncCheck
+tdif_l "mmix-pipe.w" -
+terminate "mmix-pipe.w" -
+time "C" -
+unit_busy "mmix-pipe.w" -
+unit_found "mmix-pipe.w" -
+void "C" -
+wait_or_pass "mmix-pipe.w" =waitOrPass
+wow "mmix-pipe.w" -
+write_restart "mmix-pipe.w" =lWriteRestart
+X § -
+zero_spec "mmix-pipe.w" -
+
+== mmixconfig
+buf_pointer "mmix-config.w" =bufPointer
+calloc "C" -
+disablesecurity "mmix-config.w" -
+exit "C" =os.Exit
+get_token "mmix-config.w" =getToken
+int_stages "mmix-config.w" =intStages
+MMIX_config "mmix-config.w" =MMIXConfig
+MMIX_run "mmix-pipe.w" =MMIXRun
+pipe_seq "mmix-pipe.w" =pipeSeq
+rewind "C" -
+security_disabled "mmix-pipe.w" =securityDisabled
+self "mmix-pipe.w" -
+
+== mmixmem
+read_hex "mmix-mem.w" =readHex
+
+== mmmix
+cur_dat "mmmix.w" =curDat
+exit "C" =os.Exit
+feof "C" -
+fp "C" -
+ftell "C" -
+mmoLoad - aux:mmixsim
+new_inst_ptr "mmmix.w" -
+sl3 "mmmix.w" -
+sscanf "C" =fmt.Sscanf
+strtoimax "C" -
+strtoumax "C" -
+what_say "mmmix.w" =whatSay
