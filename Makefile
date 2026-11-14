@@ -25,7 +25,7 @@ PKGS := mmixarith abstime mmixal mmotype mmixio mmixsim mmmix nnixfs
 # 디렉터리마다 든 .w 파일들. 따로 적지 않으면 디렉터리 이름과 같은 .w 하나다.
 WEBS_mmmix := mmixpipe mmixconfig mmixmem mmmix
 webs = $(or $(WEBS_$(1)),$(1))
-# 코드가 없어 태글하지 않고 조판만 하는 문서들. 꾸러미가 아니므로 루트에 둔다.
+# 코드가 없어 태글하지 않고 조판만 하는 문서들. 패키지가 아니므로 루트에 둔다.
 DOCONLY := mmixdoc
 DOCS := $(foreach p,$(PKGS),$(foreach w,$(call webs,$(p)),$(p)/$(w))) $(addprefix ./,$(DOCONLY))
 
@@ -86,7 +86,7 @@ TWILL_TEX = rm -f $$w.smref; \
 	    `grep -ac $(WARNS) $$w.log` `grep -c '\\uninitialized' $$w.smref`; \
 	  else echo "$${d\#./}.pdf: 만들어지지 않았다($$w.log를 볼 것)"; fi
 
-# 웹마다 gtwill 앞에서 twill/bux.py가 그 디렉터리에 system.bux(가져온 꾸러미와
+# 웹마다 gtwill 앞에서 twill/bux.py가 그 디렉터리에 system.bux(가져온 패키지와
 # 형제 웹의 이름)와 웹이름.bux(twill/hints.txt의 힌트)를 쓴다. 무엇을 어떻게
 # 고르는지는 그 두 파일에 적혀 있다. 다른 웹의 .aux를 빌려 쓰는데 그 웹이 차례상
 # 뒤에 올 수도 있으므로, 먼저 모든 웹에 gtwill을 한 번씩 돌려 .aux를 마련한다.

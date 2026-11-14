@@ -24,8 +24,8 @@
 \def\<#1>{\hbox{$\langle\,$#1$\,\rangle$}}\let\is=\longrightarrow
 \def\bull{\smallbreak\textindent{$\bullet$}}
 
-% gweave가 형으로 알아보지 못하는 이름들. 표준 꾸러미와 이 저장소의 다른 꾸러미,
-% 같은 꾸러미의 다른 .w에서 정의한 형이다.
+% gweave가 형으로 알아보지 못하는 이름들. 표준 패키지와 이 저장소의 다른 패키지,
+% 같은 패키지의 다른 .w에서 정의한 형이다.
 @s atomic.Bool int
 @s big.Int int
 @s bufio.Reader int

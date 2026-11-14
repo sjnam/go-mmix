@@ -29,7 +29,7 @@ bypass|로 현재 명령의 나머지를 건너뛰었다. 여기서는 |err|가 
 라이브러리의 구문 분석기들도 오류에서 빠져나올 때 이 방법을 쓴다. 치명적 오류도
 같은 방법으로 맨 바깥까지 빠져나온다.
 \item{$\bullet$} 그 밖의 |goto| 문들은 이름표 붙은 |break|와 |continue|로 바꾸었다.
-\item{$\bullet$} 옥타바이트는 \.{mmixarith} 꾸러미에서처럼 |uint64|다.
+\item{$\bullet$} 옥타바이트는 \.{mmixarith} 패키지에서처럼 |uint64|다.
 \smallskip\noindent
 다음은 이 프로그램 전체의 뼈대다. 커누스의 원본에서는 이것이 맨 끝의 ``프로그램
 실행하기'' 장에 있었다.
@@ -771,7 +771,7 @@ const (
 {\mc MMIX-ARITH}라는 별도의 프로그램 모듈에 있다.
 @^system dependencies@>
 
-보충: 이 한글판에서 그 모듈은 \.{mmixarith} 꾸러미다. 옥타바이트는 거기서처럼 |uint64|의
+보충: 이 한글판에서 그 모듈은 \.{mmixarith} 패키지다. 옥타바이트는 거기서처럼 |uint64|의
 별칭이다. 원본은 \.{mmixarith}의 서브루틴 |oplus|, |ominus|, |incr|, |oand|,
 |shift_left|, |shift_right|, |omult|, |odiv|를 외부 함수로 선언하고, 어셈블러가 시작할 때
 ``타입 \KW{tetra}가 제대로 구현되지 않았다''는 기초 점검까지 했다. 64비트 \GO/에서는 덧셈,

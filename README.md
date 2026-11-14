@@ -51,7 +51,7 @@ Go 프로그램은 커누스의 C 프로그램과 같은 입력에 대해 바이
 
 각 디렉터리의 일차 산출물은 `.w`다. Go 원시 파일 `.go`는 `gtangle`이 `.w`에서
 뽑아낸 것이고, 문서 `.pdf`는 `gweave`와 `luatex`로 조판한 것이다.
-라이브러리 꾸러미(`mmixarith`, `mmixio`)는 `go get`이 되도록 `.go`도 함께 둔다.
+라이브러리 패키지(`mmixarith`, `mmixio`)는 `go get`이 되도록 `.go`도 함께 둔다.
 
 ## 빌드
 

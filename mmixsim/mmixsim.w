@@ -3101,7 +3101,7 @@ func (m *simulator) memArg(addr Octa) Octa {
 한다. 여기서는 그 서브루틴들을 선언하고, 그것들이 기대는 기본 인터페이스 세 개를 쓰기만
 하면 된다.
 
-보충: \GO/에서는 \.{mmixio} 꾸러미를 가져오고, 그 꾸러미의 인터페이스 |mmixio.Simulator|가
+보충: \GO/에서는 \.{mmixio} 패키지를 가져오고, 그 패키지의 인터페이스 |mmixio.Simulator|가
 요구하는 메서드 세 개 |MMGetChars|, |MMPutChars|, |StdinChr|을 |simulator|에 정의한다.
 원본의 |mmix_io_init|은 |mmixio.New|가 되었다.
 
