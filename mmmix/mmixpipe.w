@@ -1,5 +1,5 @@
 % 이 파일은 MMIXware의 mmix-pipe.w((c) 1999 Donald E. Knuth)를 한글 GWEB(Go)로
-% 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
+% 옮긴 것으로, MMIXware 패키지의 일부가 아니다.
 @i ../boilerplate.w
 
 \input kotexgweb

@@ -1,5 +1,5 @@
 % 이 파일은 MMIXware의 mmmix.w((c) 1999 Donald E. Knuth)를 한글 GWEB(Go)로
-% 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
+% 옮긴 것으로, MMIXware 패키지의 일부가 아니다.
 @i ../boilerplate.w
 
 \input kotexgweb
@@ -1081,7 +1081,7 @@ if neg {
 }
 return Tetra(v), rest, true
 
-@* 시험. 이 장은 옮긴이가 덧붙인 것이다. 커누스의 꾸러미에는 메타 시뮬레이터를 위한 설정 파일
+@* 시험. 이 장은 옮긴이가 덧붙인 것이다. 커누스의 패키지에는 메타 시뮬레이터를 위한 설정 파일
 일곱 개(\.{plain}, \.{test}, \.{test1}, \.{test2}, \.{primes}, \.{primesx}, \.{deluxe})와 십육진
 프로그램 파일 다섯 개(\.{test}, \.{test1}, \.{test2}, \.{primes}, \.{halves})가 들어 있지만, 기대하는
 출력은 없다. 그래서 옮긴이는 커누스의 \CEE/ 원본을 커누스의 \.{Makefile}과 같은 선택 사항

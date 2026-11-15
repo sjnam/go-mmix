@@ -1,5 +1,5 @@
 % 이 파일은 MMIXware의 mmix-sim.w((c) 1999 Donald E. Knuth)를 한글 GWEB(Go)로
-% 옮긴 것으로, MMIXware 꾸러미의 일부가 아니다.
+% 옮긴 것으로, MMIXware 패키지의 일부가 아니다.
 @i ../boilerplate.w
 
 \input kotexgweb
@@ -552,7 +552,7 @@ ReadErr  GETA t,1F              readerr: fputs("Trouble r...!",stderr)\cr
 {}         JMP  Quit              goto quit \}\cr
 1H       BYTE "Trouble reading!",\#a,0\cr
 }$$
-보충: 오른쪽 열은 각 명령에 해당하는 \CEE/ 코드다. 이 프로그램은 커누스의 꾸러미에
+보충: 오른쪽 열은 각 명령에 해당하는 \CEE/ 코드다. 이 프로그램은 커누스의 패키지에
 \.{copy.mms}로 들어 있다.
 
 @* 기초. 원본은 먼저 의미상의 편의를 주는 타입 |bool|을 정의했다. \GO/에는 이미 있다.
@@ -4730,7 +4730,7 @@ for j < len(s) && digit(s[j]) {
 }
 digits = s[i:j]
 
-@* 시험. 원본에는 시험 프로그램이 따로 없었지만, 커누스의 꾸러미에는 시뮬레이터를 시험하는
+@* 시험. 원본에는 시험 프로그램이 따로 없었지만, 커누스의 패키지에는 시뮬레이터를 시험하는
 \.{silly.mms}와 대화 명령 파일 \.{silly.run}, 그리고 기대하는 출력 \.{silly.out}이 들어 있다.
 옮긴이는 그것을 첫 시험으로 삼았다. 나머지 시험들은 옮긴이가 만든 것이다. 시험마다 임시
 디렉터리로 옮겨 가서 시뮬레이터를 부르므로, 파일 이름이 원본을 돌릴 때와 같다.

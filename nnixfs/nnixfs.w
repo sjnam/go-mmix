@@ -13,7 +13,7 @@
 \def\botofcontents{\vskip 0pt plus 1filll
     \ninepoint\baselineskip12pt
     \noindent 이 프로그램은 커누스의 {\tt MMIX}ware를 옮긴 것이 아니라, 옮긴이가
-    \NNIX\ 커널을 위해 새로 쓴 것이다. {\tt MMIX}ware 꾸러미의 일부가 아니다.}
+    \NNIX\ 커널을 위해 새로 쓴 것이다. {\tt MMIX}ware 패키지의 일부가 아니다.}
 
 @* 들어가며. 커누스는 \MMIX의 운영체제를 \NNIX라고 부르고는 만들지 않았다. 나는 2026년
 10월에 메타 시뮬레이터 \.{mmmix} 위에서 그것을 조금씩 만들어 보기 시작했다. 4단계에서
