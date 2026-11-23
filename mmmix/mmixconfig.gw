@@ -1,6 +1,6 @@
 % 이 파일은 MMIXware의 mmix-config.w((c) 1999 Donald E. Knuth)를 한글 GWEB(Go)로
 % 옮긴 것으로, MMIXware 패키지의 일부가 아니다.
-@i ../boilerplate.w
+@i ../boilerplate.gw
 
 \input kotexgweb
 \def\title{MMIXCONFIG}
@@ -295,7 +295,7 @@ func (cf *configReader) configPanic(format string, a ...any) {
 
 보충: 설정 파일을 읽는 동안에만 쓰는 원본의 전역 변수들은 구조체 |configReader|의 필드다.
 원본의 |get_token|에 있던 정적 변수 |buffer|와 |buf_pointer|도 호출 사이에 값을 지켜야 하므로
-필드다. 설정 파일은 \.{mmmix.w}에서 정의하는 타입 |cfile|로 읽는데, \CEE/의 |fgets|를 흉내 낸다.
+필드다. 설정 파일은 \.{mmmix.gw}에서 정의하는 타입 |cfile|로 읽는데, \CEE/의 |fgets|를 흉내 낸다.
 
 @<상수@>=
 const configBufSize = 100 // we don't need long lines

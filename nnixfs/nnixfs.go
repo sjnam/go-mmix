@@ -1,4 +1,4 @@
-//line nnixfs/nnixfs.w:37
+//line nnixfs/nnixfs.gw:37
 package main
 
 import (
@@ -11,7 +11,7 @@ import (
 	"strconv"
 )
 
-//line nnixfs/nnixfs.w:107
+//line nnixfs/nnixfs.gw:107
 const (
 	bsize     = 1024       // bytes per block
 	magic     = "NNIXFS01" // the superblock's label
@@ -24,7 +24,7 @@ const (
 	maxBlocks = 4096       // number of blocks the kernel can handle
 )
 
-//line nnixfs/nnixfs.w:122
+//line nnixfs/nnixfs.gw:122
 type fsys struct {
 	b         []byte // the whole image
 	nblocks   int    // number of blocks
@@ -34,7 +34,7 @@ type fsys struct {
 	dataStart int    // block where the data begins
 }
 
-//line nnixfs/nnixfs.w:162
+//line nnixfs/nnixfs.gw:162
 func load(name string) (*fsys, error) {
 	b, err := os.ReadFile(name)
 	if err != nil {
@@ -68,7 +68,7 @@ func (f *fsys) block(i int) []byte {
 	return f.b[i*bsize:][:bsize]
 }
 
-//line nnixfs/nnixfs.w:199
+//line nnixfs/nnixfs.gw:199
 func (f *fsys) lookup(name string) int {
 	for i := 0; i < dirBlocks*bsize/entSize; i++ {
 		if e := f.entry(i); e[0] != 0 && entName(e) == name {
@@ -86,7 +86,7 @@ func entName(e []byte) string {
 	return string(e[:n])
 }
 
-//line nnixfs/nnixfs.w:219
+//line nnixfs/nnixfs.gw:219
 func (f *fsys) free(b uint32) {
 	for b != fatEnd && b != fatFree {
 		next := f.fat(int(b))
@@ -95,7 +95,7 @@ func (f *fsys) free(b uint32) {
 	}
 }
 
-//line nnixfs/nnixfs.w:53
+//line nnixfs/nnixfs.gw:53
 func main() {
 	os.Exit(nnixfs(os.Args, os.Stdout, os.Stderr))
 }
@@ -103,18 +103,18 @@ func main() {
 func nnixfs(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 3 {
 
-//line nnixfs/nnixfs.w:85
+//line nnixfs/nnixfs.gw:85
 		fmt.Fprintf(stderr, "Usage: nnixfs mkfs|put|get|ls|rm image ...\n")
 		return 2
 
-//line nnixfs/nnixfs.w:60
+//line nnixfs/nnixfs.gw:60
 	}
 	img := args[2]
 	var err error
 	switch args[1] {
 	case "mkfs":
 
-//line nnixfs/nnixfs.w:136
+//line nnixfs/nnixfs.gw:136
 		n := 1024
 		if len(args) > 3 {
 			if n, err = strconv.Atoi(args[3]); err != nil {
@@ -137,17 +137,17 @@ func nnixfs(args []string, stdout, stderr io.Writer) int {
 		}
 		err = os.WriteFile(img, f.b, 0o644)
 
-//line nnixfs/nnixfs.w:66
+//line nnixfs/nnixfs.gw:66
 	case "put":
 
-//line nnixfs/nnixfs.w:231
+//line nnixfs/nnixfs.gw:231
 		if len(args) < 4 {
 
-//line nnixfs/nnixfs.w:85
+//line nnixfs/nnixfs.gw:85
 			fmt.Fprintf(stderr, "Usage: nnixfs mkfs|put|get|ls|rm image ...\n")
 			return 2
 
-//line nnixfs/nnixfs.w:233
+//line nnixfs/nnixfs.gw:233
 		}
 		name := filepath.Base(args[3])
 		if len(args) > 4 {
@@ -170,7 +170,7 @@ func nnixfs(args []string, stdout, stderr io.Writer) int {
 			f.free(binary.BigEndian.Uint32(f.entry(i)[48:]))
 		} else {
 
-//line nnixfs/nnixfs.w:264
+//line nnixfs/nnixfs.gw:264
 			for i = 0; i < dirBlocks*bsize/entSize && f.entry(i)[0] != 0; i++ {
 			}
 			if i == dirBlocks*bsize/entSize {
@@ -178,13 +178,13 @@ func nnixfs(args []string, stdout, stderr io.Writer) int {
 				break
 			}
 
-//line nnixfs/nnixfs.w:255
+//line nnixfs/nnixfs.gw:255
 		}
 		e := f.entry(i)
 		clear(e)
 		copy(e, name)
 
-//line nnixfs/nnixfs.w:275
+//line nnixfs/nnixfs.gw:275
 		var first, prev uint32
 		for off := 0; off < len(data); off += bsize {
 			b := f.dataStart
@@ -211,21 +211,21 @@ func nnixfs(args []string, stdout, stderr io.Writer) int {
 		}
 		binary.BigEndian.PutUint32(e[48:], first)
 
-//line nnixfs/nnixfs.w:260
+//line nnixfs/nnixfs.gw:260
 		binary.BigEndian.PutUint64(e[56:], uint64(len(data)))
 		err = os.WriteFile(img, f.b, 0o644)
 
-//line nnixfs/nnixfs.w:68
+//line nnixfs/nnixfs.gw:68
 	case "get":
 
-//line nnixfs/nnixfs.w:304
+//line nnixfs/nnixfs.gw:304
 		if len(args) < 4 {
 
-//line nnixfs/nnixfs.w:85
+//line nnixfs/nnixfs.gw:85
 			fmt.Fprintf(stderr, "Usage: nnixfs mkfs|put|get|ls|rm image ...\n")
 			return 2
 
-//line nnixfs/nnixfs.w:306
+//line nnixfs/nnixfs.gw:306
 		}
 		var f *fsys
 		if f, err = load(img); err != nil {
@@ -255,10 +255,10 @@ func nnixfs(args []string, stdout, stderr io.Writer) int {
 		}
 		err = os.WriteFile(out, data, 0o644)
 
-//line nnixfs/nnixfs.w:70
+//line nnixfs/nnixfs.gw:70
 	case "ls":
 
-//line nnixfs/nnixfs.w:336
+//line nnixfs/nnixfs.gw:336
 		var f *fsys
 		if f, err = load(img); err != nil {
 			break
@@ -269,17 +269,17 @@ func nnixfs(args []string, stdout, stderr io.Writer) int {
 			}
 		}
 
-//line nnixfs/nnixfs.w:72
+//line nnixfs/nnixfs.gw:72
 	case "rm":
 
-//line nnixfs/nnixfs.w:347
+//line nnixfs/nnixfs.gw:347
 		if len(args) < 4 {
 
-//line nnixfs/nnixfs.w:85
+//line nnixfs/nnixfs.gw:85
 			fmt.Fprintf(stderr, "Usage: nnixfs mkfs|put|get|ls|rm image ...\n")
 			return 2
 
-//line nnixfs/nnixfs.w:349
+//line nnixfs/nnixfs.gw:349
 		}
 		var f *fsys
 		if f, err = load(img); err != nil {
@@ -294,14 +294,14 @@ func nnixfs(args []string, stdout, stderr io.Writer) int {
 		clear(f.entry(i))
 		err = os.WriteFile(img, f.b, 0o644)
 
-//line nnixfs/nnixfs.w:74
+//line nnixfs/nnixfs.gw:74
 	default:
 
-//line nnixfs/nnixfs.w:85
+//line nnixfs/nnixfs.gw:85
 		fmt.Fprintf(stderr, "Usage: nnixfs mkfs|put|get|ls|rm image ...\n")
 		return 2
 
-//line nnixfs/nnixfs.w:76
+//line nnixfs/nnixfs.gw:76
 	}
 	if err != nil {
 		fmt.Fprintf(stderr, "nnixfs: %v\n", err)

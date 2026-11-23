@@ -4,10 +4,10 @@
 #
 #   python3 twill/bux.py 웹이름 원본...     (웹의 디렉터리에서 부른다)
 #
-# system.bux: 웹이 가져오는 go-mmix 패키지마다, 그 패키지의 모든 .w의 .aux에서
+# system.bux: 웹이 가져오는 go-mmix 패키지마다, 그 패키지의 모든 .gw의 .aux에서
 #   내보낸 이름(대문자로 시작하는 것)의 @$ 줄. Go에서 남의 패키지 것은 내보낸
 #   이름만 보이니 이것으로 넉넉하다. 레이블과 시험 함수는 남이 쓸 수 없으니 뺀다.
-#   mmmix처럼 한 패키지가 .w 여럿으로 나뉘면 형제 웹의 이름은 내보내지 않은
+#   mmmix처럼 한 패키지가 .gw 여럿으로 나뉘면 형제 웹의 이름은 내보내지 않은
 #   것도 보이므로, 형제의 .go에서 패키지 수준으로 선언한 이름(구조체 필드 포함)도
 #   모은다. .aux에는 지역 변수도 들어 있어 이렇게 걸러야 한다. 한정자 없이 쓴
 #   이름은 형제 쪽을 가리키므로 형제의 정의가 가져온 패키지의 것을 이긴다(mmixpipe의
@@ -38,12 +38,12 @@ def die(msg):
 def webs_in(d):
     """디렉터리 d(ROOT에서 본 이름)의 웹 이름들."""
     return sorted(f[:-2] for f in os.listdir(os.path.join(ROOT, d))
-                  if f.endswith('.w') and f != 'boilerplate.w')
+                  if f.endswith('.gw') and f != 'boilerplate.gw')
 
 
 def webdir(stem):
     for d in sorted(os.listdir(ROOT)) + ['.']:
-        if os.path.exists(os.path.join(ROOT, d, stem + '.w')):
+        if os.path.exists(os.path.join(ROOT, d, stem + '.gw')):
             return os.path.join(ROOT, d)
     die('웹 %s를 찾을 수 없다' % stem)
 
@@ -64,7 +64,7 @@ def lines_by_section(path, out=None, n=None):
 
 
 def title(stem):
-    w = open(os.path.join(webdir(stem), stem + '.w'), encoding='utf-8').read()
+    w = open(os.path.join(webdir(stem), stem + '.gw'), encoding='utf-8').read()
     m = re.search(r'\\def\\title\{((?:[^{}]|\{[^{}]*\})*)\}', w)
     return m.group(1) if m else stem
 
@@ -145,16 +145,16 @@ def typeset(exprs):
     types = set()
     for d, _, fs in os.walk(ROOT):
         for f in fs:
-            if f.endswith('.w'):
+            if f.endswith('.gw'):
                 types |= set(re.findall(r'(?m)^\s*type\s+([A-Za-z_]\w*)',
                                         open(os.path.join(d, f), encoding='utf-8').read()))
     tmp = tempfile.mkdtemp()
-    with open(os.path.join(tmp, 'x.w'), 'w', encoding='utf-8') as f:
-        f.write('@i %s/boilerplate.w\n' % ROOT)
+    with open(os.path.join(tmp, 'x.gw'), 'w', encoding='utf-8') as f:
+        f.write('@i %s/boilerplate.gw\n' % ROOT)
         f.writelines('@s %s int\n' % t for t in sorted(types))
         f.write('@* x.\n')
         f.writelines('|%s|\\par\n' % e for e in exprs)
-    subprocess.run(['gweave', 'x.w'], cwd=tmp, check=True, capture_output=True)
+    subprocess.run(['gweave', 'x.gw'], cwd=tmp, check=True, capture_output=True)
     tex = open(os.path.join(tmp, 'x.tex'), encoding='utf-8').read()
     out, i = [], 0
     while (i := tex.find('\\PB{', i)) >= 0:
@@ -197,7 +197,7 @@ def location(stem, name, loc, secs):
         return loc
     other, _, num = loc.partition('§')
     web = other or stem
-    ss = secs if web == stem else lines_by_section(os.path.join(webdir(web), web + '.w'))
+    ss = secs if web == stem else lines_by_section(os.path.join(webdir(web), web + '.gw'))
     hits = [n for n, l in ss if n > 0 and in_bars(name, l)]
     if not hits:
         die('%s: %s가 %s의 |...|에 나오지 않는다' % (stem, name, web))
@@ -209,7 +209,7 @@ def location(stem, name, loc, secs):
 def hint_bux(stem, srcs):
     secs = []
     for s in srcs:
-        if s.endswith('.w'):
+        if s.endswith('.gw'):
             secs = lines_by_section(s)
     rows = hints_for(stem)
     exprs = [m[1:] for _, _, m in rows if m[0] in '=:']
@@ -233,7 +233,7 @@ def main():
     stem, srcs = sys.argv[1], sys.argv[2:]
     head = '%% twill/bux.py가 만든 것이다. 고치려면 %s를 고친다.\n'
     with open('system.bux', 'w', encoding='utf-8') as f:
-        f.write(head % '이 웹이 가져오는 패키지의 .w')
+        f.write(head % '이 웹이 가져오는 패키지의 .gw')
         f.writelines(l + '\n' for l in system_bux(stem, srcs))
     with open(stem + '.bux', 'w', encoding='utf-8') as f:
         f.write(head % 'twill/hints.txt')

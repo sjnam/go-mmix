@@ -1,4 +1,4 @@
-//line mmmix/mmmix.w:23
+//line mmmix/mmmix.gw:23
 package main
 
 import (
@@ -11,7 +11,7 @@ import (
 	"github.com/sjnam/go-mmix/mmixio"
 )
 
-//line mmmix/mmmix.w:913
+//line mmmix/mmmix.gw:913
 type cfile struct {
 	f   *os.File      // the file being read; |nil| if standard input
 	r   *bufio.Reader // read buffer
@@ -19,13 +19,13 @@ type cfile struct {
 	eof bool          // end-of-file indicator (|feof|)
 }
 
-//line mmmix/mmmix.w:161
+//line mmmix/mmmix.gw:161
 const bufSize = 100
 
-//line mmmix/mmmix.w:437
+//line mmmix/mmmix.gw:437
 const kernelBoot = 0x8000000500000000 // where the kernel starts
 
-//line mmmix/mmmix.w:456
+//line mmmix/mmmix.gw:456
 const (
 	mm       = 0x98 // the escape code of the \.{mmo} format
 	lopQuote = 0x0  // the quotation lopcode
@@ -42,7 +42,7 @@ const (
 	lopEnd   = 0xc  // the end-it-all lopcode
 )
 
-//line mmmix/mmmix.w:296
+//line mmmix/mmmix.gw:296
 func (mx *machine) undumpOcta(f *cfile, name string, dat *Octa) bool {
 	var t Tetra
 	for k := 0; k < 8; k++ {
@@ -65,7 +65,7 @@ func (mx *machine) undumpOcta(f *cfile, name string, dat *Octa) bool {
 	return true
 }
 
-//line mmmix/mmmix.w:477
+//line mmmix/mmmix.gw:477
 func (mx *machine) kernelTet(f *cfile, name string) Tetra {
 	var b [4]byte
 	if _, err := io.ReadFull(f.r, b[:]); err != nil {
@@ -93,7 +93,7 @@ func (mx *machine) kernelErr(name string) {
 	panic(exitSignal(-4))
 }
 
-//line mmmix/mmmix.w:509
+//line mmmix/mmmix.gw:509
 func (mx *machine) kernelLoad(loc Octa, t Tetra, xor bool) {
 	if loc&signBit == 0 || loc-signBit >= hioBase {
 		mx.errprintf("Panic: Kernel location %016x isn't in negative memory!\n", loc)
@@ -111,7 +111,7 @@ func (mx *machine) kernelLoad(loc Octa, t Tetra, xor bool) {
 	mx.memWrite(a, o)
 }
 
-//line mmmix/mmmix.w:760
+//line mmmix/mmmix.gw:760
 func readHex(p []byte) Octa {
 	var h, l Tetra
 	d := make([]byte, 0, len(p))
@@ -142,7 +142,7 @@ scan:
 	return Octa(h)<<32 | Octa(l)
 }
 
-//line mmmix/mmmix.w:921
+//line mmmix/mmmix.gw:921
 func openCfile(name string) *cfile {
 	f, err := os.Open(name)
 	if err != nil {
@@ -151,7 +151,7 @@ func openCfile(name string) *cfile {
 	return &cfile{f: f, r: bufio.NewReader(f)}
 }
 
-//line mmmix/mmmix.w:934
+//line mmmix/mmmix.gw:934
 func (c *cfile) fgets(buf []byte, n int) bool {
 	if c.eof {
 		return false
@@ -177,7 +177,7 @@ func (c *cfile) fgets(buf []byte, n int) bool {
 	return true
 }
 
-//line mmmix/mmmix.w:963
+//line mmmix/mmmix.gw:963
 func strlen(b []byte) int {
 	if n := bytes.IndexByte(b, 0); n >= 0 {
 		return n
@@ -197,7 +197,7 @@ func isspace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'
 }
 
-//line mmmix/mmmix.w:988
+//line mmmix/mmmix.gw:988
 func sscanfD(b []byte) (int32, bool) {
 	s := cstr(b)
 	i := 0
@@ -223,7 +223,7 @@ func sscanfD(b []byte) (int32, bool) {
 	return int32(v), true
 }
 
-//line mmmix/mmmix.w:1020
+//line mmmix/mmmix.gw:1020
 func sscanfX(s []byte, w1, w2 int) (Tetra, Tetra, bool) {
 	h, s, ok := scanHexField(s, w1)
 	if !ok {
@@ -240,7 +240,7 @@ func scanHexField(s []byte, width int) (Tetra, []byte, bool) {
 	var buf []byte
 	nDigits := true
 
-//line mmmix/mmmix.w:1046
+//line mmmix/mmmix.gw:1046
 	signOK, pfxOK, nzDigits, haveSign := true, true, true, false
 scan:
 	for ; width > 0 && len(buf) < len(s); width-- {
@@ -264,7 +264,7 @@ scan:
 		buf = append(buf, c)
 	}
 
-//line mmmix/mmmix.w:1036
+//line mmmix/mmmix.gw:1036
 	if nDigits {
 		return 0, s, false
 	}
@@ -272,7 +272,7 @@ scan:
 		buf = buf[:len(buf)-1]
 	}
 
-//line mmmix/mmmix.w:1070
+//line mmmix/mmmix.gw:1070
 	rest := s[len(buf):]
 	neg := buf[0] == '-'
 	if buf[0] == '+' || buf[0] == '-' {
@@ -287,19 +287,19 @@ scan:
 	}
 	return Tetra(v), rest, true
 
-//line mmmix/mmmix.w:1043
+//line mmmix/mmmix.gw:1043
 }
 
-//line mmmix/mmmix.w:39
+//line mmmix/mmmix.gw:39
 func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
-	mx := &machine{ /*line mmmix/mmmix.w:68*/ out: bufio.NewWriter(stdout),
-//line mmmix/mmmix.w:69
+	mx := &machine{ /*line mmmix/mmmix.gw:68*/ out: bufio.NewWriter(stdout),
+//line mmmix/mmmix.gw:69
 		stderr: stderr,
-		stdin:  &cfile{r: bufio.NewReader(stdin)} /*line mmmix/mmmix.w:40*/}
-//line mmmix/mmmix.w:41
+		stdin:  &cfile{r: bufio.NewReader(stdin)} /*line mmmix/mmmix.gw:40*/}
+//line mmmix/mmmix.gw:41
 	defer func() {
 
-//line mmmix/mmmix.w:77
+//line mmmix/mmmix.gw:77
 		mx.out.Flush()
 		if mx.io != nil {
 			mx.io.FlushAll()
@@ -318,10 +318,10 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 			code = int(e)
 		}
 
-//line mmmix/mmmix.w:43
+//line mmmix/mmmix.gw:43
 	}()
 
-//line mmmix/mmmix.w:164
+//line mmmix/mmmix.gw:164
 	var (
 		n, m           int                    // temporary integers
 		curLoc         Octa                   // the current location
@@ -337,9 +337,9 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 		diskFileName   string                 // supplement: disk image given by \.{-d}
 	)
 
-//line mmmix/mmmix.w:45
+//line mmmix/mmmix.gw:45
 
-//line mmmix/mmmix.w:114
+//line mmmix/mmmix.gw:114
 	argc := len(args)
 	for n = 1; n < len(args) && len(args[n]) > 0 && args[n][0] == '-'; n++ {
 		if len(args[n]) > 1 && args[n][1] == 's' {
@@ -360,15 +360,15 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 	configFileName := args[argc-2]
 	progFileName := args[argc-1]
 
-//line mmmix/mmmix.w:46
+//line mmmix/mmmix.gw:46
 	mx.MMIXConfig(configFileName)
 	mx.MMIXInit()
 	mx.io = mmixio.New(mx, mx.out, stderr)
 
-//line mmmix/mmmix.w:135
+//line mmmix/mmmix.gw:135
 	if len(progFileName) > 4 && progFileName[len(progFileName)-4:] == ".mmb" {
 
-//line mmmix/mmmix.w:265
+//line mmmix/mmmix.gw:265
 		progFile = openCfile(progFileName)
 		if progFile == nil {
 			mx.errprintf("Panic: Can't open MMIX binary file %s!\n", progFileName)
@@ -388,7 +388,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 				curLoc = curLoc>>61<<32 | curLoc&0xffffffff // apply trivial mapping function for each segment
 			}
 
-//line mmmix/mmmix.w:319
+//line mmmix/mmmix.gw:319
 			for {
 				if !mx.undumpOcta(progFile, progFileName, &curDat) {
 					mx.errprintf("Unexpected end of file on %s!\n", progFileName)
@@ -404,7 +404,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 					panic(exitSignal(-5))
 				}
 
-//line mmmix/mmmix.w:243
+//line mmmix/mmmix.gw:243
 				if newChunk {
 					mx.memWrite(curLoc, curDat)
 				} else {
@@ -412,7 +412,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 				}
 				curLoc = curLoc&^0xffffffff | Octa(Tetra(curLoc)+8)
 
-//line mmmix/mmmix.w:334
+//line mmmix/mmmix.gw:334
 				if Tetra(curLoc)&0xfff8 != 0 {
 					newChunk = false
 				} else {
@@ -424,10 +424,10 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 				}
 			}
 
-//line mmmix/mmmix.w:284
+//line mmmix/mmmix.gw:284
 		}
 
-//line mmmix/mmmix.w:352
+//line mmmix/mmmix.gw:352
 		if curLoc>>32 != 3 {
 			mx.errprintf("Panic: MMIX binary file didn't set up the stack!\n")
 
@@ -447,7 +447,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 		mx.g[rT].o = 0x80000005<<32 | mx.g[rT].o&0xffffffff
 		mx.g[rTT].o = 0x80000006<<32 | mx.g[rTT].o&0xffffffff
 
-//line mmmix/mmmix.w:379
+//line mmmix/mmmix.gw:379
 		curDat = Octa(RESUME<<24+1) << 32
 		curLoc = 5 << 32
 		mx.memWrite(curLoc, curDat) // the primitive trap handler
@@ -458,7 +458,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 		curLoc = 6 << 32
 		mx.memWrite(curLoc, curDat) // more of the primitive dynamic trap handler
 
-//line mmmix/mmmix.w:390
+//line mmmix/mmmix.gw:390
 		curDat = 7                  // generate a PTE with \.{rwx} permission
 		curLoc = 4 << 32            // beginning of skeleton page table
 		mx.memWrite(curLoc, curDat) // PTE for the text segment
@@ -474,17 +474,17 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 		curLoc = 4<<32 | 9<<13
 		mx.memWrite(curLoc, curDat) // PTE for the stack segment
 
-//line mmmix/mmmix.w:372
+//line mmmix/mmmix.gw:372
 		mx.g[rK].o = negOne // enable all interrupts
 		mx.g[rV].o = 0x369c2004<<32 | mx.g[rV].o&0xffffffff
 		mx.pageBad, mx.pageR, mx.pageS = false, 4<<(32-13), 32
 		mx.pageMask = mx.pageMask&^0xffffffff | 0xffffffff
 		mx.pageB[1], mx.pageB[2], mx.pageB[3], mx.pageB[4] = 3, 6, 9, 12
 
-//line mmmix/mmmix.w:137
+//line mmmix/mmmix.gw:137
 	} else {
 
-//line mmmix/mmmix.w:183
+//line mmmix/mmmix.gw:183
 		progFile = openCfile(progFileName)
 		if progFile == nil {
 			mx.errprintf("Panic: Can't open MMIX hexadecimal file %s!\n", progFileName)
@@ -503,7 +503,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 			}
 			if buffer[12] == ':' {
 
-//line mmmix/mmmix.w:213
+//line mmmix/mmmix.gw:213
 				if h, l, ok := sscanfX(cstr(buffer[:]), 4, 8); !ok {
 					mx.errprintf("Panic: Improper hexadecimal file location: `%s'!\n", cstr(buffer[:]))
 
@@ -513,10 +513,10 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 				}
 				newChunk = true
 
-//line mmmix/mmmix.w:201
+//line mmmix/mmmix.gw:201
 			} else if buffer[0] == ' ' {
 
-//line mmmix/mmmix.w:225
+//line mmmix/mmmix.gw:225
 				if h, l, ok := sscanfX(cstr(buffer[1:]), 8, 8); !ok {
 					mx.errprintf("Panic: Improper hexadecimal file data: `%s'!\n", cstr(buffer[:]))
 
@@ -525,7 +525,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 					curDat = Octa(h)<<32 | Octa(l)
 				}
 
-//line mmmix/mmmix.w:243
+//line mmmix/mmmix.gw:243
 				if newChunk {
 					mx.memWrite(curLoc, curDat)
 				} else {
@@ -533,7 +533,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 				}
 				curLoc = curLoc&^0xffffffff | Octa(Tetra(curLoc)+8)
 
-//line mmmix/mmmix.w:233
+//line mmmix/mmmix.gw:233
 				if Tetra(curLoc)&0xfff8 != 0 {
 					newChunk = false
 				} else {
@@ -543,7 +543,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 					}
 				}
 
-//line mmmix/mmmix.w:203
+//line mmmix/mmmix.gw:203
 			} else {
 				mx.errprintf("Panic: Improper hexadecimal file line: `%s'!\n", cstr(buffer[:]))
 
@@ -551,16 +551,16 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 			}
 		}
 
-//line mmmix/mmmix.w:139
+//line mmmix/mmmix.gw:139
 	}
 	progFile.f.Close()
 
-//line mmmix/mmmix.w:50
+//line mmmix/mmmix.gw:50
 
-//line mmmix/mmmix.w:420
+//line mmmix/mmmix.gw:420
 	if diskFileName != "" {
 
-//line mmmix/mmmix.w:442
+//line mmmix/mmmix.gw:442
 		f, err := os.OpenFile(diskFileName, os.O_RDWR, 0)
 		if err != nil {
 			mx.errprintf("Panic: Can't open disk image %s!\n", diskFileName)
@@ -570,13 +570,13 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 		st, _ := f.Stat()
 		mx.blkDev = &blk{mx: mx, f: f, nblk: Octa(st.Size() / blkSize)}
 
-//line mmmix/mmmix.w:422
+//line mmmix/mmmix.gw:422
 	}
 	if kernelFileName != "" {
 		mx.hioDev = &hio{mx: mx}
 		mx.hioDev.io = mmixio.New(mx.hioDev, mx.out, stderr)
 
-//line mmmix/mmmix.w:531
+//line mmmix/mmmix.gw:531
 		kf := openCfile(kernelFileName)
 		if kf == nil {
 			mx.errprintf("Panic: Can't open kernel object file %s!\n", kernelFileName)
@@ -603,7 +603,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 					}
 					t = mx.kernelTet(kf, kernelFileName)
 
-//line mmmix/mmmix.w:567
+//line mmmix/mmmix.gw:567
 				case lopLoc:
 					curLoc = mx.kernelAddress(kf, kernelFileName, t)
 					continue items
@@ -625,7 +625,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 				case lopPost, lopStab, lopEnd:
 					break items
 
-//line mmmix/mmmix.w:592
+//line mmmix/mmmix.gw:592
 				case lopFixr, lopFixrx:
 					delta := yz
 					j := Tetra(0)
@@ -646,7 +646,7 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 					mx.kernelLoad(curLoc-d<<2, delta, true)
 					continue items
 
-//line mmmix/mmmix.w:557
+//line mmmix/mmmix.gw:557
 				default:
 					mx.kernelErr(kernelFileName)
 				}
@@ -656,29 +656,29 @@ func mmmix(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) 
 		}
 		kf.f.Close()
 
-//line mmmix/mmmix.w:427
+//line mmmix/mmmix.gw:427
 		if len(progFileName) > 4 && progFileName[len(progFileName)-4:] == ".mmb" {
 			mx.g[rWW].o = mx.instPtr.o
 			mx.g[rXX].o = signBit
 			mx.instPtr.o = kernelBoot
 			mx.head.loc = kernelBoot - 4
 
-//line mmmix/mmmix.w:746
+//line mmmix/mmmix.gw:746
 			if mx.instPtr.o&signBit != 0 {
 				mx.g[rK].o &^= 1 << 32 // disable interrupts on |pBit|
 			}
 			mx.instPtr.p = nil
 
-//line mmmix/mmmix.w:433
+//line mmmix/mmmix.gw:433
 		}
 	}
 
-//line mmmix/mmmix.w:51
+//line mmmix/mmmix.gw:51
 	if silent {
 		return mx.MMIXSilent()
 	}
 
-//line mmmix/mmmix.w:663
+//line mmmix/mmmix.gw:663
 interact:
 	for {
 		mx.printf("mmmix> ")
@@ -690,7 +690,7 @@ interact:
 		case 'q', 'x':
 			break interact
 
-//line mmmix/mmmix.w:683
+//line mmmix/mmmix.gw:683
 		case 'h', '?':
 			mx.printf("The interactive commands are as follows:\n")
 			mx.printf(" <n> to run for n cycles\n")
@@ -704,7 +704,7 @@ interact:
 			mx.printf("      40[I/O read/write]+80[branch prediction details]+\n")
 			mx.printf("      100[invalid cache blocks displayed too]\n")
 
-//line mmmix/mmmix.w:698
+//line mmmix/mmmix.gw:698
 			mx.printf(" -<n> to deissue n instructions\n")
 			mx.printf(" l<n> to print current value of local register n\n")
 			mx.printf(" g<n> to print current value of global register n\n")
@@ -719,7 +719,7 @@ interact:
 			mx.printf(" q to exit\n")
 			mx.printf("(Here <n> is a decimal integer, <x> is hexadecimal.)\n")
 
-//line mmmix/mmmix.w:717
+//line mmmix/mmmix.gw:717
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			if v, ok := sscanfD(buffer[:]); !ok {
 				whatSay = true
@@ -737,32 +737,32 @@ interact:
 		case '@':
 			mx.instPtr.o = readHex(buffer[1:])
 
-//line mmmix/mmmix.w:746
+//line mmmix/mmmix.gw:746
 			if mx.instPtr.o&signBit != 0 {
 				mx.g[rK].o &^= 1 << 32 // disable interrupts on |pBit|
 			}
 			mx.instPtr.p = nil
 
-//line mmmix/mmmix.w:734
+//line mmmix/mmmix.gw:734
 		case 'k':
 			mx.instPtr.o ^= 0x80000000 << 32 // shortcut to kernel mode
 			if Tetra(mx.ticks) == 0 && mx.head != nil {
 				mx.head.loc ^= 0x80000000 << 32 // fix the \.{UNSAVE} loc
 			}
 
-//line mmmix/mmmix.w:746
+//line mmmix/mmmix.gw:746
 			if mx.instPtr.o&signBit != 0 {
 				mx.g[rK].o &^= 1 << 32 // disable interrupts on |pBit|
 			}
 			mx.instPtr.p = nil
 
-//line mmmix/mmmix.w:740
+//line mmmix/mmmix.gw:740
 		case 'b':
 			bp = readHex(buffer[1:])
 		case 'v':
 			mx.verbose = int(Tetra(readHex(buffer[1:])))
 
-//line mmmix/mmmix.w:793
+//line mmmix/mmmix.gw:793
 		case '-':
 			if v, ok := sscanfD(buffer[1:]); !ok || v < 0 {
 				whatSay = true
@@ -788,7 +788,7 @@ interact:
 			tmp = mx.memRead(readHex(buffer[1:]))
 			mx.printf("  m[%s]=%016x\n", cstr(buffer[1:]), tmp)
 
-//line mmmix/mmmix.w:824
+//line mmmix/mmmix.gw:824
 		case 'g':
 			if v, ok := sscanfD(buffer[1:]); !ok || v < 0 || v >= 256 {
 				whatSay = true
@@ -805,7 +805,7 @@ interact:
 			}
 			mx.printf("  g[%d]=%016x\n", n, mx.g[n].o)
 
-//line mmmix/mmmix.w:841
+//line mmmix/mmmix.gw:841
 		case 'I':
 			if buffer[1] == 'T' {
 				mx.printCache(mx.ITcache, false)
@@ -830,7 +830,7 @@ interact:
 				mx.g[rI].o = Octa(int64(v))
 			}
 
-//line mmmix/mmmix.w:866
+//line mmmix/mmmix.gw:866
 		case 'f':
 			tmp = readHex(buffer[1:])
 			if newTail := mx.prevFetch(mx.tail); newTail == mx.head {
@@ -843,7 +843,7 @@ interact:
 				mx.tail = newTail
 			}
 
-//line mmmix/mmmix.w:882
+//line mmmix/mmmix.gw:882
 		case 'd':
 			if Tetra(mx.ticks) != 0 {
 				mx.printf("Sorry: I disable ITcache and DTcache only at the beginning!\n")
@@ -858,13 +858,13 @@ interact:
 				mx.instPtr.p = &mx.unknownSpec
 			}
 
-//line mmmix/mmmix.w:902
+//line mmmix/mmmix.gw:902
 		case '!':
 			for j := 0; j < mx.funitCount; j++ {
 				mx.printf("unit %s %d\n", mx.funit[j].name, mx.funit[j].k)
 			}
 
-//line mmmix/mmmix.w:674
+//line mmmix/mmmix.gw:674
 		default:
 			whatSay = true
 		}
@@ -873,7 +873,7 @@ interact:
 		}
 	}
 
-//line mmmix/mmmix.w:55
+//line mmmix/mmmix.gw:55
 	mx.printf("Simulation ended at time %d.\n", int32(Tetra(mx.ticks)))
 	mx.printStats()
 	return 0

@@ -1,4 +1,4 @@
-% 이 파일은 MMIXware를 한글 GWEB(Go)로 옮긴 모든 .w의 첫머리에 @i로 들어간다.
+% 이 파일은 MMIXware를 한글 GWEB(Go)로 옮긴 모든 .gw의 첫머리에 @i로 들어간다.
 % 원본 MMIXware (c) 1999 Donald E. Knuth. 이 번역은 MMIXware 패키지의 일부가 아니다.
 
 \def\botofcontents{\vskip 0pt plus 1filll
@@ -25,7 +25,7 @@
 \def\bull{\smallbreak\textindent{$\bullet$}}
 
 % gweave가 형으로 알아보지 못하는 이름들. 표준 패키지와 이 저장소의 다른 패키지,
-% 같은 패키지의 다른 .w에서 정의한 형이다.
+% 같은 패키지의 다른 .gw에서 정의한 형이다.
 @s atomic.Bool int
 @s big.Int int
 @s bufio.Reader int

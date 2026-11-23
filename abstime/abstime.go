@@ -1,4 +1,4 @@
-//line abstime/abstime.w:34
+//line abstime/abstime.gw:34
 package main
 
 import (

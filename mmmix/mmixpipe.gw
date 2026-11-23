@@ -1,6 +1,6 @@
 % 이 파일은 MMIXware의 mmix-pipe.w((c) 1999 Donald E. Knuth)를 한글 GWEB(Go)로
 % 옮긴 것으로, MMIXware 패키지의 일부가 아니다.
-@i ../boilerplate.w
+@i ../boilerplate.gw
 
 \input kotexgweb
 \def\title{MMIXPIPE}
@@ -24,9 +24,9 @@
 
 보충: \GO/ 판에서 메타 시뮬레이터는 디렉터리 \.{mmmix} 하나에 든 \.{main} 패키지다.
 커누스의 네 파일 \.{mmix-pipe.w}, \.{mmix-config.w}, \.{mmix-mem.w}, \.{mmmix.w}는 각각
-\.{mmixpipe.w}, \.{mmixconfig.w}, \.{mmixmem.w}, \.{mmmix.w}로 옮겼고, 저마다 같은 이름의
+\.{mmixpipe.gw}, \.{mmixconfig.gw}, \.{mmixmem.gw}, \.{mmmix.gw}로 옮겼고, 저마다 같은 이름의
 \GO/ 파일을 만든다. 원본은 헤더 파일 \.{mmix-pipe.h}로 전역 변수를 나누어 썼는데, 여기서는
-그 변수들이 모두 구조체 |machine|의 필드다. 주 프로그램 \.{mmmix.w}가 파이프라인의 속사정을
+그 변수들이 모두 구조체 |machine|의 필드다. 주 프로그램 \.{mmmix.gw}가 파이프라인의 속사정을
 직접 들여다보므로, 패키지를 나누지 않고 한 패키지에 두었다.
 
 @c
@@ -3957,7 +3957,7 @@ memHash      []chunknode // the simulated main memory
 
 @ 따로 컴파일하는 프로시저 |spec_read()|와 |spec_write()|는 일반 프로시저 |mem_read()|와
 |mem_write()|와 같은 호출 관례를 따르되, |size| 매개변수가 더 있다. 이것은 |1<<size|바이트를
-읽거나 써야 한다는 것을 지정한다. 보충: 이 둘은 \.{mmixmem.w}에서 정의하는 메서드 |specRead|와
+읽거나 써야 한다는 것을 지정한다. 보충: 이 둘은 \.{mmixmem.gw}에서 정의하는 메서드 |specRead|와
 |specWrite|다.
 
 @ 프로그램이 할당하지 않은 덩이에서 읽으려고 하면 값 0을 돌려준다. 원하면 사용자에게 알림도
@@ -6726,7 +6726,7 @@ if mx.g[rI].o == 0 {
 	}
 }
 if mx.blkDev != nil {
-	mx.blkDev.tick() // supplement: the block device of \.{mmixmem.w} spends time
+	mx.blkDev.tick() // supplement: the block device of \.{mmixmem.gw} spends time
 }
 mx.tryingToInterrupt = false
 if mx.g[rQ].o&mx.g[rK].o != 0 && mx.cool != mx.hot &&
@@ -8416,7 +8416,7 @@ if argCount[yy] == 3 {
 끝을 알리는 널 문자는 세지 않는다.
 
 보충: 원본에서 |m|은 읽은 개수이고 |p|는 |buf+m|이었다. 여기서는 색인 |k| 하나로 둘을 대신한다.
-물리 주소 |a|부터 문자를 읽는 루프는 함수 |getChars|로 떼어 냈다. \.{mmixmem.w}의 호스트 입출력
+물리 주소 |a|부터 문자를 읽는 루프는 함수 |getChars|로 떼어 냈다. \.{mmixmem.gw}의 호스트 입출력
 장치도 그것을 부르기 때문이다. 장치는 커널이 변환한 물리 주소를 받으므로 |magicAddr|를 거치지 않는다.
 
 @<함수들@>=
@@ -8580,9 +8580,9 @@ stdinBufEnd   int       // current end of that buffer
 @* 기계. 보충: 이 장은 옮긴이가 덧붙인 것이다. 원본의 전역 변수들은 모두 앞에서 조금씩 정의한
 절 ``기계의 상태''에 모였다. 그것들을 필드로 가진 구조체가 |machine|이다. 여기에 입출력을 위한
 필드를 더한다. 표준 출력은 버퍼를 거치고, 표준 오류는 바로 쓴다. 필드 |io|는 \.{mmixio}의 상태이고,
-|stdin|은 표준 입력을 \CEE/의 |fgets|처럼 읽는 파일이다. 타입 |cfile|은 \.{mmmix.w}에서 정의한다.
-필드 |specBuf|는 \.{mmixmem.w}의 원본에서 정적 버퍼였다. 필드 |hioDev|와 |blkDev|는 \NNIX\ 커널을 위해
-\.{mmixmem.w}에 덧붙인 장치다.
+|stdin|은 표준 입력을 \CEE/의 |fgets|처럼 읽는 파일이다. 타입 |cfile|은 \.{mmmix.gw}에서 정의한다.
+필드 |specBuf|는 \.{mmixmem.gw}의 원본에서 정적 버퍼였다. 필드 |hioDev|와 |blkDev|는 \NNIX\ 커널을 위해
+\.{mmixmem.gw}에 덧붙인 장치다.
 
 @<타입 정의@>=
 type machine struct {
@@ -8591,9 +8591,9 @@ type machine struct {
 	stderr io.Writer     // standard error
 	io     *mmixio.IO    // files of the simulated program
 	stdin  *cfile        // standard input
-	specBuf [20]byte     // buffer used by |specRead| of \.{mmixmem.w}
-	hioDev  *hio         // host I/O device of \.{mmixmem.w} (only when \.{-k} is given)
-	blkDev  *blk         // block device of \.{mmixmem.w} (only when \.{-d} is given)
+	specBuf [20]byte     // buffer used by |specRead| of \.{mmixmem.gw}
+	hioDev  *hio         // host I/O device of \.{mmixmem.gw} (only when \.{-k} is given)
+	blkDev  *blk         // block device of \.{mmixmem.gw} (only when \.{-d} is given)
 }
 
 @ 원본의 |exit(n)|은 종료 코드를 담은 |exitSignal|을 던지는 공황이 된다. 주 프로그램이 그것을

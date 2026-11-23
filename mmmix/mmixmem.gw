@@ -1,6 +1,6 @@
 % 이 파일은 MMIXware의 mmix-mem.w((c) 1999 Donald E. Knuth)를 한글 GWEB(Go)로
 % 옮긴 것으로, MMIXware 패키지의 일부가 아니다.
-@i ../boilerplate.w
+@i ../boilerplate.gw
 
 \input kotexgweb
 \def\title{MMIXMEM}
@@ -19,7 +19,7 @@
 가린다.
 
 보충: \GO/ 판에서 두 루틴은 |machine|의 메서드다. 원본은 주 프로그램 모듈의 |read_hex|를
-가져다 썼는데, 여기서도 \.{mmmix.w}의 |readHex|를 쓴다. 원본의 정적 버퍼 |buf|는 |machine|의
+가져다 썼는데, 여기서도 \.{mmmix.gw}의 |readHex|를 쓴다. 원본의 정적 버퍼 |buf|는 |machine|의
 필드 |specBuf|다.
 
 보충: 원본의 두 루틴은 허수아비 판 그대로 두고, 끝에 \NNIX\ 커널을 위한 장치 하나를 덧붙인다.
@@ -307,7 +307,7 @@ if left := int(mask + 1 - v&mask); left < n {
 }
 
 @ 장치는 |mmixio.Simulator|가 요구하는 메서드 셋을 구현한다. 버퍼를 한 페이지씩 변환해서
-\.{mmixpipe.w}의 |getChars|와 |putChars|로 읽고 쓴다. 그것들은 |magicRead|와 |magicWrite|를 거치므로
+\.{mmixpipe.gw}의 |getChars|와 |putChars|로 읽고 쓴다. 그것들은 |magicRead|와 |magicWrite|를 거치므로
 쓰기 버퍼와 캐시까지 살핀다. 곧 이 장치는 캐시 일관성을 지키는 DMA처럼 동작한다.
 
 페이지는 짝수 크기이고 짝수 주소에서 시작하므로, |getChars|의 멈춤 조건(널 바이트, 또는 짝수
@@ -423,7 +423,7 @@ case hioCmd:
 	}
 }
 
-@ 메서드 |tick|은 \.{mmixpipe.w}가 사이클마다 부른다. 명령이 진행 중이면 남은 사이클을 줄이고, 다
+@ 메서드 |tick|은 \.{mmixpipe.gw}가 사이클마다 부른다. 명령이 진행 중이면 남은 사이클을 줄이고, 다
 되면 일을 한다. 레지스터 \.{BLOCK}과 \.{ADDR}은 명령이 끝날 때의 값을 쓴다(커널은 그동안 바꾸지
 않는다). 커누스의 타이머 rI처럼 rQ와 |newQ|에 같은 비트를 켠다.
 

@@ -1,6 +1,6 @@
 % 이 파일은 MMIXware의 mmmix.w((c) 1999 Donald E. Knuth)를 한글 GWEB(Go)로
 % 옮긴 것으로, MMIXware 패키지의 일부가 아니다.
-@i ../boilerplate.w
+@i ../boilerplate.gw
 
 \input kotexgweb
 \def\title{MMMIX}
@@ -404,7 +404,7 @@ mx.memWrite(curLoc, curDat) // PTE for the stack segment
 
 @* 커널 싣기. 보충: 이 장은 옮긴이가 덧붙인 것이다. 커누스가 만들지 않은 \NNIX\ 대신에 쓸
 작은 커널을 저장소의 \.{nnix/nnix.mms}에 두었다. 이 커널은 rT와 rTT에 진짜 처리기를 두고,
-요구 페이징을 하며, \.{mmixmem.w}에 덧붙인 호스트 입출력 장치로 입출력을 한다. 그러면 마법 같은 입출력은 일어나지
+요구 페이징을 하며, \.{mmixmem.gw}에 덧붙인 호스트 입출력 장치로 입출력을 한다. 그러면 마법 같은 입출력은 일어나지
 않는다. 마법은 rT 자리에서 \.{RESUME}~\.1을 배정할 때만 일어나기 때문이다.
 
 커널은 미리 짜 둔 환경을 준비한 {\it 뒤에\/} 싣는다. 그래서 위치 $2^{32}\times5$의 원시적인 트랩

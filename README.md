@@ -9,7 +9,7 @@ an assembler, a simulator, and a pipelined meta-simulator.
 MMIX는 커누스가 『The Art of Computer Programming』(TAOCP)의 예제를 위해 설계한 64비트 RISC 컴퓨터다.
 MMIXware는 그 기계의 명세, 어셈블러, 시뮬레이터, 그리고 파이프라인 메타 시뮬레이터를 모두 CWEB로 쓴 패키지다.
 
-이 저장소의 `.w` 파일들은 원본을 한 절도 빠뜨리지 않고 한글로 옮기고, C 코드를 Go로 다시 썼다.
+이 저장소의 `.gw` 파일들은 원본을 한 절도 빠뜨리지 않고 한글로 옮기고, C 코드를 Go로 다시 썼다.
 옮긴이가 덧붙인 설명은 문서 안에서 "보충:"으로 밝혀 두었다.
 Go 프로그램은 커누스의 C 프로그램과 같은 입력에 대해 바이트 단위로 같은 출력을 내는지 대조하며 검증했다.
 
@@ -35,21 +35,21 @@ Go 프로그램은 커누스의 C 프로그램과 같은 입력에 대해 바이
 | `examples/` | | 예제 | 원본에 딸린 예제(아래 [예제 파일](#예제-파일) 참고) |
 
 디렉터리 `mmmix/`의 원본은 `mmmix.w`, `mmix-pipe.w`, `mmix-config.w`,
-`mmix-mem.w` 네 개이고, 번역도 같은 이름의 `.w` 네 개로 나뉘어 있다.
+`mmix-mem.w` 네 개이고, 번역도 같은 이름의 `.gw` 네 개로 나뉘어 있다.
 
 루트에는 다음 파일이 있다.
 
-- `mmixdoc.w`: 원본 `mmix-doc.w`를 옮긴 것으로, MMIX 아키텍처의 자세한 명세다.
+- `mmixdoc.gw`: 원본 `mmix-doc.w`를 옮긴 것으로, MMIX 아키텍처의 자세한 명세다.
   코드가 없어 조판만 한다.
-- `mmix-logo.mp`: `mmixdoc.w`의 목차 쪽에 놓는 MMIX 로고(MetaPost). 이 README 머리의
+- `mmix-logo.mp`: `mmixdoc.gw`의 목차 쪽에 놓는 MMIX 로고(MetaPost). 이 README 머리의
   `mmix-logo.svg`도 여기서 뽑는다.
-- `boilerplate.w`: 모든 `.w`가 첫머리에서 `@i`로 읽어 들이는 공통 머리말이다.
+- `boilerplate.gw`: 모든 `.gw`가 첫머리에서 `@i`로 읽어 들이는 공통 머리말이다.
   저작권 안내와 매크로가 들어 있다.
 - `Makefile`: tangle, 테스트, 조판을 한꺼번에 돌린다.
 - `go.mod`: 모듈 `github.com/sjnam/go-mmix`를 정의한다.
 - `BUGS.md`: 옮기면서 찾은 원본의 버그와 문서 오타(영문). 재현 방법과 패치를 담았다.
 
-각 디렉터리의 일차 산출물은 `.w`다. Go 원시 파일 `.go`는 `gtangle`이 `.w`에서
+각 디렉터리의 일차 산출물은 `.gw`다. Go 원시 파일 `.go`는 `gtangle`이 `.gw`에서
 뽑아낸 것이고, 문서 `.pdf`는 `gweave`와 `luatex`로 조판한 것이다.
 라이브러리 패키지(`mmixarith`, `mmixio`)는 `go get`이 되도록 `.go`도 함께 둔다.
 
@@ -63,15 +63,15 @@ go install ./mmixal ./mmixsim ./mmotype ./mmmix    # $GOPATH/bin에 설치
 go build -o bin/ ./mmixal ./mmixsim ./mmotype ./mmmix
 ```
 
-문학적 프로그램 `.w`를 고치고 다시 만들 때는 GWEB 도구(`gtangle`, `gweave`)가 필요하다.
+문학적 프로그램 `.gw`를 고치고 다시 만들 때는 GWEB 도구(`gtangle`, `gweave`)가 필요하다.
 문서를 조판할 때는 `luatex`와 한글 조판용 `kotexgweb`, 그림을 그릴 `luamplib`도 필요하다.
 `make twill`에는 GWEB 0.10.7 이상에 맞춘 `gtwill`과 `gtwill-refsort`, `python3`도 필요하다.
 
 ```sh
-make          # 모든 .w를 tangle한 뒤 go vet, go test
-make tangle   # .w → .go (+ _test.go)
+make          # 모든 .gw를 tangle한 뒤 go vet, go test
+make tangle   # .gw → .go (+ _test.go)
 make test     # go vet + go test
-make doc      # 각 .w를 조판해 .pdf를 만들고 조판 경고 수를 보여 준다
+make doc      # 각 .gw를 조판해 .pdf를 만들고 조판 경고 수를 보여 준다
 make twill    # gtwill로 오른쪽 쪽마다 미니 색인을 단 책꼴 .pdf를 만든다
 make intro    # mmixal과 mmixsim의 앞머리 안내서(*-intro.pdf)를 뗀다
 make clean    # 조판 생성물 삭제
@@ -294,7 +294,7 @@ mmmix> q
 
 **1단계: 진짜 트랩 처리기.** `TRAP 0,Y,Z`를 나누고, 사용자 메모리에서 인자를 읽고,
 메모리 사상 입출력 장치에 명령을 내린 뒤, 끝나기를 기다려 결과를 돌려준다. 장치는
-`mmmix/mmixmem.w`에 덧붙인 호스트 입출력 장치(HIO)다. 물리 주소 2^48(커널이 보기에는
+`mmmix/mmixmem.gw`에 덧붙인 호스트 입출력 장치(HIO)다. 물리 주소 2^48(커널이 보기에는
 `#8001000000000000`)에 레지스터 일곱 개를 둔다. 호스트의 파일을 읽고 쓰는 일은 여전히
 시뮬레이터 안에서 `mmixio`가 하지만, 이제는 장치 레지스터라는 하드웨어 인터페이스를
 거친다. 장치를 이렇게 설계한 까닭은 파이프라인의 성질에 있다. `mmmix`에서 시험해 보면

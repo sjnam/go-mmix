@@ -1,15 +1,15 @@
 # mmix 빌드용 Makefile: 커누스의 MMIXware를 한글 GWEB(Go)로 옮긴 것.
 #
 #   make            # tangle + go vet + go test
-#   make tangle     # 각 .w -> .go (+ _test.go)
-#   make doc        # 각 .w의 .pdf 조판 (한글이라 luatex)
+#   make tangle     # 각 .gw -> .go (+ _test.go)
+#   make doc        # 각 .gw의 .pdf 조판 (한글이라 luatex)
 #   make twill      # gtwill로 오른쪽 쪽마다 미니 색인을 단 책꼴 .pdf 조판
 #   make intro      # 어셈블러와 시뮬레이터의 앞머리 안내서 (*-intro.pdf)
 #   make nnix       # NNIX 커널 nnix/nnix.mmo(mmmix -k로 싣는다)와 셸 nnix/sh.mmo
 #   make test       # go vet + go test
-#   make clean      # 조판 생성물 삭제 (.w 원본은 남김)
+#   make clean      # 조판 생성물 삭제 (.gw 원본은 남김)
 #
-# 일차 산출물은 .w다. 라이브러리 패키지의 .go는 go get이 되도록 커밋한다.
+# 일차 산출물은 .gw다. 라이브러리 패키지의 .go는 go get이 되도록 커밋한다.
 
 GTANGLE ?= gtangle
 GWEAVE  ?= gweave
@@ -22,7 +22,7 @@ WARNS   := 'Overfull\|Underfull\|Error\|Missing\|Undefined'
 # 옮기기가 진행되면서 여기에 디렉터리가 하나씩 늘어난다(라이브러리와 명령 모두).
 PKGS := mmixarith abstime mmixal mmotype mmixio mmixsim mmmix nnixfs
 
-# 디렉터리마다 든 .w 파일들. 따로 적지 않으면 디렉터리 이름과 같은 .w 하나다.
+# 디렉터리마다 든 .gw 파일들. 따로 적지 않으면 디렉터리 이름과 같은 .gw 하나다.
 WEBS_mmmix := mmixpipe mmixconfig mmixmem mmmix
 webs = $(or $(WEBS_$(1)),$(1))
 # 코드가 없어 태글하지 않고 조판만 하는 문서들. 패키지가 아니므로 루트에 둔다.
@@ -37,7 +37,7 @@ all: tangle test
 tangle: $(PKGS)
 
 $(PKGS):
-	cd $@ && for w in $(call webs,$@); do $(GTANGLE) $$w.w || exit 1; done
+	cd $@ && for w in $(call webs,$@); do $(GTANGLE) $$w.gw || exit 1; done
 
 # 원본의 rN에는 컴파일한 시각이 들어간다. 커누스의 Makefile이 abstime.h를 새로 만들듯이,
 # 시뮬레이터를 tangle할 때마다 abstime.go를 새로 만든다.
@@ -54,7 +54,7 @@ test:
 
 # \MMIX\의처럼 쓰면 \의가 제어 순서가 되니, 조판하기 전에 먼저 걸러 낸다.
 MACROCHECK = @perl -CSD -ne 'if (/\\[A-Za-z]+\\\p{Hangul}/) { print "$$ARGV:$$.: $$_"; $$bad=1 } \
-	  close ARGV if eof; END { exit $$bad }' *.w */*.w || \
+	  close ARGV if eof; END { exit $$bad }' *.gw */*.gw || \
 	  (echo '위 줄: \\MMIX\\의 꼴은 \\의가 제어 순서가 된다. \\MMIX의로 쓸 것'; false)
 
 # luatex은 nonstopmode라야 오류가 나도 멈추지 않고 .log에 다 남긴다.
@@ -63,7 +63,7 @@ doc:
 	$(MACROCHECK)
 	@for d in $(DOCS); do \
 	  p=$${d%/*}; w=$${d#*/}; \
-	  (cd $$p && $(GWEAVE) $$w.w && \
+	  (cd $$p && $(GWEAVE) $$w.gw && \
 	   $(LUATEX) --interaction=nonstopmode $$w.tex >/dev/null; \
 	   printf '%s: 조판 경고 %s개\n' $${d#./} \
 	     $$(grep -ac $(WARNS) $$w.log)); \
@@ -96,11 +96,11 @@ twill:
 	$(MACROCHECK)
 	@for d in $(DOCS); do \
 	  p=$${d%/*}; w=$${d#*/}; \
-	  (cd $$p && $(GTWILL) $$w.w >/dev/null 2>&1) || exit 1; \
+	  (cd $$p && $(GTWILL) $$w.gw >/dev/null 2>&1) || exit 1; \
 	done
 	@for d in $(DOCS); do \
 	  p=$${d%/*}; w=$${d#*/}; \
-	  (cd $$p && $(BUX) $$w $$w.w && $(GTWILL) $$w.w >/dev/null && \
+	  (cd $$p && $(BUX) $$w $$w.gw && $(GTWILL) $$w.gw >/dev/null && \
 	   { $(TWILL_TEX); }) || exit 1; \
 	done
 
@@ -113,8 +113,8 @@ intro:
 	@for e in $(INTRO); do \
 	  d=$${e%:*}; s=$${e#*:}; p=$${d%/*}; w=$${d#*/}; \
 	  (cd $$p && \
-	   { [ $$w.pdf -nt $$w.w ] && [ $$w.toc -nt $$w.w ] || \
-	     { $(GWEAVE) $$w.w >/dev/null && \
+	   { [ $$w.pdf -nt $$w.gw ] && [ $$w.toc -nt $$w.gw ] || \
+	     { $(GWEAVE) $$w.gw >/dev/null && \
 	       luatex --interaction=nonstopmode $$w.tex >/dev/null; }; } && \
 	   n=$$(sed -n "s/^\\\\Tline{0}{$$s}{.*}{\([0-9]*\)}$$/\1/p" $$w.toc) && \
 	   [ -n "$$n" ] && \
