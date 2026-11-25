@@ -234,6 +234,18 @@ Some minor items and the typos in `mmix-doc.w` follow the numbered bugs.
           TRAP  0,Halt,0
   ```
 
+- **Build dependence:** the bug is in every build, but the symptom is
+  visible only when the garbage happens to be nonzero. The trace said
+  `l[1]` with Apple clang (`-O0` and `-O2`), `l[116]` with GCC `-O2` and
+  `l[255]` with clang `-O0` on Linux arm64. It said `l[0]`, which looks
+  correct, with GCC `-O0` and clang `-O2` on Linux arm64, and with GCC 16
+  on x86-64 at both `-g -fPIE` and `-O2`. Valgrind does not see it either,
+  because GCC keeps `register int O` in a machine register whose value
+  the C start-up code has already set. Clang's MemorySanitizer
+  (`clang -g -O1 -fsanitize=memory`, Linux) does: it reports
+  "use-of-uninitialized-value" in "Increase rL" (lines 1852–1854) for the
+  input above, and nothing for a plain `c`.
+
 - **Proposed patch:** with this change the trace says `$0=l[0]`.
 
   ```text
@@ -396,6 +408,15 @@ Some minor items and the typos in `mmix-doc.w` follow the numbered bugs.
           CSP   $3,$4,$4
           TRAP  0,Halt,0
   ```
+
+- **Build dependence:** with Knuth's flags (`-O0`) the `b=` field appears
+  with every compiler tried: `b=110` with clang on macOS and Linux,
+  `b=1600000001` with GCC on Linux arm64, and `b=433dc000000000` with GCC
+  on x86-64. With `-O2` it disappears with every compiler, because the
+  garbage happens to be 0 there. Valgrind on a GCC `-g -fPIE` build
+  reports "Conditional jump or move depends on uninitialised value(s)" in
+  `print_control_block` (line 788), with the value created by a stack
+  allocation in `specval` (line 1919).
 
 - **Proposed patch:** with this change the `b=` field disappears.
 
