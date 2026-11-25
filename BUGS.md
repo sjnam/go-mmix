@@ -48,7 +48,7 @@ to a copy of the sources and checked:
 | 7 | mmixal | a label-only last line reuses the previous line | function |
 | 8 | mmotype | wrong expected value in the `lop_end` message | output |
 | 9 | mmotype | `printf("%s",NULL)` on a corrupt file | UB |
-| 10 | mmmix | `mmmix -s` never halts when built with `-O2` | UB |
+| 10 | mmmix | `mmmix -s` never halts when built with clang `-O1` or higher | UB |
 | 11 | mmix-pipe | `specval` returns an uninitialized value | output |
 | 12 | mmix-pipe | shift by a negative amount | UB |
 
@@ -319,20 +319,52 @@ Some minor items and the typos in `mmix-doc.w` follow the numbered bugs.
   @z
   ```
 
-### 10. mmmix: `mmmix -s` never halts when built with `-O2`
+### 10. mmmix: `mmmix -s` never halts when built with clang `-O1` or higher
 
-- **Where:** `mmix-pipe.w` §10 (lines 226–234, `MMIX_silent`) and §304
-  (line 5443).
-- **Symptom:** built with clang `-O2`, `mmmix -s` never halts, whatever the
-  program. The same sources built with Knuth's flags (`-g -fPIE`) work. The
-  local variable `octa breakpoint` of `MMIX_silent` is never initialized, but
-  line 5443 compares it with `inst_ptr` in every cycle. The optimizer
-  apparently exploits this undefined behavior.
-- **Reproduce:** after `mmix -Dhello.mmb hello`, the command
-  `timeout 10 mmmix-O2 -s plain.mmconfig hello.mmb` prints nothing and times
-  out. The online mode of the same build (`10000`) halts at time 405.
+- **Where:** `mmix-pipe.w` §10 (lines 226–234, `MMIX_silent`), §301 (the
+  fetch loop, lines 5401–5414) and §304 (line 5443).
+- **Symptom:** built with clang at `-O1` or higher, `mmmix -s` never halts,
+  whatever the program. Nothing is printed, not even the program's own
+  output. The local variable `octa breakpoint` of `MMIX_silent` is never
+  initialized, and its address is never taken, so reading it is undefined.
+  Line 5443 compares it with `inst_ptr`. Clang treats the result of this
+  comparison as an undefined value and decides that any path that branches
+  on it can never run. It therefore deletes the body of the fetch loop
+  after `if (new_tail==head) break;`, including all of §304. This happens
+  although `breakpoint_hit` is never read in `MMIX_silent`.
+- **What the debugger shows** (Apple clang, `-O2 -g`, with lldb):
+  - Lines 5406–5442 are present in `MMIX_run` but absent from
+    `MMIX_silent`. Only the `wait(1)` of line 5415 remains.
+  - The fetch buffer stays empty (`head==tail`), so no instruction is ever
+    issued.
+  - The test `if (halted)` of line 232 is still there and runs on every
+    cycle. But line 6581, `if (!zz) halted=true;`, is never reached, and
+    `mmix_fputs` is never called. So `halted` never becomes true.
+- **Which compilers:**
+
+  | Compiler | Platform | `-O0` | `-O1`, `-O2`, `-O3`, `-Os` |
+  | --- | --- | --- | --- |
+  | Apple clang 21.0 | macOS, arm64 | halts | hangs |
+  | Debian clang 19.1 | Linux, arm64 | halts | hangs |
+  | GCC 9.5, 12.5, 16.2 | Linux, arm64 | halts | halts |
+  | GCC 16.2 | Linux, x86-64 | halts | halts |
+
+  The problem is specific to clang/LLVM, not to macOS. GCC is safe
+  because it sees that `breakpoint_hit` is never used in `MMIX_silent`
+  (with `-Wall` it warns "variable 'breakpoint_hit' set but not used") and
+  removes the comparison altogether. Neither compiler warns that
+  `breakpoint` is uninitialized, even with `-Wall`. The unchanged sources
+  built with clang `-O2 -ftrivial-auto-var-init=pattern` halt, which
+  confirms that the uninitialized variable is the cause. Knuth's own flags
+  (`-g -fPIE`) mean `-O0`, so the default build works.
+- **Reproduce:** after `mmix -Dhello.mmb hello`, build `mmmix` with
+  `clang -O2` and run `timeout 10 mmmix -s plain.mmconfig hello.mmb`. It
+  prints nothing and times out. The online mode of the same build
+  (`10000`) halts at time 405, because `MMIX_run` receives `breakpoint` as
+  a parameter.
 - **Proposed patch:** give `breakpoint` a value that can never be fetched.
-  With this change the `-O2` build prints "hello, world" and halts.
+  With this change the clang `-O1`, `-O2`, `-O3` and `-Os` builds all print
+  "hello, world" and halt.
 
   ```text
   @x [10] l.228
