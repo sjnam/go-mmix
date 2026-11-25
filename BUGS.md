@@ -416,7 +416,10 @@ Some minor items and the typos in `mmix-doc.w` follow the numbered bugs.
   garbage happens to be 0 there. Valgrind on a GCC `-g -fPIE` build
   reports "Conditional jump or move depends on uninitialised value(s)" in
   `print_control_block` (line 788), with the value created by a stack
-  allocation in `specval` (line 1919).
+  allocation in `specval` (line 1919). All eleven of its reports (in
+  eight contexts) come from that allocation. Without the `v1` command
+  valgrind reports no errors at all, so the garbage seems to reach only
+  the diagnostic output, not the simulation itself.
 
 - **Proposed patch:** with this change the `b=` field disappears.
 
